@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <title>Surya Arjun — Strategies</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      /* ── Surya Arjun Dawn ── */
+      --bg: #fbf7f0;
+      --surface: #ffffff;
+      --border: #e8ddd0;
+      --text: #1a0f00;
+      --muted: #8b7355;
+      --accent: #f5a623;
+      --accent-hover: #d4870a;
+      --green: #1a7a4a;
+      --red: #c0392b;
+      --yellow: #d4870a;
+      --purple: #7c3aed;
+      --orange: #c47a00;
+      --neon-glow: 0 4px 12px rgba(245,166,35,.1);
+      --green-glow: 0 4px 12px rgba(26,122,74,.1);
+      --red-glow: 0 4px 12px rgba(192,57,43,.1);
+    }
+
+    html, body { max-width: 100%; overflow-x: hidden; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; background-image: radial-gradient(circle at top right, rgba(245,166,35,.06), transparent 600px); }
+
+    header { background: #fff; border-bottom: 2px solid #f5a623; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(245,166,35,.1); }
+    header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; display: flex; align-items: center; gap: 8px; }
+    header h1 span { color: var(--accent); font-weight: 900; }
+    
+    .header-right { display: flex; align-items: center; gap: 14px; }
+    .container { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+    
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.05); transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; position: relative; overflow: hidden; }
+    .card:hover { border-color: rgba(37, 99, 235, 0.2); box-shadow: 0 12px 20px -4px rgba(15, 23, 42, 0.08); }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .card-title { font-size: 16px; font-weight: 700; color: var(--text); }
+    .card-desc { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+    
+    .pill { display: inline-flex; align-items: center; padding: 3px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
+    .pill-green  { background: rgba(16, 185, 129, 0.1);  color: var(--green);  border: 1px solid rgba(16, 185, 129, 0.2); }
+    .pill-blue   { background: rgba(37, 99, 235, 0.1);   color: var(--accent);  border: 1px solid rgba(37, 99, 235, 0.2); }
+    .pill-purple { background: rgba(99, 102, 241, 0.1);  color: var(--purple);  border: 1px solid rgba(99, 102, 241, 0.2); }
+    
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 20px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; font-size: 13px; font-weight: 700; text-decoration: none; transition: all 0.15s ease; background: var(--surface); color: var(--text); gap: 6px; }
+    .btn:hover { transform: translateY(-1px); background: #f8fafc; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .btn-save { background: var(--accent); color: #ffffff; border-color: transparent; box-shadow: var(--neon-glow); }
+    .btn-save:hover { background: var(--accent-hover); }
+    
+    /* Toggle Switch styles */
+    .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.06); border: 1px solid var(--border); transition: .3s; border-radius: 24px; }
+    .slider::before { position: absolute; content: ""; height: 16px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--green); border-color: transparent; box-shadow: var(--green-glow); }
+    input:checked + .slider::before { transform: translateX(20px); }
+    
+    .feature-list { margin-top: 12px; padding-left: 18px; font-size: 12px; color: var(--muted); }
+    .feature-list li { margin-bottom: 4px; }
+    #toast { display: none; position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--green); padding: 12px 20px; border-radius: 6px; font-weight: 600; font-size: 13px; z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+    
+    /* Left Navigation Sidebar Layout */
+    .layout-wrapper { display: flex; min-height: calc(100vh - 70px); max-width: 100%; overflow-x: hidden; }
+    .sidebar { width: 240px; background: #ffffff; border-right: 1px solid var(--border); padding: 24px 16px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+    .sidebar-title { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; padding: 0 12px 8px; border-bottom: 1px solid rgba(0,0,0,0.04); margin-bottom: 8px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; color: var(--muted); text-decoration: none; font-weight: 600; transition: all 0.15s ease; border: 1px solid transparent; }
+    .nav-item:hover { color: var(--text); background: rgba(0,0,0,0.02); }
+    .nav-item.active { background: rgba(37, 99, 235, 0.08); color: var(--accent); border-color: rgba(37, 99, 235, 0.15); box-shadow: 0 0 12px rgba(37,99,235,0.05); }
+    .nav-icon { font-size: 16px; }
+    .main-content { flex-grow: 1; min-width: 0; overflow-x: hidden; }
+    @media(max-width:960px){
+      .layout-wrapper { flex-direction: column; }
+      .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); padding: 12px 24px; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 12px; }
+      .sidebar-title { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📈 <span>SENSEX</span> Auto-Trader</h1>
+  <div class="header-right">
+  </div>
+</header>
+
+<div class="layout-wrapper">
+  <aside class="sidebar">
+    <div class="sidebar-title">Navigation</div>
+    <a href="/" class="nav-item">
+      <span class="nav-icon">📊</span> Dashboard
+    </a>
+    <a href="/strategies" class="nav-item active">
+      <span class="nav-icon">⚙️</span> Toggle Strategies
+    </a>
+  </aside>
+  <main class="main-content">
+    <div class="container">
+  <div style="margin-bottom:24px;">
+    <h2 style="font-size:20px;font-weight:600;margin-bottom:6px;">Toggle Strategy Configurations</h2>
+    <p style="color:var(--muted);font-size:13px;">Turn active strategies on or off. Whichever strategies are toggled <strong>ON</strong> will simultaneously generate signals and take real trades based on your dropdown profile or environment config.</p>
+  </div>
+
+  <!-- Standard Card -->
+  <div class="card">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="card-title">📊 Standard EMA Crossover</span>
+        <span class="pill pill-blue">Active All Day</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="chk-ENABLE_EMA_STRATEGY" onchange="toggleStrategy('ENABLE_EMA_STRATEGY', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-desc">Evaluates 5-minute EMA9 / EMA21 alignment, close breakout, and 5-minute trend confirmation. Active from 09:15 to 15:00 IST.</div>
+    <ul class="feature-list">
+      <li>5m Close &gt; EMA21 (or &lt; for Put)</li>
+      <li>5m EMA9 &gt; EMA21 (or &lt; for Put)</li>
+      <li>5m Close &gt; Previous Candle High (or &lt; Low for Put)</li>
+      <li>5m Trend Confirmation check</li>
+    </ul>
+  </div>
+
+  <!-- ORB Card -->
+  <div class="card">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="card-title">⚡ Opening Range Breakout (ORB)</span>
+        <span class="pill pill-green">5M High/Low</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="chk-ENABLE_ORB_STRATEGY" onchange="toggleStrategy('ENABLE_ORB_STRATEGY', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-desc">Fires immediately when the 5-minute candle close crosses the opening 5-minute range (09:15–09:20). Highly effective for morning momentum.</div>
+    <ul class="feature-list">
+      <li>CE: Close(0) crosses ABOVE Opening Range High</li>
+      <li>PE: Close(0) crosses BELOW Opening Range Low</li>
+      <li>Ensures instant breakouts right after the opening candle closes</li>
+    </ul>
+  </div>
+
+  <!-- Time Range Breakout (TRB) Card -->
+  <div class="card">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="card-title">⏰ Time Range Breakout (TRB)</span>
+        <span class="pill pill-yellow">15M High/Low Breakout</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="chk-ENABLE_TRB_STRATEGY" onchange="toggleStrategy('ENABLE_TRB_STRATEGY', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-desc">Fires when the completed 5-minute candle close crosses the High or Low of the 15-minute anchor candle formed between 09:45 AM and 10:00 AM.</div>
+    <ul class="feature-list">
+      <li>Anchor Candle: <span id="trb-start-time">09:45</span> (<span id="trb-duration">15</span>-minute interval)</li>
+      <li>CE_TRB: 5m Close crosses ABOVE 15m high boundary</li>
+      <li>PE_TRB: 5m Close crosses BELOW 15m low boundary</li>
+      <li>Time Guard: Evaluation is strictly blocked before 10:00 AM IST</li>
+    </ul>
+  </div>
+
+  <!-- Order Block (OB) Card -->
+  <div class="card">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="card-title">&#x1F9F1; Order Block (OB)</span>
+        <span class="pill pill-purple">Price Zone Re-entry</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="chk-ENABLE_OB_STRATEGY" onchange="toggleStrategy('ENABLE_OB_STRATEGY', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-desc">Fires CE_OB / PE_OB when the 5m candle close enters a valid (non-breaker) bullish or bearish order block zone detected on the 5m chart. Logic mirrors the Flux Charts "Volumized Order Blocks" Pine Script indicator.</div>
+    <ul class="feature-list">
+      <li>Swing detection: ATR-capped pivot highs/lows (swing length: <span id="ob-swing-len">10</span>)</li>
+      <li>CE_OB: close inside a valid bullish OB (formed when price crossed above a swing high)</li>
+      <li>PE_OB: close inside a valid bearish OB (formed when price crossed below a swing low)</li>
+      <li>Invalidation: <span id="ob-invalidation">Wick</span> method &mdash; OB becomes a breaker when pierced, then deleted</li>
+      <li>Max OB zones tracked: <span id="ob-max-blocks">3</span> per side &mdash; OBs larger than ATR &times; <span id="ob-atr-mult">3.5</span> discarded</li>
+    </ul>
+  </div>
+
+  <!-- Momentum Card -->
+  <div class="card">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="card-title">🚀 Momentum Phase 2</span>
+        <span class="pill pill-purple">Afternoon Boost</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="chk-ENABLE_MOMENTUM_PHASE" onchange="toggleStrategy('ENABLE_MOMENTUM_PHASE', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-desc">Fires during the afternoon breakout window (13:30–14:30) on large-body breakout candles, even if the price does not break the previous high.</div>
+    <ul class="feature-list">
+      <li>Candle body size &ge; minimum required points (default 40.0)</li>
+      <li>5m Close &gt; EMA9, and EMA9 &gt; EMA21</li>
+      <li>5m Trend Confirmation</li>
+    </ul>
+  </div>
+
+  <!-- VWAP Retest Card -->
+  <div class="card">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="card-title">🌊 VWAP Retest</span>
+        <span class="pill" style="background:rgba(20,184,166,0.1);color:#0d9488;border:1px solid rgba(20,184,166,0.2);">Intraday Mean Reversion</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="chk-ENABLE_VWAP_STRATEGY" onchange="toggleStrategy('ENABLE_VWAP_STRATEGY', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-desc">Fires CE_VWAP / PE_VWAP when price pulls back to VWAP and a 5-minute candle closes back on the right side with momentum. Institutions use VWAP as a benchmark — large orders cluster around it.</div>
+    <ul class="feature-list">
+      <li>CE_VWAP: At least one of the last <span id="vwap-lookback">3</span> candles closed BELOW VWAP (retest dip)</li>
+      <li>CE_VWAP: Current 5m close &gt; VWAP</li>
+      <li>CE_VWAP: Current 5m close &gt; previous candle high (momentum confirmation)</li>
+      <li>PE_VWAP: Mirror — retest pop above VWAP then close back below with momentum</li>
+      <li>Min bounce distance above/below VWAP: <span id="vwap-bounce">0</span> pts</li>
+    </ul>
+  </div>
+
+  <!-- PDHL Card -->
+  <div class="card">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="card-title">📅 Previous Day High / Low (PDHL) Breakout</span>
+        <span class="pill" style="background:rgba(249,115,22,0.1);color:#ea580c;border:1px solid rgba(249,115,22,0.2);">Key Level Breakout</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="chk-ENABLE_PDHL_STRATEGY" onchange="toggleStrategy('ENABLE_PDHL_STRATEGY', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-desc">Fires CE_PDHL / PE_PDHL when the 5-minute candle closes beyond the previous day's high or low. These are widely watched institutional levels with strong breakout follow-through.</div>
+    <ul class="feature-list">
+      <li>CE_PDHL: Previous candle closed at/below PDH — fresh crossover (not continuation)</li>
+      <li>CE_PDHL: Current 5m close &gt; PDH + <span id="pdhl-buffer">0</span> pts buffer</li>
+      <li>CE_PDHL: Current 5m close &gt; previous candle high (momentum confirmation)</li>
+      <li>PE_PDHL: Mirror — fresh close below PDL with momentum confirmation</li>
+    </ul>
+  </div>
+
+  <!-- NATR Trailing Stop Card -->
+  <div class="card">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="card-title">&#x1F4C9; NATR Trailing Stop</span>
+        <span class="pill" style="background:rgba(16,185,129,0.1);color:#059669;border:1px solid rgba(16,185,129,0.2);">ATR Trend Flip</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="chk-ENABLE_NATR_STRATEGY" onchange="toggleStrategy('ENABLE_NATR_STRATEGY', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-desc">Fires CE_NATR / PE_NATR when the 5-minute close crosses the dynamic ATR trailing stop line. Mirrors the "ATR 5 Min Index Study" (NATRPeriod=<span id="natr-period">21</span>, NATRMultip=<span id="natr-mult">3.0</span>). The stop ratchets up in uptrends and down in downtrends — a crossover signals a trend flip.</div>
+    <ul class="feature-list">
+      <li>ATR Trailing Stop = ATR(<span id="natr-period2">21</span>) x <span id="natr-mult2">3.0</span> — ratchets with price</li>
+      <li>CE_NATR: previous close was at/below stop AND current close crosses above stop</li>
+      <li>PE_NATR: previous close was at/above stop AND current close crosses below stop</li>
+      <li>Minimum <span id="natr-period3">21</span> + 3 candles required to seed the ATR</li>
+    </ul>
+  </div>
+
+  <!-- ATR Copilot Card -->
+  <div class="card">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="card-title">&#x1F4A1; ATR Copilot</span>
+        <span class="pill" style="background:rgba(139,92,246,0.1);color:#7c3aed;border:1px solid rgba(139,92,246,0.2);">Band Breakout</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="chk-ENABLE_ATR_COPILOT_STRATEGY" onchange="toggleStrategy('ENABLE_ATR_COPILOT_STRATEGY', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-desc">Fires CE_ATR / PE_ATR when the 5-minute candle closes outside the ATR noise band for the first time. Bands = EMA(<span id="atr-cop-ema">21</span>) &plusmn; ATR(<span id="atr-cop-period">5</span>) &times; <span id="atr-cop-mult">3.0</span>. Price must have been inside the band on the previous candle (fresh breakout only — no continuation entries).</div>
+    <ul class="feature-list">
+      <li>CE_ATR: previous close &le; upper band AND current close &gt; upper band</li>
+      <li>PE_ATR: previous close &ge; lower band AND current close &lt; lower band</li>
+      <li>No-trade zone: price between lower and upper band (noise)</li>
+      <li>R:R gate &mdash; CE requires &ge; <span id="atr-cop-long-rr">2.0</span>, PE requires &ge; <span id="atr-cop-rr">1.2</span></li>
+      <li>Minimum <span id="atr-cop-ema2">21</span> + <span id="atr-cop-period2">5</span> + 2 candles required to seed indicators</li>
+    </ul>
+  </div>
+
+  <div style="text-align:right;">
+    <button class="btn btn-save" onclick="saveAll()">Save Configurations</button>
+  </div>
+</div>
+</main>
+</div>
+
+<div id="toast">Settings updated successfully!</div>
+
+<script>
+  let _config = {};
+
+  async function loadConfig() {
+    try {
+      const res = await fetch('/api/env');
+      _config = await res.json();
+      
+      document.getElementById('chk-ENABLE_EMA_STRATEGY').checked    = (_config.ENABLE_EMA_STRATEGY    === 'true');
+      document.getElementById('chk-ENABLE_ORB_STRATEGY').checked    = (_config.ENABLE_ORB_STRATEGY    === 'true');
+      document.getElementById('chk-ENABLE_OB_STRATEGY').checked     = (_config.ENABLE_OB_STRATEGY     === 'true');
+      document.getElementById('chk-ENABLE_MOMENTUM_PHASE').checked  = (_config.ENABLE_MOMENTUM_PHASE  === 'true');
+      document.getElementById('chk-ENABLE_TRB_STRATEGY').checked    = (_config.ENABLE_TRB_STRATEGY    === 'true');
+      document.getElementById('chk-ENABLE_VWAP_STRATEGY').checked   = (_config.ENABLE_VWAP_STRATEGY   === 'true');
+      document.getElementById('chk-ENABLE_PDHL_STRATEGY').checked   = (_config.ENABLE_PDHL_STRATEGY   === 'true');
+      document.getElementById('chk-ENABLE_NATR_STRATEGY').checked          = (_config.ENABLE_NATR_STRATEGY          === 'true');
+      document.getElementById('chk-ENABLE_ATR_COPILOT_STRATEGY').checked   = (_config.ENABLE_ATR_COPILOT_STRATEGY   === 'true');
+
+      // Populate OB parameter display values
+      if (_config.OB_SWING_LENGTH)  document.getElementById('ob-swing-len').textContent    = _config.OB_SWING_LENGTH;
+      if (_config.OB_INVALIDATION)  document.getElementById('ob-invalidation').textContent  = _config.OB_INVALIDATION;
+      if (_config.OB_MAX_BLOCKS)    document.getElementById('ob-max-blocks').textContent    = _config.OB_MAX_BLOCKS;
+      if (_config.OB_MAX_ATR_MULT)  document.getElementById('ob-atr-mult').textContent      = _config.OB_MAX_ATR_MULT;
+
+      // Populate TRB parameter display values
+      if (_config.TRB_CANDLE_START_TIME)     document.getElementById('trb-start-time').textContent = _config.TRB_CANDLE_START_TIME;
+      if (_config.TRB_CANDLE_DURATION_MINS)  document.getElementById('trb-duration').textContent   = _config.TRB_CANDLE_DURATION_MINS;
+
+      // Populate VWAP parameter display values
+      if (_config.VWAP_RETEST_LOOKBACK)  document.getElementById('vwap-lookback').textContent = _config.VWAP_RETEST_LOOKBACK;
+      if (_config.VWAP_MIN_BOUNCE_PTS)   document.getElementById('vwap-bounce').textContent   = _config.VWAP_MIN_BOUNCE_PTS;
+
+      // Populate PDHL parameter display values
+      if (_config.PDHL_BUFFER_PTS)  document.getElementById('pdhl-buffer').textContent = _config.PDHL_BUFFER_PTS;
+
+      // Populate NATR parameter display values
+      if (_config.NATR_PERIOD) {
+        ['natr-period','natr-period2','natr-period3'].forEach(id => document.getElementById(id).textContent = _config.NATR_PERIOD);
+      }
+      if (_config.NATR_MULT) {
+        ['natr-mult','natr-mult2'].forEach(id => document.getElementById(id).textContent = _config.NATR_MULT);
+      }
+
+      // Populate ATR Copilot parameter display values
+      if (_config.ATR_COPILOT_PERIOD) {
+        ['atr-cop-period','atr-cop-period2'].forEach(id => document.getElementById(id).textContent = _config.ATR_COPILOT_PERIOD);
+      }
+      if (_config.ATR_COPILOT_EMA_PERIOD) {
+        ['atr-cop-ema','atr-cop-ema2'].forEach(id => document.getElementById(id).textContent = _config.ATR_COPILOT_EMA_PERIOD);
+      }
+      if (_config.ATR_COPILOT_BAND_MULT)    document.getElementById('atr-cop-mult').textContent     = _config.ATR_COPILOT_BAND_MULT;
+      if (_config.ATR_COPILOT_MIN_RR)       document.getElementById('atr-cop-rr').textContent       = _config.ATR_COPILOT_MIN_RR;
+      if (_config.ATR_COPILOT_LONG_MIN_RR)  document.getElementById('atr-cop-long-rr').textContent  = _config.ATR_COPILOT_LONG_MIN_RR;
+    } catch(err) {
+      console.error("Failed to load configs", err);
+    }
+  }
+
+  function toggleStrategy(key, val) {
+    _config[key] = val ? 'true' : 'false';
+  }
+
+  async function saveAll() {
+    // Read directly from checkbox state — never rely on _config cache which
+    // may not reflect the current toggle position.
+    const payload = {
+      ENABLE_EMA_STRATEGY:   document.getElementById('chk-ENABLE_EMA_STRATEGY').checked   ? 'true' : 'false',
+      ENABLE_ORB_STRATEGY:   document.getElementById('chk-ENABLE_ORB_STRATEGY').checked   ? 'true' : 'false',
+      ENABLE_OB_STRATEGY:    document.getElementById('chk-ENABLE_OB_STRATEGY').checked    ? 'true' : 'false',
+      ENABLE_MOMENTUM_PHASE: document.getElementById('chk-ENABLE_MOMENTUM_PHASE').checked ? 'true' : 'false',
+      ENABLE_TRB_STRATEGY:   document.getElementById('chk-ENABLE_TRB_STRATEGY').checked   ? 'true' : 'false',
+      ENABLE_VWAP_STRATEGY:  document.getElementById('chk-ENABLE_VWAP_STRATEGY').checked  ? 'true' : 'false',
+      ENABLE_PDHL_STRATEGY:  document.getElementById('chk-ENABLE_PDHL_STRATEGY').checked  ? 'true' : 'false',
+      ENABLE_NATR_STRATEGY:         document.getElementById('chk-ENABLE_NATR_STRATEGY').checked         ? 'true' : 'false',
+      ENABLE_ATR_COPILOT_STRATEGY:  document.getElementById('chk-ENABLE_ATR_COPILOT_STRATEGY').checked  ? 'true' : 'false',
+    };
+    try {
+      const res = await fetch('/api/env', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      // Read body as text first — avoids a crash if the server returns HTML
+      const text = await res.text();
+      if (!res.ok) {
+        alert('Save failed: server returned HTTP ' + res.status + '.\n\n' + text.substring(0, 300));
+        return;
+      }
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch(_) {
+        alert('Save failed: server returned unexpected response (not JSON).\n\n' + text.substring(0, 300));
+        return;
+      }
+      if (data.ok) {
+        showToast('Settings saved. Restart the bot for changes to take effect.');
+      } else {
+        alert('Save failed: ' + (data.error || 'unknown error'));
+      }
+    } catch(err) {
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        alert('Save failed: could not reach the server. Make sure the bot server is running on port 5000.');
+      } else {
+        alert('Save failed: ' + err.message);
+      }
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg || 'Settings updated successfully!';
+    t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 4000);
+  }
+
+  window.onload = loadConfig;
+</script>
+</body>
+</html>

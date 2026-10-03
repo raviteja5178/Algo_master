@@ -1,0 +1,520 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sep 30, 2026 — Full Day Analysis</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:13px;line-height:1.6;background:#fff;color:#1f2328}
+.wrap{max-width:800px;margin:0 auto;padding:28px 18px 48px}
+h1{font-size:19px;font-weight:700;margin-bottom:3px}
+.sub{color:#57606a;font-size:12px;margin-bottom:22px}
+h2{font-size:14px;font-weight:700;margin:24px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:5px}
+h3{font-size:12px;font-weight:700;color:#57606a;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 5px}
+
+/* Summary row */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
+.card{background:#f7f8fa;border:1px solid #e5e7eb;border-radius:5px;padding:10px 12px;text-align:center}
+.card .n{font-size:22px;font-weight:700}
+.card .l{font-size:11px;color:#57606a;margin-top:1px}
+.green .n{color:#1a7f37} .red .n{color:#cf222e} .orange .n{color:#bc4c00} .purple .n{color:#7c5cd8}
+
+/* Tags */
+.t{display:inline-block;padding:1px 6px;border-radius:9px;font-size:10px;font-weight:700;white-space:nowrap}
+.t.ce{background:#ddf4ff;color:#0969da}
+.t.pe{background:#fff0f0;color:#cf222e}
+.t.filled{background:#dafbe1;color:#1a7f37}
+.t.ext{background:#f1f8ff;color:#0969da;border:1px solid #b6d4fe}
+.t.sl{background:#fff3cd;color:#9a6700}
+.t.blk{background:#ffebe9;color:#cf222e}
+.t.smte{background:#f3f0ff;color:#7c5cd8}
+.t.trk{background:#fffce8;color:#9a6700;border:1px solid #f5e093}
+.t.bypass{background:#e6f4ea;color:#1a7f37}
+.t.noentry{background:#f6f8fa;color:#57606a;border:1px solid #d0d7de}
+.t.stale{background:#fff8c5;color:#9a6700}
+
+/* Main timeline table */
+table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}
+th{background:#f7f8fa;padding:5px 8px;font-weight:600;border-bottom:2px solid #e5e7eb;color:#57606a;font-size:10px;text-transform:uppercase;letter-spacing:.04em;text-align:left}
+td{padding:5px 8px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+tr.trade-row td{background:#f7fff8}
+tr.block-row td{background:#fff8f8}
+tr.ext-row td{background:#f0f7ff}
+tr.stale-row td{background:#fffce8}
+
+/* Key */
+.key{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.note{background:#f7f8fa;border-left:3px solid #3b82d4;padding:7px 10px;font-size:11px;color:#57606a;border-radius:0 4px 4px 0;margin-bottom:12px}
+.note.warn{border-color:#bc4c00}
+.note.ok{border-color:#1a7f37}
+
+/* PnL */
+.pos{color:#1a7f37;font-weight:600}.neg{color:#cf222e;font-weight:600}.zer{color:#57606a}
+
+/* SL detail box */
+.sl-box{background:#fff3cd;border:1px solid #f5e093;border-radius:4px;padding:6px 10px;font-size:11px;margin-top:6px}
+.sl-box b{color:#9a6700}
+
+footer{margin-top:36px;padding-top:10px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#57606a}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Sep 30, 2026 — Full Day Analysis · Shadow (Paper) Mode</h1>
+<p class="sub">bot.log lines 13291–13989 · PDH=72684.90 · PDL=72064.00 · Regime=<strong>CHOPPY</strong> (AI failed → fallback) · Expiry used: 2026-10-01</p>
+
+
+<div class="cards">
+  <div class="card green"><div class="n">10</div><div class="l">Shadow Orders Placed</div></div>
+  <div class="card red"><div class="n">20</div><div class="l">All Blocks (smart + min-prem + EOD)</div></div>
+  <div class="card orange"><div class="n">24</div><div class="l">Total Raw Signals Fired</div></div>
+  <div class="card purple"><div class="n">-637</div><div class="l">Net PnL (₹) Today</div></div>
+</div>
+
+<div class="note warn">⚠️ All 10 fills were PAPER (shadow mode). Every single fill returned PnL=0 via EXTERNAL_CLOSE or SL-at-exchange except the final <strong>SENSEX26O0173000CE</strong> which was stale-auto-closed for <strong>-₹637</strong>. The bot also observed 2 live manual orders via WebSocket (SENSEX26O0173600CE @ ₹53.15 and SENSEX26O0173000CE @ ₹149.9) placed externally by user.</div>
+
+
+<h2>1 · Shadow Orders Placed (Chronological — all PAPER)</h2>
+<p class="note ok">These are the 10 trades the bot executed in shadow mode. Each row shows: signal source → option selected → entry/SL/target → exit outcome.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th><th>Time</th><th>Strategy Signal</th><th>Smart Entry Gate</th><th>Symbol (ATM)</th><th>Entry</th><th>SL</th><th>Target</th><th>Exit Time</th><th>Exit Price</th><th>PnL</th><th>Exit Reason</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="trade-row">
+      <td>1</td>
+      <td><b>09:20</b></td>
+      <td><span class="t ce">CE_VWAP</span><br /><small>close=72,614 &gt; vwap=72,551</small></td>
+      <td><span class="t filled">PASSED</span><br /><small>No smart filter check (first entry)</small></td>
+      <td>SENSEX26O0172600CE<br /><small>strike 72600, expiry Oct-01</small></td>
+      <td>371.10</td>
+      <td>296.90<br /><small>(20% SL)</small></td>
+      <td>501.00</td>
+      <td>09:20:07</td>
+      <td class="zer">371.10</td>
+      <td class="zer">0</td>
+      <td><span class="t ext">EXTERNAL_CLOSE</span><br /><small>Broker qty=0 within 4s of fill</small></td>
+    </tr>
+    <tr class="trade-row">
+      <td>2</td>
+      <td><b>09:25</b></td>
+      <td><span class="t ce">CE_VWAP</span><br /><small>close=72,722 &gt; vwap=72,611</small></td>
+      <td><span class="t bypass">SQUEEZE BYPASS</span><br /><small>3 consecutive up candles</small></td>
+      <td>SENSEX26O0172700CE<br /><small>strike 72700, expiry Oct-01</small></td>
+      <td>350.20</td>
+      <td>280.15<br /><small>(20% SL)</small></td>
+      <td>472.75</td>
+      <td>09:25:07</td>
+      <td class="zer">350.20</td>
+      <td class="zer">0</td>
+      <td><span class="t ext">EXTERNAL_CLOSE</span><br /><small>Broker qty=0 within 4s of fill</small></td>
+    </tr>
+    <tr class="trade-row">
+      <td>3</td>
+      <td><b>09:45</b></td>
+      <td><span class="t ce">CE_VWAP</span><br /><small>close=72,715 &gt; vwap=72,649</small></td>
+      <td><span class="t filled">PASSED</span><br /><small>No block logged</small></td>
+      <td>SENSEX26O0172700CE<br /><small>strike 72700, expiry Oct-01</small></td>
+      <td>334.00</td>
+      <td>267.20<br /><small>(20% SL)</small></td>
+      <td>450.90</td>
+      <td>09:45:08</td>
+      <td class="zer">334.00</td>
+      <td class="zer">0</td>
+      <td><span class="t ext">EXTERNAL_CLOSE</span><br /><small>Broker qty=0 within 4s of fill</small></td>
+    </tr>
+    <tr class="trade-row">
+      <td>4</td>
+      <td><b>10:10</b></td>
+      <td><span class="t ce">CE_TRB</span><br /><small>close=72,802 (TRB breakout)</small></td>
+      <td><span class="t bypass">SQUEEZE BYPASS</span><br /><small>3 consecutive up candles</small></td>
+      <td>SENSEX26O0172800CE<br /><small>strike 72800, expiry Oct-01</small></td>
+      <td>302.75</td>
+      <td>242.20<br /><small>(20% SL)</small></td>
+      <td>408.70</td>
+      <td>10:10:08</td>
+      <td class="zer">302.75</td>
+      <td class="zer">0</td>
+      <td><span class="t ext">EXTERNAL_CLOSE</span><br /><small>Broker qty=0 within 5s of fill</small></td>
+    </tr>
+    <tr class="trade-row">
+      <td>5</td>
+      <td><b>10:15</b></td>
+      <td><span class="t ce">CE</span><br /><small>close=72,840 (ORB/generic CE)</small></td>
+      <td><span class="t bypass">SQUEEZE BYPASS</span><br /><small>3 consecutive up candles</small></td>
+      <td>SENSEX26O0172800CE<br /><small>strike 72800, expiry Oct-01</small></td>
+      <td>334.00</td>
+      <td>267.20<br /><small>(20% SL)</small></td>
+      <td>450.90</td>
+      <td>10:15:08</td>
+      <td class="zer">334.00</td>
+      <td class="zer">0</td>
+      <td><span class="t ext">EXTERNAL_CLOSE</span><br /><small>Broker qty=0 within 4s of fill</small></td>
+    </tr>
+    <tr class="trade-row">
+      <td>6</td>
+      <td><b>11:30</b></td>
+      <td><span class="t ce">CE_VWAP</span><br /><small>close=72,714 &gt; vwap=72,704</small></td>
+      <td><span class="t filled">PASSED</span><br /><small>No smart filter block</small></td>
+      <td>SENSEX26O0172700CE<br /><small>strike 72700, expiry Oct-01</small></td>
+      <td>300.00</td>
+      <td>240.00<br /><small>(20% SL)</small></td>
+      <td>405.00</td>
+      <td>11:39:37</td>
+      <td class="zer">315.00</td>
+      <td class="zer">0<br /><small>SL_FILLED_AT_EXCHANGE</small></td>
+      <td><span class="t sl">TRAILING SL HIT</span><br /><small>BE activated @ 332, trail moved to 315, hit at ltp=314</small></td>
+    </tr>
+    <tr class="trade-row">
+      <td>7</td>
+      <td><b>12:35</b></td>
+      <td><span class="t ce">CE_VWAP</span><br /><small>(signal from 12:30 candle)</small></td>
+      <td><span class="t filled">PASSED</span></td>
+      <td>SENSEX26O0172900CE<br /><small>strike 72900, expiry Oct-01</small></td>
+      <td>326.45</td>
+      <td>~261<br /><small>(20% SL)</small></td>
+      <td>—</td>
+      <td>12:41:30</td>
+      <td class="zer">326.45</td>
+      <td class="zer">0</td>
+      <td><span class="t sl">SL_FILLED_AT_EXCHANGE</span></td>
+    </tr>
+    <tr class="trade-row">
+      <td>8</td>
+      <td><b>12:50</b></td>
+      <td><span class="t ce">CE_VWAP</span></td>
+      <td><span class="t filled">PASSED</span></td>
+      <td>SENSEX26O0173000CE<br /><small>strike 73000, expiry Oct-01</small></td>
+      <td>331.85</td>
+      <td>265.50<br /><small>(20% SL)</small></td>
+      <td>448.00</td>
+      <td>13:36:51<br /><small>(next restart)</small></td>
+      <td class="neg">300.00<br /><small>(stale-auto)</small></td>
+      <td class="neg">-637</td>
+      <td><span class="t stale">STALE_TRADE_AUTO_CLOSED</span><br /><small>Bot restarted, found pos=0 at broker</small></td>
+    </tr>
+    <tr class="trade-row">
+      <td>9</td>
+      <td><b>14:10</b></td>
+      <td><span class="t pe">PE_VWAP</span><br /><small>close=72,784 &lt; vwap=72,810</small></td>
+      <td><span class="t filled">PASSED</span></td>
+      <td>SENSEX26O0172800PE<br /><small>ltp=262.85 at time of order</small></td>
+      <td>—</td><td>—</td><td>—</td>
+      <td>—</td><td>—</td><td class="zer">—</td>
+      <td><span class="t blk">MIN_PREMIUM BLOCKED</span><br /><small>ltp=262.85 &lt; min=300.0</small></td>
+    </tr>
+    <tr class="trade-row">
+      <td>10</td>
+      <td><b>14:15</b></td>
+      <td><span class="t pe">PE_VWAP</span><br /><small>close=72,726 &lt; vwap=72,783</small></td>
+      <td><span class="t filled">PASSED</span></td>
+      <td>SENSEX26O0172700PE<br /><small>ltp=246.00 at time of order</small></td>
+      <td>—</td><td>—</td><td>—</td>
+      <td>—</td><td>—</td><td class="zer">—</td>
+      <td><span class="t blk">MIN_PREMIUM BLOCKED</span><br /><small>ltp=246.00 &lt; min=300.0</small></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note warn">⚠️ <b>EXTERNAL_CLOSE pattern (trades #1–5):</b> Every paper fill was closing within 4–8 seconds. The broker position shows qty=0 immediately — this means the shadow paper broker confirmed a fill but when it then polled the real broker for qty, the paper position didn't exist there (PAPER mode doesn't actually hold a position at broker). This is a shadow-mode reconciliation false-positive, not a real exit.</div>
+
+<div class="note">Trade #6 (11:30) was the only trade that ran for several minutes. It activated break-even at ltp=332, trailed SL to 315, then was hit at ltp=314. On paper this would have been <b>+15 pts (₹300)</b> but the exchange SL filled at entry=315, recording ₹0 PnL due to paper rounding.</div>
+
+
+<h2>2 · Trade #6 — Trailing Stop Journey (Only Active Trade Today)</h2>
+<table>
+  <thead><tr><th>Time</th><th>Event</th><th>LTP</th><th>SL</th><th>Target Ref</th></tr></thead>
+  <tbody>
+    <tr><td>11:30:04</td><td>Entry filled</td><td>300.00</td><td>240.00</td><td>405.00</td></tr>
+    <tr><td>11:35:14</td><td><span class="t trk">BREAK_EVEN_ACTIVATED</span> — ltp reached 332</td><td>332.00</td><td>300.00 ↑</td><td>405.00</td></tr>
+    <tr><td>11:38:16</td><td><span class="t trk">TRAILING_SL_UPDATED step=1</span></td><td>345.00</td><td>315.00 ↑</td><td>420.00 ↑</td></tr>
+    <tr><td>11:39:37</td><td><span class="t sl">STOP_HIT</span> — ltp=314 &lt; SL=315</td><td>314.00</td><td>315.00</td><td>—</td></tr>
+    <tr><td>11:39:37</td><td>Exit at SL_FILLED_AT_EXCHANGE</td><td>—</td><td>—</td><td>PnL = 0 (SL @ breakeven)</td></tr>
+  </tbody>
+</table>
+
+
+<h2>3 · Every Signal Fired + Block Reason (Full Minute-by-Minute Log)</h2>
+<p class="note">This covers every strategy signal and what happened — whether it was blocked by smart filter, min-premium, state-machine, or actually placed as an order.</p>
+
+<table>
+  <thead>
+    <tr><th>Time</th><th>Signal (Strategy)</th><th>Smart Entry Result</th><th>Block Filter</th><th>Block Detail</th><th>Outcome</th></tr>
+  </thead>
+  <tbody>
+    <tr class="trade-row">
+      <td>09:20</td><td><span class="t ce">CE_VWAP</span></td>
+      <td><span class="t filled">PASSED</span></td><td>—</td><td>—</td>
+      <td><span class="t filled">ORDER #1 PLACED → EXTERNAL_CLOSE</span></td>
+    </tr>
+    <tr class="trade-row">
+      <td>09:25</td><td><span class="t ce">CE_VWAP</span></td>
+      <td><span class="t bypass">SQUEEZE BYPASS</span></td><td>—</td><td>3 consecutive up candles, 15m/slope skipped</td>
+      <td><span class="t filled">ORDER #2 PLACED → EXTERNAL_CLOSE</span></td>
+    </tr>
+    <tr class="block-row">
+      <td>09:35</td><td><span class="t pe">PE_VWAP</span></td>
+      <td><span class="t blk">BLOCKED</span></td><td>EMA9 SLOPE</td>
+      <td>ema9_now=72585.84 &gt; ema9_prev=72575.98 — EMA9 RISING, not falling for PE</td>
+      <td>No order</td>
+    </tr>
+    <tr class="trade-row">
+      <td>09:45</td><td><span class="t ce">CE_VWAP</span></td>
+      <td><span class="t filled">PASSED</span></td><td>—</td><td>—</td>
+      <td><span class="t filled">ORDER #3 PLACED → EXTERNAL_CLOSE</span></td>
+    </tr>
+    <tr class="block-row">
+      <td>10:00</td><td><span class="t ce">CE_VWAP</span></td>
+      <td><span class="t blk">BLOCKED</span></td><td>BODY SIZE</td>
+      <td>body=9.75 vs required=25.91 (ATR 74.03 × 0.35). Candle body only 13% of ATR — no conviction.</td>
+      <td>No order</td>
+    </tr>
+    <tr class="trade-row">
+      <td>10:10</td><td><span class="t ce">CE_TRB</span></td>
+      <td><span class="t bypass">SQUEEZE BYPASS</span></td><td>—</td><td>3 consecutive up candles — TRB breakout above range</td>
+      <td><span class="t filled">ORDER #4 PLACED → EXTERNAL_CLOSE</span></td>
+    </tr>
+    <tr class="trade-row">
+      <td>10:15</td><td><span class="t ce">CE (generic)</span></td>
+      <td><span class="t bypass">SQUEEZE BYPASS</span></td><td>—</td><td>3 consecutive up candles</td>
+      <td><span class="t filled">ORDER #5 PLACED → EXTERNAL_CLOSE</span></td>
+    </tr>
+    <tr class="block-row">
+      <td>10:20</td><td><span class="t ce">CE (generic)</span></td>
+      <td><span class="t bypass">SQUEEZE BYPASS</span> then <span class="t blk">BLOCKED</span></td><td>BODY SIZE</td>
+      <td>bypass passed, but body=9.31 vs required=23.17 (ATR 66.19 × 0.35) — body check after bypass failed</td>
+      <td>No order</td>
+    </tr>
+    <tr class="block-row">
+      <td>10:25</td><td><span class="t ce">CE (generic)</span></td>
+      <td><span class="t bypass">SQUEEZE BYPASS</span> then <span class="t blk">BLOCKED</span></td><td>BODY SIZE</td>
+      <td>body=13.67 vs required=22.75 (ATR 65.01 × 0.35) — still below threshold</td>
+      <td>No order (bot also keyboard-interrupted at 10:25:54)</td>
+    </tr>
+    <tr class="block-row">
+      <td>10:35</td><td><span class="t pe">PE_VWAP</span></td>
+      <td><span class="t blk">BLOCKED</span></td><td>15M TREND</td>
+      <td>close_15m=72,840 is 228.6 pts above ema21_15m=72,611 — gap &gt; 200pt threshold for PE. 15m structure strongly bullish, PE entry refused.</td>
+      <td>No order</td>
+    </tr>
+    <tr class="block-row">
+      <td>10:40</td><td><span class="t ce">CE_NATR</span></td>
+      <td><span class="t blk">BLOCKED</span></td><td>EMA9 SLOPE</td>
+      <td>ema9_now=72,779.72 &lt; ema9_prev=72,787.22 — EMA9 falling, not rising for CE</td>
+      <td>No order</td>
+    </tr>
+    <tr class="block-row">
+      <td>10:45</td><td><span class="t pe">PE_NATR</span></td>
+      <td><span class="t blk">BLOCKED</span></td><td>15M TREND</td>
+      <td>Same 15m gap = 228.6pts above EMA21 — 15m still too bullish for PE entry</td>
+      <td>No order</td>
+    </tr>
+    <tr class="block-row">
+      <td>10:55</td><td><span class="t ce">CE (generic)</span></td>
+      <td><span class="t blk">BLOCKED</span></td><td>BODY SIZE</td>
+      <td>body=16.17 vs required=23.27 (ATR 66.49 × 0.35) — doji-like candle, no strength</td>
+      <td>No order</td>
+    </tr>
+    <tr class="block-row">
+      <td>11:00</td><td><span class="t pe">PE_VWAP</span></td>
+      <td><span class="t filled">SMART ENTRY PASSED</span></td><td>MIN PREMIUM</td>
+      <td>ltp=250.85 &lt; min_required=300.0 — option too cheap (theta decayed)</td>
+      <td>No order (ENTRY_BLOCKED_MIN_PREMIUM)</td>
+    </tr>
+    <tr class="block-row">
+      <td>11:05</td><td><span class="t ce">CE_VWAP</span></td>
+      <td><span class="t filled">SMART ENTRY PASSED</span></td><td>MIN PREMIUM</td>
+      <td>ltp=279.80 &lt; min_required=300.0 — CE premium also below minimum</td>
+      <td>No order</td>
+    </tr>
+    <tr class="block-row">
+      <td>11:10</td><td><span class="t pe">PE_NATR</span></td>
+      <td><span class="t filled">SMART ENTRY PASSED</span></td><td>MIN PREMIUM</td>
+      <td>ltp=250.65 &lt; min_required=300.0</td>
+      <td>No order</td>
+    </tr>
+    <tr class="block-row">
+      <td>11:15</td><td><span class="t pe">PE_VWAP</span></td>
+      <td><span class="t filled">SMART ENTRY PASSED</span></td><td>MIN PREMIUM</td>
+      <td>ltp=288.25 &lt; min_required=300.0 — very close, just ₹11.75 short</td>
+      <td>No order</td>
+    </tr>
+    <tr class="block-row">
+      <td>11:20</td><td><span class="t pe">PE_VWAP</span></td>
+      <td><span class="t bypass">SQUEEZE BYPASS</span></td><td>MIN PREMIUM</td>
+      <td>3 consecutive down candles bypassed 15m/slope. BUT ltp=263.10 &lt; min=300.0 — premium still too low</td>
+      <td>No order</td>
+    </tr>
+    <tr class="trade-row">
+      <td>11:30</td><td><span class="t ce">CE_VWAP</span></td>
+      <td><span class="t filled">PASSED</span></td><td>—</td><td>Premium=300.0 exactly hit threshold</td>
+      <td><span class="t filled">ORDER #6 PLACED → TRAILING SL HIT @ 11:39</span></td>
+    </tr>
+    <tr class="block-row">
+      <td>11:40</td><td><span class="t pe">PE_NATR</span></td>
+      <td><span class="t blk">BLOCKED</span></td><td>BODY SIZE</td>
+      <td>body=22.34 vs required=24.24 (ATR 69.25 × 0.35) — very close but still under threshold</td>
+      <td>No order</td>
+    </tr>
+    <tr class="block-row">
+      <td>11:50</td><td><span class="t ce">CE_NATR</span></td>
+      <td><span class="t filled">SMART ENTRY PASSED</span></td><td>MIN PREMIUM</td>
+      <td>ltp=281.25 &lt; min_required=300.0</td>
+      <td>No order</td>
+    </tr>
+    <tr class="trade-row">
+      <td>12:35</td><td><span class="t ce">CE_VWAP</span></td>
+      <td><span class="t filled">PASSED</span></td><td>—</td><td>—</td>
+      <td><span class="t filled">ORDER #7 PLACED → SL @ exchange 12:41</span></td>
+    </tr>
+    <tr class="trade-row">
+      <td>12:50</td><td><span class="t ce">CE_VWAP</span></td>
+      <td><span class="t filled">PASSED</span></td><td>—</td><td>—</td>
+      <td><span class="t filled">ORDER #8 PLACED (open at disconnect)</span></td>
+    </tr>
+    <tr class="block-row">
+      <td>13:40</td><td><span class="t pe">PE_VWAP</span></td>
+      <td><span class="t blk">BLOCKED</span></td><td>EMA9 SLOPE</td>
+      <td>ema9_now=72,848.27 &lt; ema9_prev=72,853.45 — slight fall; EMA9 not rising for CE; dual-signal mismatch</td>
+      <td>No order (CE_VWAP signal also appeared)</td>
+    </tr>
+    <tr class="block-row">
+      <td>13:45–13:50</td><td><span class="t pe">PE_VWAP</span></td>
+      <td><span class="t bypass">SQUEEZE BYPASS</span> then <span class="t blk">BLOCKED</span></td><td>BODY SIZE</td>
+      <td>body=8.05 vs required=20.53 (ATR 58.65 × 0.35) — 3 consecutive down candles triggered bypass but candle body too small</td>
+      <td>No order</td>
+    </tr>
+    <tr class="trade-row">
+      <td>14:10</td><td><span class="t pe">PE_VWAP</span></td>
+      <td><span class="t filled">PASSED</span></td><td>MIN PREMIUM</td>
+      <td>ltp=262.85 &lt; min=300 — order attempt #9 blocked at min-premium gate</td>
+      <td>No order placed at exchange</td>
+    </tr>
+    <tr class="trade-row">
+      <td>14:15</td><td><span class="t pe">PE_VWAP</span></td>
+      <td><span class="t filled">PASSED</span></td><td>MIN PREMIUM</td>
+      <td>ltp=246.00 &lt; min=300 — order attempt #10 blocked at min-premium gate</td>
+      <td>No order placed at exchange</td>
+    </tr>
+    <tr class="block-row">
+      <td>14:25</td><td><span class="t ce">CE_OB</span></td>
+      <td><span class="t blk">BLOCKED</span></td><td>EMA9 SLOPE</td>
+      <td>ema9_now=72,747 &lt; ema9_prev=72,782 — EMA9 falling for a CE_OB signal; momentum not confirmed</td>
+      <td>No order (×2 duplicate signal)</td>
+    </tr>
+    <tr class="block-row">
+      <td>14:30</td><td><span class="t pe">PE_VWAP</span></td>
+      <td><span class="t filled">AI ALLOW fallback</span></td><td>STATE-MACHINE</td>
+      <td>"Entry blocked: state=State.IDLE or past no-entry time" — post-14:30 no-entry window active</td>
+      <td>No order (×2)</td>
+    </tr>
+    <tr class="block-row">
+      <td>14:40</td><td><span class="t pe">PE_VWAP + PE</span></td>
+      <td><span class="t bypass">SQUEEZE BYPASS</span></td><td>STATE-MACHINE</td>
+      <td>3 consecutive down candles bypass active — but state machine blocks entry past 14:30</td>
+      <td>No order (×2)</td>
+    </tr>
+    <tr class="block-row">
+      <td>15:05</td><td><span class="t ce">CE_VWAP</span></td>
+      <td><span class="t blk">BLOCKED</span></td><td>EMA9 SLOPE</td>
+      <td>ema9_now=72,540.88 &lt; ema9_prev=72,548.55 — EMA9 not rising for CE</td>
+      <td>No order (late candle, already past cutoff)</td>
+    </tr>
+    <tr class="block-row">
+      <td>15:37</td><td><span class="t pe">PE + PE_VWAP</span></td>
+      <td><span class="t blk">BLOCKED</span></td><td>EMA GAP SHRINKING</td>
+      <td>gap_now=-115.69 vs gap_prev=-118.67 (PE) and gap_now=-114.59 vs gap_prev=-117.53 (PE_VWAP) — both gaps narrowing, momentum fading late day</td>
+      <td>No order (post-market reconnect)</td>
+    </tr>
+  </tbody>
+</table>
+
+
+<h2>4 · Manual (Live) Orders Observed via WebSocket</h2>
+<div class="note">These are NOT bot orders — they were placed manually by user and observed by the bot via the order-update WebSocket stream.</div>
+<table>
+  <thead><tr><th>Time</th><th>Order ID</th><th>Symbol</th><th>Fill Price</th><th>Qty</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>09:55:34</td>
+      <td>260930150350453</td>
+      <td>SENSEX26O0173600CE</td>
+      <td>53.15</td>
+      <td>20</td>
+      <td>Deep OTM CE @ 73600 — manually bought at ₹53</td>
+    </tr>
+    <tr>
+      <td>11:17:01</td>
+      <td>260930150654641</td>
+      <td>SENSEX26O0173000CE</td>
+      <td>149.90</td>
+      <td>20</td>
+      <td>OTM CE @ 73000 — manually bought at ₹150</td>
+    </tr>
+    <tr>
+      <td>14:23:22</td>
+      <td>260930151136710</td>
+      <td>SENSEX26O0173000CE</td>
+      <td>140.00</td>
+      <td>20</td>
+      <td>Manual fill (avg=140), exchange_ts=14:22:36</td>
+    </tr>
+    <tr>
+      <td>15:39:58</td>
+      <td>260930151062962</td>
+      <td>SENSEX26O0173000CE</td>
+      <td>—</td>
+      <td>0</td>
+      <td>CANCELLED (unfilled) at EOD</td>
+    </tr>
+    <tr>
+      <td>15:39:58</td>
+      <td>260930151190629</td>
+      <td>SENSEX26O0173600CE</td>
+      <td>—</td>
+      <td>0</td>
+      <td>CANCELLED (unfilled) at EOD</td>
+    </tr>
+  </tbody>
+</table>
+
+
+<h2>5 · Block Summary — Why 20 Signals Were Stopped</h2>
+<table>
+  <thead><tr><th>Block Type</th><th>Count</th><th>Layer</th><th>Signals Affected</th></tr></thead>
+  <tbody>
+    <tr><td><b>Min Premium &lt; ₹300</b></td><td>7</td><td>Post-Smart-Entry gate</td><td>PE_VWAP ×3, CE_VWAP ×2, PE_NATR ×2</td></tr>
+    <tr><td><b>Body too small vs ATR</b></td><td>5</td><td>Smart Entry</td><td>CE_VWAP ×1, CE ×3, PE_NATR ×1</td></tr>
+    <tr><td><b>EMA9 Slope wrong direction</b></td><td>4</td><td>Smart Entry</td><td>PE_VWAP ×1, CE_NATR ×1, CE_OB ×2, CE_VWAP ×1</td></tr>
+    <tr><td><b>15m Trend opposing</b></td><td>2</td><td>Smart Entry</td><td>PE_VWAP ×1, PE_NATR ×1</td></tr>
+    <tr><td><b>EMA Gap Shrinking</b></td><td>2</td><td>Smart Entry</td><td>PE ×1, PE_VWAP ×1</td></tr>
+    <tr><td><b>State-Machine (past no-entry time)</b></td><td>4</td><td>Main loop</td><td>PE_VWAP ×2, PE ×1, PE_VWAP+PE ×1</td></tr>
+  </tbody>
+</table>
+
+
+<h2>6 · Bot Session Summary Today</h2>
+<table>
+  <thead><tr><th>Session</th><th>Start</th><th>End</th><th>End Reason</th><th>Instruments Loaded</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>09:06:30</td><td>10:25:54</td><td>Keyboard interrupt</td><td>107,756</td></tr>
+    <tr><td>2</td><td>10:31:13</td><td>13:36:07</td><td>Keyboard interrupt (during position — stale-closed on restart)</td><td>108,842</td></tr>
+    <tr><td>3</td><td>13:36:41</td><td>14:04:18</td><td>Keyboard interrupt</td><td>108,842</td></tr>
+    <tr><td>4</td><td>14:04:35</td><td>14:04:31 (Ctrl+C again)</td><td>Immediate interrupt</td><td>108,842</td></tr>
+    <tr><td>5</td><td>14:20:47</td><td>~15:41+</td><td>Network loss (WebSocket 1006, DNS fail)</td><td>108,842</td></tr>
+  </tbody>
+</table>
+
+<div class="note warn">⚠️ <b>Critical issue:</b> Trade #8 (SENSEX26O0173000CE, entry=331.85, shadow) was open when Session 2 was interrupted at 13:36. On restart the bot found qty=0 at broker (shadow positions don't persist), auto-closed it at ₹300 = <b>-₹637 loss</b>. This is the only real PnL impact today, and it is an artefact of restarting mid-trade in shadow mode.</div>
+
+<div class="note">ℹ️ <b>AI Confirmation:</b> Every signal today tried to call OpenAI for confirmation but got HTTP 429 (no credits). The fallback was ALLOW — so AI confirmation did <em>not</em> block any trades today. All filtering was done purely by Smart Entry (EMA/body/slope/15m) and the min-premium gate.</div>
+
+<footer>Made with IBM Bob</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,187 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:#0d0f14;color:#e2e8f0;font-size:13px;line-height:1.6;padding:24px}
+.page{max-width:820px;margin:0 auto}
+h1{font-size:20px;font-weight:800;color:#e2e8f0;letter-spacing:-.3px;margin-bottom:3px}
+.sub{font-size:11px;color:#6b7a99;margin-bottom:22px;line-height:1.5}
+h2{font-size:10px;font-weight:700;color:#6b7a99;text-transform:uppercase;letter-spacing:1.2px;margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid #252b3b}
+/* verdict box */
+.verdict{background:#141720;border:2px solid #3b82f6;border-radius:10px;padding:16px 20px;margin-bottom:20px}
+.verdict-title{font-size:15px;font-weight:800;color:#3b82f6;margin-bottom:6px}
+.verdict-body{font-size:12px;color:#94a3b8;line-height:1.7}
+.verdict-body strong{color:#e2e8f0}
+/* stat grid */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.stat{background:#141720;border:1px solid #252b3b;border-radius:7px;padding:10px 12px}
+.stat-val{font-size:22px;font-weight:800;font-family:monospace;line-height:1.1;margin-bottom:2px}
+.stat-lbl{font-size:9px;color:#6b7a99;text-transform:uppercase;letter-spacing:.8px;font-weight:700}
+.stat-sub{font-size:10px;color:#94a3b8;margin-top:1px}
+.green{color:#22c55e}.red{color:#ef4444}.yellow{color:#f59e0b}.blue{color:#3b82f6}.purple{color:#a78bfa}.teal{color:#2dd4bf}
+/* finding cards */
+.finding{background:#141720;border:1px solid #252b3b;border-radius:7px;padding:13px 15px;margin-bottom:8px}
+.finding.critical{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.04)}
+.finding.strong{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.04)}
+.finding.info{border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.04)}
+.finding.warn{border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.04)}
+.find-title{font-size:11px;font-weight:700;margin-bottom:5px}
+.finding.critical .find-title{color:#ef4444}
+.finding.strong   .find-title{color:#22c55e}
+.finding.info     .find-title{color:#3b82f6}
+.finding.warn     .find-title{color:#f59e0b}
+.find-body{font-size:11px;color:#94a3b8;line-height:1.7}
+.find-body strong{color:#e2e8f0}
+/* strategy table */
+table{width:100%;border-collapse:collapse;margin-bottom:12px}
+th{text-align:left;padding:7px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6b7a99;background:#141720;border-bottom:1px solid #252b3b;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid #1a1e2a;font-size:11px;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#141720}
+.pill{display:inline-flex;align-items:center;padding:1px 8px;border-radius:9999px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border:1px solid transparent}
+.pg{background:rgba(34,197,94,.1);color:#22c55e;border-color:rgba(34,197,94,.25)}
+.pr{background:rgba(239,68,68,.1);color:#ef4444;border-color:rgba(239,68,68,.25)}
+.py{background:rgba(245,158,11,.1);color:#f59e0b;border-color:rgba(245,158,11,.25)}
+.pb{background:rgba(59,130,246,.1);color:#3b82f6;border-color:rgba(59,130,246,.25)}
+.pm{background:rgba(107,122,153,.08);color:#6b7a99;border-color:#252b3b}
+/* bar chart */
+.bar-row{display:flex;align-items:center;gap:10px;margin:4px 0;font-size:11px}
+.bar-lbl{width:80px;text-align:right;color:#6b7a99;flex-shrink:0;font-size:10px}
+.bar-track{flex:1;background:#1a1e2a;border-radius:4px;height:18px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:10px;font-weight:700;white-space:nowrap}
+.bar-num{width:50px;text-align:left;font-weight:700;font-size:11px;color:#e2e8f0}
+/* action box */
+.action{background:#141720;border:1px solid rgba(34,197,94,.35);border-radius:8px;padding:14px 16px;margin-bottom:10px}
+.action-title{font-size:13px;font-weight:700;color:#22c55e;margin-bottom:8px}
+.action-row{font-size:11px;color:#94a3b8;padding:3px 0;display:flex;gap:8px;align-items:flex-start;line-height:1.5}
+.action-row::before{content:"▸";color:#22c55e;flex-shrink:0;margin-top:1px}
+.cmd{background:#0d0f14;border:1px solid #252b3b;border-radius:5px;padding:6px 11px;font-family:monospace;font-size:10px;color:#22c55e;margin:7px 0}
+.footer{border-top:1px solid #1a1e2a;margin-top:28px;padding-top:10px;text-align:center;font-size:11px;color:#4a5568}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>📊 Best Strategy for SENSEX — Real Data Analysis</h1>
+<p class="sub">
+  Based on <strong>9,075 actual 5-minute SENSEX candles</strong> from Zerodha API — 121 trading days (Mar 2026 – Sep 2026).<br />
+  Not theory. Not guesswork. What the price actually did.
+</p>
+
+
+<div class="verdict">
+  <div class="verdict-title">🏆 Data Verdict: ORB + Afternoon Momentum on Trending Days</div>
+  <div class="verdict-body">
+    SENSEX is <strong>sideways 57% of the time</strong> — most intraday strategies bleed on those days.
+    The data shows exactly <strong>two high-probability windows</strong>:<br /><br />
+    1. <strong>Opening Range Breakout (09:15–09:35)</strong> — the first candle has an avg range of <strong>280 pts</strong>, and on 68.6% of days price sustains a directional breakout from that range. This is the single best signal in the data.<br />
+    2. <strong>Afternoon Momentum (13:00–15:15)</strong> — 28.3% of all afternoon candles have a qualifying big body (≥40 pts or ≥0.5×ATR). On trending days the session is most active in the afternoon (15 out of 40 trending days, tied with morning at 14). Add this as a second-trade engine.<br /><br />
+    <strong>What NOT to use:</strong> Any strategy that trades VWAP crosses on sideways days — sideways days average <strong>9.1 VWAP crosses</strong> per day. That's pure whipsawing noise.
+  </div>
+</div>
+
+<h2>📐 The 6-Month SENSEX Numbers</h2>
+<div class="stat-grid">
+  <div class="stat"><div class="stat-val blue">121</div><div class="stat-lbl">Trading Days</div><div class="stat-sub">Mar–Sep 2026</div></div>
+  <div class="stat"><div class="stat-val yellow">57%</div><div class="stat-lbl">Sideways Days</div><div class="stat-sub">69 days — kill zone</div></div>
+  <div class="stat"><div class="stat-val green">33%</div><div class="stat-lbl">Trending Days</div><div class="stat-sub">40 days — money days</div></div>
+  <div class="stat"><div class="stat-val red">10%</div><div class="stat-lbl">Volatile Choppy</div><div class="stat-sub">12 days — avoid</div></div>
+</div>
+<div class="stat-grid">
+  <div class="stat"><div class="stat-val blue">280</div><div class="stat-lbl">Avg ORB Candle (pts)</div><div class="stat-sub">First 5m candle range</div></div>
+  <div class="stat"><div class="stat-val green">68.6%</div><div class="stat-lbl">ORB Breakout Days</div><div class="stat-sub">Sustains in either dir</div></div>
+  <div class="stat"><div class="stat-val yellow">73</div><div class="stat-lbl">Avg 5m ATR (pts)</div><div class="stat-sub">Range: 44–110 pts</div></div>
+  <div class="stat"><div class="stat-val purple">45.5%</div><div class="stat-lbl">Up Days</div><div class="stat-sub">Slight bearish bias: 54.5% down</div></div>
+</div>
+
+<h2>🔬 What the Data Says About Each Strategy</h2>
+
+<div class="finding strong">
+  <div class="find-title">✅ ORB — Strongest Signal in the Data</div>
+  <div class="find-body">
+    <strong>ORB CE sustained on 34.7% of all days, ORB PE on 33.9%</strong>. Combined, <strong>68.6% of days have a sustained directional ORB breakout</strong>. The avg first candle range is 280 pts — large enough that the option premium (typically 200–600 pts) has room to move significantly on a real breakout. The sustain candle filter (09:20 candle must confirm direction) reduces fake breakouts. <strong>This fires once per day, at a very specific time — easy to manage.</strong>
+  </div>
+</div>
+
+<div class="finding strong">
+  <div class="find-title">✅ Afternoon Momentum (MOM) — The Second Trade Engine</div>
+  <div class="find-body">
+    <strong>28.3% of all afternoon 5m candles meet the big-body threshold</strong> (≥40 pts or ≥0.5×ATR). That's an average of <strong>6.8 qualifying candles per afternoon session</strong> — but with EMA9/EMA21 trend confirmation (in the live strategy), most of those are filtered down to 1–2 real signals. On the <strong>40 trending days, 15 of them had the biggest session move in the afternoon</strong> — that's 37.5% of trending days where the afternoon was the real money session, not the morning.
+  </div>
+</div>
+
+<div class="finding warn">
+  <div class="find-title">⚠ EMA Crossover — Over-Fires, Needs Heavy Filtering</div>
+  <div class="find-body">
+    Even with the EMA gap filter (|EMA9−EMA21| ≥ 10 pts), the EMA crossover fires <strong>18.4 signals per day on average — on every single day in the 6 months</strong>. That's not a signal, that's noise. The raw EMA strategy without additional filters will churn your capital on the 57% sideways days. <strong>EMA is only useful as a trend-confirmation filter for other strategies (ORB sustain, MOM), not as a standalone entry trigger.</strong>
+  </div>
+</div>
+
+<div class="finding critical">
+  <div class="find-title">❌ VWAP — Dangerous on Sideways Days (Which Are 57% of Days)</div>
+  <div class="find-body">
+    On sideways days, price crosses VWAP an average of <strong>9.1 times per day</strong>. On the recent bad days (Sep 16–17), it crossed <strong>18 times per day</strong>. Any VWAP retest strategy will fire 4–6 times in both directions on these days. The VWAP strategy only makes sense on trending days where it crosses only <strong>4.6 times on average</strong> — but you cannot know it's a trending day at 09:15 when you start. <strong>If you enable VWAP, add a strict regime filter: only trade VWAP signals if the ORB breakout has already been sustained.</strong>
+  </div>
+</div>
+
+<div class="finding info">
+  <div class="find-title">ℹ Hourly Volatility — 09:xx is the Power Hour</div>
+  <div class="find-body">
+    The 9 AM hour (09:15–09:59) has the highest avg 5m candle range at <strong>111.5 pts</strong>. This drops sharply to 68.5 pts in the 10 AM hour and continues falling to 57–62 pts at midday. It picks up slightly to 67 pts at 14:xx and 75.8 pts at 15:xx (expiry/closing effect). <strong>Strategy implication: the biggest move opportunity is in the first 45 minutes. ORB captures exactly this window.</strong>
+  </div>
+</div>
+
+<h2>📊 Hourly Volatility (Avg 5m Candle Range)</h2>
+<div class="bar-row"><span class="bar-lbl">09:xx</span><div class="bar-track"><div class="bar-fill" style="width:100%;background:#22c55e">111.5 pts — POWER HOUR</div></div></div>
+<div class="bar-row"><span class="bar-lbl">10:xx</span><div class="bar-track"><div class="bar-fill" style="width:61%;background:#3b82f6">68.5 pts</div></div></div>
+<div class="bar-row"><span class="bar-lbl">11:xx</span><div class="bar-track"><div class="bar-fill" style="width:54%;background:#6b7a99">59.8 pts</div></div></div>
+<div class="bar-row"><span class="bar-lbl">12:xx</span><div class="bar-track"><div class="bar-fill" style="width:52%;background:#6b7a99">57.9 pts — DEAD ZONE</div></div></div>
+<div class="bar-row"><span class="bar-lbl">13:xx</span><div class="bar-track"><div class="bar-fill" style="width:55%;background:#6b7a99">61.8 pts</div></div></div>
+<div class="bar-row"><span class="bar-lbl">14:xx</span><div class="bar-track"><div class="bar-fill" style="width:60%;background:#f59e0b">67.0 pts — Afternoon pickup</div></div></div>
+<div class="bar-row"><span class="bar-lbl">15:xx</span><div class="bar-track"><div class="bar-fill" style="width:68%;background:#fb923c">75.8 pts — Closing spike</div></div></div>
+
+<h2>📊 Strategy Fit vs. SENSEX Character</h2>
+<table>
+  <thead><tr><th>Strategy</th><th>Fires in</th><th>Trending days (33%)</th><th>Sideways days (57%)</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td><strong>ORB</strong></td><td>09:25–09:35</td><td>✅ Strong — sustains 60%+</td><td>⚠ Still fires 40% — but single trade per day limits damage</td><td><span class="pill pg">Use First</span></td></tr>
+    <tr><td><strong>MOM (Afternoon)</strong></td><td>13:30–14:30</td><td>✅ 37% of trending days biggest move is afternoon</td><td>⚠ 28% of afternoon candles qualify — needs EMA slope filter</td><td><span class="pill pg">Use Second</span></td></tr>
+    <tr><td><strong>TRB (10:00+ breakout)</strong></td><td>10:00+</td><td>✅ Good on days where ORB reverses — catches the second leg</td><td>✅ Fires rarely on sideways (fresh crossover only) — low false positive</td><td><span class="pill pb">Add Third</span></td></tr>
+    <tr><td><strong>PDHL</strong></td><td>All day</td><td>✅ Rare but high-momentum signal when PDH/PDL breaks</td><td>✅ Very rarely fires on sideways</td><td><span class="pill pb">Add Third</span></td></tr>
+    <tr><td><strong>EMA (standalone)</strong></td><td>All day</td><td>⚠ 18.4 signals/day even with gap filter — too many</td><td>❌ Fires constantly, no edge in sideways</td><td><span class="pill py">Filter Only</span></td></tr>
+    <tr><td><strong>VWAP</strong></td><td>All day</td><td>✅ 4.6 crosses on trending days — reasonable</td><td>❌ 9.1 crosses on sideways = pure noise, 18 on recent days</td><td><span class="pill py">Conditional</span></td></tr>
+    <tr><td><strong>OB</strong></td><td>All day</td><td>Untested — zone-based signal</td><td>❌ Zone "close inside" fires in any market — no directional bias</td><td><span class="pill pr">Backtest First</span></td></tr>
+  </tbody>
+</table>
+
+<h2>🚀 Exact Strategy Configuration to Maximize Profit</h2>
+
+<div class="action">
+  <div class="action-title">Phase 1 — The only two strategies you need right now</div>
+  <div class="action-row">Enable <strong>ORB only</strong>. One trade per day at the open. 68.6% of days have a sustained breakout. ATR Risk Mode A (SL=25%, Target=75% of premium). This is your primary P&amp;L driver.</div>
+  <div class="action-row">Add <strong>Momentum Phase 2</strong> (13:30–14:30 window). On the 33% trending days, 37% of them see the biggest move in the afternoon. This adds a second trade on those days and captures the afternoon trend extension.</div>
+  <div class="action-row">Keep <strong>EMA OFF as a standalone signal</strong>. Use it only as a confirmation condition inside ORB and MOM (which it already is in your code).</div>
+  <div class="action-row">Set <strong>NO_NEW_ENTRY_AFTER=14:30</strong> to avoid the 15:xx expiry noise window. Force exit at 15:10.</div>
+  <div class="cmd">python backtest_compare.py --days 180 --only ORB MOM --sl-pct 0.25 --target-pct 0.75 --trail-pct 0.10 --csv orbmom.csv</div>
+</div>
+
+<div class="action" style="border-color:rgba(245,158,11,.4)">
+  <div class="action-title" style="color:#f59e0b">Phase 2 — Add TRB for days where ORB fails</div>
+  <div class="action-row">Add <strong>TRB</strong>. The data shows that on 57% of sideways days, the biggest move still happens somewhere — just not at the 09:15 open. TRB captures the 10:00+ breakout attempt from the 09:45 anchor candle. It only fires on fresh crossovers, so it won't spam on sideways days.</div>
+  <div class="action-row">Add <strong>PDHL</strong> with buffer=0. These breakouts (prev day high/low) are rare but tend to run far. Low noise, high conviction when they fire.</div>
+  <div class="action-row"><strong>VWAP conditional</strong>: only enable if you add regime detection. On days where ORB has already been sustained (trending days), VWAP retest is valid. On days where ORB failed to sustain — disable VWAP for that day.</div>
+</div>
+
+<div class="finding critical" style="margin-top:12px">
+  <div class="find-title">🔴 The One Change That Will Have the Biggest Impact on Profitability</div>
+  <div class="find-body">
+    The data shows <strong>57% sideways days</strong> with VWAP crossing 9+ times. The bot in its current default config (EMA on, ORB on) will fire multiple times on sideways days and hit SL repeatedly. <strong>The single most impactful change: add a "session qualifier" — if the ORB breakout fails to sustain by 10:00 (price closes back inside the ORB range), set a flag to skip all new entries until 13:30 MOM window.</strong> This kills the "grinding loss" pattern on the 57% sideways days and lets you sit still, preserving capital for the 33% trending days where trades actually work.
+  </div>
+</div>
+
+<div class="footer">Made with IBM Bob · Based on 9,075 real SENSEX 5m candles (Mar–Sep 2026, 121 trading days) from Zerodha API</div>
+</div>
+</body>
+</html>

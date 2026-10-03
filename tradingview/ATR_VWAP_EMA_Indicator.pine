@@ -1,0 +1,156 @@
+// ============================================================
+// ATR Trailing Stop + VWAP + EMA  —  Sensex Auto Trader
+// Mirrors natr_strategy.py  |  vwap_strategy.py  |  indicators.py
+// ============================================================
+//@version=5
+indicator(title="ATR + VWAP + EMA  [Sensex Auto Trader]",
+         shorttitle="ATR·VWAP·EMA",
+         overlay=true)
+
+// ─────────────────────────────────────────────
+//  INPUTS
+// ─────────────────────────────────────────────
+// ATR Trailing Stop  (natr_strategy.py  NATR_PERIOD / NATR_MULT)
+atr_period  = input.int(21,   "ATR Period",      minval=1,   group="ATR Trailing Stop")
+atr_mult    = input.float(3.0, "ATR Multiplier", minval=0.1, step=0.1, group="ATR Trailing Stop")
+show_atr    = input.bool(true, "Show ATR Stop",  group="ATR Trailing Stop")
+
+// EMA  (indicators.py  ema())
+ema_period  = input.int(21,  "EMA Period",  minval=1, group="EMA")
+show_ema    = input.bool(true, "Show EMA",  group="EMA")
+
+// VWAP  (vwap_strategy.py)
+show_vwap          = input.bool(true,  "Show VWAP",                    group="VWAP")
+vwap_retest_bars   = input.int(3,      "Retest Lookback (bars)",       minval=1, group="VWAP")
+min_bounce_pts     = input.float(0.0,  "Min Bounce Points from VWAP",  minval=0, group="VWAP")
+
+// Signal labels
+show_signals = input.bool(true, "Show CE / PE Signals", group="Signals")
+
+// ─────────────────────────────────────────────
+//  VWAP  (session-anchored, standard)
+// ─────────────────────────────────────────────
+vwap_val = ta.vwap(hlc3)
+
+// ─────────────────────────────────────────────
+//  EMA  (Wilder/standard EMA — matches indicators.py)
+// ─────────────────────────────────────────────
+ema_val = ta.ema(close, ema_period)
+
+// ─────────────────────────────────────────────
+//  ATR Trailing Stop  (mirrors _compute_natr_stop())
+//  Wilder ATR → loss = mult * ATR → ratchet stop
+// ─────────────────────────────────────────────
+atr_val  = ta.atr(atr_period)
+loss     = atr_mult * atr_val
+
+var float atr_stop = na
+
+if na(atr_stop[1])
+    atr_stop := close - loss       // seed on first bar
+else if close > atr_stop[1]
+    atr_stop := math.max(atr_stop[1], close - loss)   // ratchet up
+else if close < atr_stop[1]
+    atr_stop := math.min(atr_stop[1], close + loss)   // ratchet down
+else
+    atr_stop := atr_stop[1]
+
+// ─────────────────────────────────────────────
+//  CE / PE Signal Detection
+// ─────────────────────────────────────────────
+
+// ── ATR cross signals (natr_strategy.py) ──
+atr_ce_signal = close[1] <= atr_stop[1] and close > atr_stop   // cross above stop
+atr_pe_signal = close[1] >= atr_stop[1] and close < atr_stop   // cross below stop
+
+// ── VWAP retest signals (vwap_strategy.py) ──
+// CE: any of last N bars closed below VWAP, current bar closes above VWAP
+//     and close > prev high  and close >= vwap + min_bounce
+vwap_dip_found = false
+for i = 1 to vwap_retest_bars
+    if close[i] < vwap_val[i]
+        vwap_dip_found := true
+
+vwap_ce_signal = vwap_dip_found
+                  and close > vwap_val
+                  and close > high[1]
+                  and (min_bounce_pts <= 0 or (close - vwap_val) >= min_bounce_pts)
+
+// PE: any of last N bars closed above VWAP, current bar closes below VWAP
+//     and close < prev low  and close <= vwap - min_bounce
+vwap_pop_found = false
+for i = 1 to vwap_retest_bars
+    if close[i] > vwap_val[i]
+        vwap_pop_found := true
+
+vwap_pe_signal = vwap_pop_found
+                  and close < vwap_val
+                  and close < low[1]
+                  and (min_bounce_pts <= 0 or (vwap_val - close) >= min_bounce_pts)
+
+// ─────────────────────────────────────────────
+//  PLOTS
+// ─────────────────────────────────────────────
+
+// ATR Trailing Stop — colour by trend side
+atr_stop_colour = close > atr_stop ? color.new(color.lime, 0) : color.new(color.red, 0)
+plot(show_atr ? atr_stop : na,
+     title="ATR Trailing Stop",
+     color=atr_stop_colour,
+     linewidth=2,
+     style=plot.style_line)
+
+// EMA
+plot(show_ema ? ema_val : na,
+     title="EMA",
+     color=color.new(color.orange, 0),
+     linewidth=1)
+
+// VWAP
+plot(show_vwap ? vwap_val : na,
+     title="VWAP",
+     color=color.new(color.aqua, 0),
+     linewidth=2)
+
+// ─────────────────────────────────────────────
+//  SIGNAL LABELS
+// ─────────────────────────────────────────────
+// ATR signals
+plotshape(show_signals and atr_ce_signal,
+          title="ATR CE",
+          location=location.belowbar,
+          style=shape.triangleup,
+          color=color.new(color.lime, 0),
+          size=size.small,
+          text="ATR\nCE")
+
+plotshape(show_signals and atr_pe_signal,
+          title="ATR PE",
+          location=location.abovebar,
+          style=shape.triangledown,
+          color=color.new(color.red, 0),
+          size=size.small,
+          text="ATR\nPE")
+
+// VWAP signals
+plotshape(show_signals and vwap_ce_signal,
+          title="VWAP CE",
+          location=location.belowbar,
+          style=shape.circle,
+          color=color.new(color.blue, 0),
+          size=size.small,
+          text="VWAP\nCE")
+
+plotshape(show_signals and vwap_pe_signal,
+          title="VWAP PE",
+          location=location.abovebar,
+          style=shape.circle,
+          color=color.new(color.purple, 0),
+          size=size.small,
+          text="VWAP\nPE")
+
+// ─────────────────────────────────────────────
+//  BACKGROUND HIGHLIGHT when above/below VWAP
+// ─────────────────────────────────────────────
+bgcolor(show_vwap and close > vwap_val ? color.new(color.lime, 95) : na, title="Above VWAP bg")
+bgcolor(show_vwap and close < vwap_val ? color.new(color.red,  95) : na, title="Below VWAP bg")

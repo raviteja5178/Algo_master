@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kite Authentication Success</title>
+  <style>
+    body {
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      background: #fbf7f0;
+      color: #1a0f00;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #e8ddd0;
+      border-top: 3px solid #f5a623;
+      border-radius: 8px;
+      padding: 40px;
+      max-width: 480px;
+      text-align: center;
+      box-shadow: 0 6px 24px rgba(245,166,35,.12);
+    }
+    .icon {
+      font-size: 48px;
+      color: #1a7a4a;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #1a0f00;
+    }
+    p {
+      font-size: 15px;
+      color: #8b7355;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .btn {
+      display: inline-block;
+      background: #f5a623;
+      color: #1a0f00;
+      padding: 10px 20px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 14px;
+      transition: background 0.15s;
+    }
+    .btn:hover {
+      background: #2563eb;
+    }
+  </style>
+  <script>
+    setTimeout(function() {
+      window.location.href = '/';
+    }, 3000);
+  </script>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">&#10003;</div>
+    <h1>Authentication Successful!</h1>
+    <p>Your Zerodha Kite session has been successfully authorized and your KITE_ACCESS_TOKEN has been saved to your environment settings.</p>
+    <p style="font-size: 13px; color: #8c959f;">Redirecting back to your dashboard in 3 seconds...</p>
+    <a href="/" class="btn">Go to Dashboard Now</a>
+  </div>
+</body>
+</html>
