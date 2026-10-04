@@ -992,7 +992,7 @@ def api_env_post():
             updated[key] = value
 
         # Reload settings in memory so the Flask process immediately picks them up
-        load_dotenv(override=True)
+        load_dotenv(dotenv_path=ENV_FILE, override=True)
         # Manually sync key attributes to settings module
         for key, val in updated.items():
             if hasattr(settings, key):
@@ -1203,7 +1203,7 @@ def _handle_request_token(request_token: str):
 
         from config import settings
         from dotenv import load_dotenv
-        load_dotenv(override=True)
+        load_dotenv(dotenv_path=ENV_FILE, override=True)
         settings.KITE_ACCESS_TOKEN = access_token
 
         # Reset the KiteConnect singleton so the next call to get_kite()
@@ -1537,7 +1537,7 @@ def api_auth_login():
     # Persist the new access token
     set_key(str(ENV_FILE), "KITE_ACCESS_TOKEN", access_token)
     os.environ["KITE_ACCESS_TOKEN"] = access_token
-    load_dotenv(override=True)
+    load_dotenv(dotenv_path=ENV_FILE, override=True)
     settings.KITE_ACCESS_TOKEN = access_token
 
     # Reset KiteConnect singleton so it picks up the new token
@@ -1583,7 +1583,7 @@ def api_auth_logout():
 
     from config import settings
     from dotenv import load_dotenv
-    load_dotenv(override=True)
+    load_dotenv(dotenv_path=ENV_FILE, override=True)
     settings.KITE_ACCESS_TOKEN = ""
 
     # Reset KiteConnect singleton

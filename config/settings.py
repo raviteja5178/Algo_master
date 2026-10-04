@@ -4,13 +4,14 @@ All trading parameters are read here — no magic numbers anywhere else.
 """
 
 import os
+from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
 
-# Use override=True so that `.env` file parameters always take precedence
-# over cached or global system environment variables.
-load_dotenv(override=True)
+# Explicitly resolve the root .env path so running python from any working directory picks it up
+_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=_ENV_PATH, override=True)
 
 
 def _get(key: str, default: str = "") -> str:
