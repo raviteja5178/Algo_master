@@ -35,7 +35,15 @@ _BUFFER = 60
 # Market session starts at 09:15 IST.  Any candle or tick before this
 # time is pre-market / pre-open auction data and must not enter the EMA
 # indicators or trigger signals.
-_SESSION_OPEN = (9, 15)  # (hour, minute) in IST
+_SESSION_OPEN  = (9, 15)   # (hour, minute) in IST
+
+# Market session ends at 15:30 IST.  The final 15:15 candle closes at 15:30
+# (one interval after its open).  Any tick after 15:30 is a Zerodha heartbeat
+# (last-traded-price repeated on every WebSocket keepalive) — its True Range
+# is zero, which Wilder-smooths the ATR down to near-zero over ~25 candles.
+# This collapses Upper/Lower bands to within 1 pt of EMA, making the ATR
+# Copilot strategy useless at next-day open until 20+ real candles rebuild it.
+_SESSION_CLOSE = (15, 30)  # (hour, minute) in IST
 
 
 class CandleAggregator:
@@ -74,6 +82,8 @@ class CandleAggregator:
         """
         ts = timestamp or datetime.now(IST)
         if (ts.hour, ts.minute) < _SESSION_OPEN:
+            return
+        if (ts.hour, ts.minute) >= _SESSION_CLOSE:
             return
         closed_candle: Candle | None = None
         with self._lock:
