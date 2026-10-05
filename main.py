@@ -191,6 +191,9 @@ class BotContext:
             squeeze_candles             = settings.SMART_ENTRY_SQUEEZE_CANDLES,
             max_premium_extension_pct   = settings.SMART_ENTRY_MAX_PREMIUM_EXTENSION_PCT,
             squeeze_body_atr_ratio      = settings.SMART_ENTRY_SQUEEZE_BODY_ATR_RATIO,
+            structure_bypass_candles    = settings.SMART_ENTRY_STRUCTURE_BYPASS_CANDLES,
+            structure_bypass_ema_confirm= settings.SMART_ENTRY_STRUCTURE_BYPASS_EMA_CONFIRM,
+            bounce_exempt_strategies    = settings.SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES,
         )
 
         # AI Confirmation Filter (created only when ENABLE_AI_CONFIRMATION=true)
@@ -640,7 +643,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
 
     # ── MIN_RR gate: block entry if R:R is below the configured minimum ──
     if settings.MIN_RR > 0 and sl_pts > 0:
-        actual_rr = target_pts / sl_pts
+        actual_rr = round(target_pts / sl_pts, 2)
         if actual_rr < settings.MIN_RR:
             log_event(
                 logger, "ENTRY_BLOCKED_MIN_RR",
@@ -991,6 +994,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
                 ctx.trade_id, exit_price, now_ist().isoformat(), pnl,
                 exit_reason="SL_FILLED_AT_EXCHANGE",
                 smart_exit_trigger=reason if reason not in ("", "STOP_HIT") else None,
+                highest_ltp=ctx.trailing.highest_ltp if ctx.trailing else None,
             )
             notify("EXIT_FILLED", symbol=ctx.tradingsymbol,
                    exit_price=exit_price, pnl=pnl, reason="SL_FILLED_AT_EXCHANGE")
@@ -1039,6 +1043,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
         ctx.trade_id, exit_price, now_ist().isoformat(), pnl,
         exit_reason=reason or "MANUAL",
         smart_exit_trigger=_smart_trigger,
+        highest_ltp=ctx.trailing.highest_ltp if ctx.trailing else None,
     )
     notify("EXIT_FILLED", symbol=ctx.tradingsymbol, exit_price=exit_price, pnl=pnl, reason=reason)
 

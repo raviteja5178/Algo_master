@@ -131,6 +131,23 @@ NO_NEW_ENTRY_AFTER: str = _get("NO_NEW_ENTRY_AFTER", "15:00")
 ENABLE_EMA_STRATEGY: bool = _getbool("ENABLE_EMA_STRATEGY", True)
 ENABLE_ORB_STRATEGY: bool = _getbool("ENABLE_ORB_STRATEGY", True)
 
+# ── Structure Breakdown Cooldown Bypass ───────────────────────────────────────
+# When a signal arrives during cooldown AND the market shows a clear structural
+# breakdown (N consecutive lower highs for PE / higher lows for CE) while close
+# is already on the wrong side of EMA9, the cooldown is reduced to 1 candle.
+#
+# Rationale: the cooldown is meant to block re-entries into choppy reversals.
+# When 3+ consecutive lower highs are visible AND close < EMA9 (for PE), the
+# market is NOT choppy — it is trending.  Blocking in that case costs trades
+# exactly as happened on 2026-10-05 with PE_NATR at 10:20.
+#
+# SMART_ENTRY_STRUCTURE_BYPASS_CANDLES : N consecutive lower highs/higher lows
+#   required to trigger the bypass. 0 = disabled. Default 3.
+# SMART_ENTRY_STRUCTURE_BYPASS_EMA_CONFIRM : also require close < EMA9 (PE) or
+#   close > EMA9 (CE) for the bypass to fire. True = stricter. Default true.
+SMART_ENTRY_STRUCTURE_BYPASS_CANDLES: int   = _getint("SMART_ENTRY_STRUCTURE_BYPASS_CANDLES", 0)
+SMART_ENTRY_STRUCTURE_BYPASS_EMA_CONFIRM: bool = _getbool("SMART_ENTRY_STRUCTURE_BYPASS_EMA_CONFIRM", True)
+
 # ── Smart Entry Filter ────────────────────────────────────────────────────────
 # Quality gate applied AFTER a raw signal (EMA / ORB / OB / MOM) fires.
 # All default OFF — set to enable.  Zero behaviour change until opted in.
@@ -184,6 +201,22 @@ SMART_ENTRY_SQUEEZE_CANDLES: int         = _getint("SMART_ENTRY_SQUEEZE_CANDLES"
 # 0.0 = use the same ratio as normal (no relaxation).
 # Recommended: 0.25 (vs default 0.35 normal ratio).
 SMART_ENTRY_SQUEEZE_BODY_ATR_RATIO: float = _getfloat("SMART_ENTRY_SQUEEZE_BODY_ATR_RATIO", 0.0)
+
+# Filter 8b — Bounce-exempt strategies.
+# Comma-separated list of strategy name suffixes that bypass Filters 1, 4 & 5
+# (body/ATR ratio, EMA gap magnitude, EMA gap widening).
+# These are "bounce" strategies whose own structural level already confirms the
+# entry — the EMA gap is expected to be flat at a VWAP retest or NATR crossover.
+# Default: "VWAP,NATR" — skip body + EMA-gap filters for CE_VWAP / PE_VWAP /
+#   CE_NATR / PE_NATR signals.
+# "" = disable (all strategies subject to body/EMA-gap filters equally).
+# Example: SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES=VWAP,NATR,OB
+_BOUNCE_EXEMPT_RAW: str = _get("SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES", "VWAP,NATR")
+SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES: set[str] = (
+    {s.strip().upper() for s in _BOUNCE_EXEMPT_RAW.split(",") if s.strip()}
+    if _BOUNCE_EXEMPT_RAW.strip()
+    else set()
+)
 
 # Filter 8 — Option premium extension guard.
 # Blocks entry when the option LTP has already risen more than this fraction

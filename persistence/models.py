@@ -155,15 +155,25 @@ def mark_trade_closed_with_reason(
     pnl: float,
     exit_reason: str,
     smart_exit_trigger: str | None = None,
+    highest_ltp: float | None = None,
 ) -> None:
-    """Like mark_trade_closed but also persists exit_reason and smart_exit_trigger."""
+    """Like mark_trade_closed but also persists exit_reason, smart_exit_trigger,
+    and the final highest_ltp so the peak price is never lost on trade close."""
     with _conn() as con:
-        con.execute(
-            "UPDATE trades SET status='CLOSED', exit_price=?, exit_time=?, realized_pnl=?, "
-            "exit_reason=?, smart_exit_trigger=?, "
-            "updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE trade_id=?",
-            (exit_price, exit_time, pnl, exit_reason, smart_exit_trigger, trade_id),
-        )
+        if highest_ltp is not None:
+            con.execute(
+                "UPDATE trades SET status='CLOSED', exit_price=?, exit_time=?, realized_pnl=?, "
+                "exit_reason=?, smart_exit_trigger=?, highest_ltp=?, "
+                "updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE trade_id=?",
+                (exit_price, exit_time, pnl, exit_reason, smart_exit_trigger, highest_ltp, trade_id),
+            )
+        else:
+            con.execute(
+                "UPDATE trades SET status='CLOSED', exit_price=?, exit_time=?, realized_pnl=?, "
+                "exit_reason=?, smart_exit_trigger=?, "
+                "updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE trade_id=?",
+                (exit_price, exit_time, pnl, exit_reason, smart_exit_trigger, trade_id),
+            )
 
 
 def fetch_shadow_trades(date: str | None = None, limit: int = 500) -> list[dict]:

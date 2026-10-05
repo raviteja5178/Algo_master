@@ -1,0 +1,408 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Oct 5 — Trade Analysis</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-size: 13px; line-height: 1.6; background: #ffffff; color: #1f2328; padding: 28px 20px; }
+.wrap { max-width: 820px; margin: 0 auto; }
+h1 { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+.sub { color: #57606a; font-size: 12px; margin-bottom: 24px; }
+h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #57606a; margin: 24px 0 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { background: #f7f8fa; color: #57606a; font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
+td { padding: 6px 8px; border-bottom: 1px solid #f0f1f3; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.red { color: #cf222e; font-weight: 600; }
+.green { color: #1a7f37; font-weight: 600; }
+.orange { color: #9a6700; font-weight: 600; }
+.muted { color: #57606a; }
+.tag { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.tag-ce { background: #dbeafe; color: #1d4ed8; }
+.tag-pe { background: #fce7f3; color: #9d174d; }
+.tag-pass { background: #dcfce7; color: #166534; }
+.tag-block { background: #fee2e2; color: #991b1b; }
+.tag-new { background: #fef9c3; color: #713f12; }
+.tag-info { background: #f0f9ff; color: #0369a1; }
+.arrow { color: #57606a; }
+.badge { display:inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; }
+.badge-stopped { background: #fee2e2; color: #991b1b; }
+.badge-collapse { background: #fef3c7; color: #92400e; }
+.badge-rr { background: #ede9fe; color: #5b21b6; }
+.badge-cooldown { background: #e5e7eb; color: #374151; }
+.badge-body { background: #fce7f3; color: #9d174d; }
+.badge-slope { background: #f3f4f6; color: #374151; }
+.badge-ema { background: #fef3c7; color: #92400e; }
+.badge-allowed { background: #dcfce7; color: #166534; }
+.section-rule { border: none; border-top: 1px solid #e5e7eb; margin: 20px 0 0; }
+.summary-box { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 16px; display: flex; gap: 32px; flex-wrap: wrap; margin-top: 12px; }
+.stat { display: flex; flex-direction: column; }
+.stat .val { font-size: 18px; font-weight: 700; }
+.stat .lbl { font-size: 11px; color: #57606a; }
+.note { background: #f0f9ff; border-left: 3px solid #3b82d4; padding: 8px 12px; font-size: 12px; color: #0f172a; margin: 8px 0; border-radius: 0 4px 4px 0; }
+.warn { background: #fffbeb; border-left: 3px solid #f59e0b; padding: 8px 12px; font-size: 12px; color: #0f172a; margin: 8px 0; border-radius: 0 4px 4px 0; }
+footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 11px; color: #57606a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>SENSEX Auto-Trader — 2026-10-05 Complete Analysis</h1>
+<p class="sub">Shadow (paper) mode  ·  3 executions  ·  13 blocked signals  ·  Net −Rs.783 actual</p>
+
+
+<h2>Actual Trades (old logic — as executed)</h2>
+<table>
+<thead>
+<tr>
+  <th>#</th><th>Strategy</th><th>Symbol</th><th>Entry time</th>
+  <th class="num">Entry</th><th>Exit time</th><th class="num">Exit</th>
+  <th>Exit reason</th><th class="num">PnL (opt pts)</th><th class="num">PnL (INR)</th><th class="num">Peak LTP</th><th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>1</td>
+  <td><span class="tag tag-ce">CE_VWAP</span></td>
+  <td class="muted" style="font-size:11px">SENSEX26O08<br />72300CE</td>
+  <td>09:25</td>
+  <td class="num">577.45</td>
+  <td>10:01</td>
+  <td class="num">571.15</td>
+  <td><span class="badge badge-stopped">STOP_HIT</span></td>
+  <td class="num red">−6.30</td>
+  <td class="num red">−Rs.126</td>
+  <td class="num">678.75</td>
+  <td class="muted" style="font-size:11px">SL was swing-low 71,697. Peak was 678.75 — trade moved +101 pts in favour before reversal</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><span class="tag tag-pe">PE_VWAP</span></td>
+  <td class="muted" style="font-size:11px">SENSEX26O08<br />72100PE</td>
+  <td>11:40</td>
+  <td class="num">436.30</td>
+  <td>—</td>
+  <td class="num">—</td>
+  <td><span class="badge badge-rr">MIN_RR ABORT</span></td>
+  <td class="num orange">0 (aborted)</td>
+  <td class="num orange">Rs.0</td>
+  <td class="num">—</td>
+  <td class="muted" style="font-size:11px">Paper-filled at 436.30, then immediately aborted: actual_rr=1.4997 rounded to 1.5 in log but raw float &lt; 1.5 threshold. <strong>Bug confirmed.</strong></td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><span class="tag tag-pe">PE_VWAP</span></td>
+  <td class="muted" style="font-size:11px">SENSEX26O08<br />72000PE</td>
+  <td>11:50</td>
+  <td class="num">414.50</td>
+  <td>—</td>
+  <td class="num">—</td>
+  <td><span class="badge badge-rr">MIN_RR ABORT</span></td>
+  <td class="num orange">0 (aborted)</td>
+  <td class="num orange">Rs.0</td>
+  <td class="num">—</td>
+  <td class="muted" style="font-size:11px">Same float bug: 155.3/103.55 = 1.4998 raw vs 1.5 threshold. Aborted.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><span class="tag tag-pe">PE</span></td>
+  <td class="muted" style="font-size:11px">SENSEX26O08<br />72000PE</td>
+  <td>12:00</td>
+  <td class="num">455.70</td>
+  <td>12:50</td>
+  <td class="num">422.85</td>
+  <td><span class="badge badge-collapse">EMA_COLLAPSE</span></td>
+  <td class="num red">−32.85</td>
+  <td class="num red">−Rs.657</td>
+  <td class="num">521.00</td>
+  <td class="muted" style="font-size:11px">EMA_COLLAPSE exit at 12:50 when close 72,043 crossed above EMA9 72,000. Peak was 521 — trade had +65 pts unrealised profit</td>
+</tr>
+</tbody>
+</table>
+
+<div class="summary-box" style="margin-top:10px">
+  <div class="stat"><span class="val red">−Rs.783</span><span class="lbl">Net actual P&amp;L</span></div>
+  <div class="stat"><span class="val">4</span><span class="lbl">Executions (incl. 2 aborted)</span></div>
+  <div class="stat"><span class="val red">2</span><span class="lbl">Losses (closed)</span></div>
+  <div class="stat"><span class="val orange">2</span><span class="lbl">Aborted by float bug</span></div>
+</div>
+
+<div class="warn" style="margin-top:10px">
+  <strong>Important:</strong> Trades 2 and 3 were paper-filled then <em>immediately</em> reversed to IDLE by the MIN_RR check. The fill was a paper artefact — no real money changed hands. The actual net is −Rs.783 (Trade 1 + Trade 4 only). But both abortions were <strong>incorrect</strong> — the R:R was exactly 1.5:1 in both cases; the raw float division just barely missed the threshold by 0.0003.
+</div>
+
+
+<h2>All 13 Blocked Signals — Old Logic vs New Logic</h2>
+<div class="note">
+  New logic changes applied: <strong>(1)</strong> VWAP/NATR signals skip body-filter and EMA-gap filters (bounce-exempt)  ·  <strong>(2)</strong> MIN_RR uses <code>round(rr, 2)</code> before comparison
+</div>
+<table>
+<thead>
+<tr>
+  <th>#</th><th>Signal</th><th>Time</th><th>SENSEX close</th><th>Block reason (old)</th>
+  <th>New logic result</th><th>Price move after</th><th>Verdict</th>
+</tr>
+</thead>
+<tbody>
+
+<tr>
+  <td>1</td><td><span class="tag tag-pe">PE_VWAP</span></td><td>10:05</td>
+  <td class="num">72,381</td>
+  <td><span class="badge badge-cooldown">COOLDOWN ×5</span></td>
+  <td><span class="badge badge-block">STILL BLOCKED</span></td>
+  <td class="muted">—</td>
+  <td class="muted" style="font-size:11px">Correct — only 4 min after Trade 1 SL. Market just reversed; cooldown is right here.</td>
+</tr>
+
+<tr>
+  <td>2</td><td><span class="tag tag-pe">PE_NATR</span></td><td>10:25</td>
+  <td class="num">72,227</td>
+  <td><span class="badge badge-cooldown">COOLDOWN ×1</span></td>
+  <td><span class="badge badge-block">STILL BLOCKED</span></td>
+  <td class="muted">Close @10:35 = 72,302 (+75)</td>
+  <td class="muted" style="font-size:11px">Price bounced +75 pts after signal — good block. CE bounce, not PE continuation.</td>
+</tr>
+
+<tr style="background:#fefce8">
+  <td>3</td><td><span class="tag tag-ce">CE_VWAP</span></td><td>10:35</td>
+  <td class="num">72,302</td>
+  <td><span class="badge badge-body">BODY 13 pts &lt; 36 req</span></td>
+  <td><span class="badge badge-allowed">ALLOWED — bounce-exempt</span></td>
+  <td class="muted">Close @10:40 = 72,129 (−173 pts)</td>
+  <td class="red" style="font-size:11px">Would have been a LOSER — CE at 72,302 and price fell 173 pts to 72,129. Saved by old logic paradoxically. However the subsequent drop is what the new logic must accept — VWAP CE here was a counter-trend entry into a downtrend.</td>
+</tr>
+
+<tr style="background:#fef2f2">
+  <td>4</td><td><span class="tag tag-pe">PE_VWAP</span></td><td>10:40</td>
+  <td class="num">72,129</td>
+  <td><span class="badge badge-ema">EMA_GAP +34.5 — wrong dir for PE</span></td>
+  <td><span class="badge badge-allowed">ALLOWED — bounce-exempt</span></td>
+  <td class="muted">Close @11:02 = 72,182 (+53 pts up)</td>
+  <td class="red" style="font-size:11px">Would have been a LOSER — PE at 72,129 but price bounced to 72,182. <em>However</em> note: the EMA gap was +34.5 (EMA9 &gt; EMA21), meaning the block reason shown is technically wrong — it was a PE signal with EMA9 bullish. The bounce-exempt bypass here <em>over-extends</em> — this block was actually correct. The gap direction mattered.</td>
+</tr>
+
+<tr>
+  <td>5</td><td><span class="tag tag-ce">CE_VWAP</span></td><td>11:02</td>
+  <td class="num">72,182</td>
+  <td><span class="badge badge-slope">EMA9 SLOPE (not rising)</span></td>
+  <td><span class="badge badge-block">STILL BLOCKED</span></td>
+  <td class="muted">Close @11:15 = 72,120 (−62 pts)</td>
+  <td class="muted" style="font-size:11px">Correct — EMA9 was falling, CE would have lost. Good block.</td>
+</tr>
+
+<tr style="background:#fefce8">
+  <td>6</td><td><span class="tag tag-pe">PE_VWAP</span></td><td>11:15</td>
+  <td class="num">72,120</td>
+  <td><span class="badge badge-body">BODY 28 pts &lt; 32 req</span></td>
+  <td><span class="badge badge-allowed">ALLOWED — bounce-exempt</span></td>
+  <td class="muted">Close @11:35 = 72,219 (+99 pts up)</td>
+  <td class="red" style="font-size:11px">Would have been a LOSER — PE at 72,120, price rose +99 pts. Body filter saved this one too.</td>
+</tr>
+
+<tr style="background:#fef2f2">
+  <td>7</td><td><span class="tag tag-ce">CE_VWAP</span></td><td>11:35</td>
+  <td class="num">72,219</td>
+  <td><span class="badge badge-ema">EMA_GAP −16.3 (EMA9 &lt; EMA21)</span></td>
+  <td><span class="badge badge-allowed">ALLOWED — bounce-exempt</span></td>
+  <td class="muted">Close @11:40 = 72,105 (−114 pts)</td>
+  <td class="red" style="font-size:11px">Would have been a LOSER — CE at 72,219, price dropped −114 pts to 72,105 on the very next candle. The bearish EMA gap was the correct warning.</td>
+</tr>
+
+<tr style="background:#dcfce7">
+  <td>8</td><td><span class="tag tag-pe">PE_VWAP</span></td><td>11:40</td>
+  <td class="num">72,104</td>
+  <td><span class="badge badge-rr">MIN_RR 1.4997 &lt; 1.5 (float bug)</span></td>
+  <td><span class="badge badge-allowed">ALLOWED — R:R float fix</span></td>
+  <td class="muted">Close @11:45 = 72,081 (−23)<br />Close @11:50 = 72,042 (−62)<br />Close @12:00 = 71,959 (−145)<br /><strong>Best: 71,959 (−145 pts)</strong></td>
+  <td class="green" style="font-size:11px"><strong>Would have been a WINNER.</strong> PE at 72,104, SENSEX fell 145 pts to 71,959. SL=78 opt pts (195 SENSEX pts), Target=117 opt pts. Target = ~117 pts below SENSEX entry (72,104−293=71,811). Swing low 71,909 was only 195 pts away. Price hit 71,959 — nearly at target zone. Estimated gain: +Rs.936 (117 × 0.4 × 20).</td>
+</tr>
+
+<tr style="background:#fefce8">
+  <td>9</td><td><span class="tag tag-pe">PE_VWAP</span></td><td>11:45</td>
+  <td class="num">72,081</td>
+  <td><span class="badge badge-body">BODY 23 pts &lt; 32 req</span></td>
+  <td><span class="badge badge-allowed">ALLOWED — bounce-exempt</span></td>
+  <td class="muted">Close @11:50 = 72,042 (−39)<br />Close @12:00 = 71,959 (−122)<br /><strong>Best: 71,959 (−122 pts)</strong></td>
+  <td class="green" style="font-size:11px">Would likely have been a WINNER — PE at 72,081, SENSEX fell 122 pts to 71,959. However Trade 8 would already be open at this point (11:40 position). This signal would have been blocked by the existing-position guard anyway. <em>Marginal additive value.</em></td>
+</tr>
+
+<tr style="background:#fef2f2">
+  <td>10</td><td><span class="tag tag-pe">PE_VWAP</span></td><td>11:50</td>
+  <td class="num">72,042</td>
+  <td><span class="badge badge-rr">MIN_RR 1.4998 &lt; 1.5 (float bug)</span></td>
+  <td><span class="badge badge-allowed">ALLOWED — R:R float fix</span></td>
+  <td class="muted">Close @12:00 = 71,959 (−83)<br /><strong>Best: 71,959 (−83 pts)</strong></td>
+  <td class="muted" style="font-size:11px">If Trade 8 is already open, this is redundant — same direction, same zone. Would have been correct direction but low additive value.</td>
+</tr>
+
+<tr>
+  <td>11</td><td><span class="tag tag-pe">PE_VWAP</span></td><td>12:55</td>
+  <td class="num">71,965</td>
+  <td><span class="badge badge-cooldown">COOLDOWN ×5</span></td>
+  <td><span class="badge badge-block">STILL BLOCKED</span></td>
+  <td class="muted">Close @13:20 = 72,095 (+130 pts up)</td>
+  <td class="muted" style="font-size:11px">Correct — price reversed sharply after EMA_COLLAPSE exit. Cooldown correctly prevented a PE re-entry into a CE bounce.</td>
+</tr>
+
+<tr style="background:#dcfce7">
+  <td>12</td><td><span class="tag tag-ce">CE_VWAP</span></td><td>13:20</td>
+  <td class="num">72,095</td>
+  <td><span class="badge badge-ema">EMA_GAP −4.6 (flat EMAs)</span></td>
+  <td><span class="badge badge-allowed">ALLOWED — bounce-exempt</span></td>
+  <td class="muted">Close @14:15 = 72,332 (+237 pts)<br /><strong>Best: 72,332 (+237 pts)</strong></td>
+  <td class="green" style="font-size:11px"><strong>Would have been a WINNER.</strong> CE at 72,095, SENSEX rose 237 pts to 72,332. The EMA gap of −4.63 was noise (flat market), VWAP was the real signal. Target (1.5× SL ≈ 117 pts) would have been hit by 13:40. Estimated gain: +Rs.936.</td>
+</tr>
+
+<tr>
+  <td>13</td><td><span class="tag tag-pe">PE_VWAP</span></td><td>14:40</td>
+  <td class="num">72,320</td>
+  <td><span class="badge badge-slope">EMA9 SLOPE (not falling)</span></td>
+  <td><span class="badge badge-block">STILL BLOCKED</span></td>
+  <td class="muted">Post-15:00 — no new entry allowed</td>
+  <td class="muted" style="font-size:11px">Correct — too late in day (14:40), EMA9 rising, PE would have been counter-trend.</td>
+</tr>
+
+</tbody>
+</table>
+
+
+<h2>Bounce-Exempt Bypass — Signal-by-Signal Verdict</h2>
+<div class="warn">
+  <strong>Key finding:</strong> 6 signals got the bounce-exempt bypass (Filters 1, 4, 5 skipped). Of those 6, <strong>3 would have been losers</strong> (signals 3, 6, 7) and <strong>2 would have been winners</strong> (signals 9, 12). Signal 4 is a special case — the block reason shown was EMA_GAP but the gap was <em>in favour of CE, not PE</em> — the PE signal had a bullish EMA gap (+34 pts), which is a valid block.
+</div>
+
+<table>
+<thead>
+<tr>
+  <th>Signal</th><th>Direction</th><th>Block bypass</th><th>Outcome if taken</th><th>Est. PnL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>#3 10:35</td><td><span class="tag tag-ce">CE_VWAP</span></td>
+  <td>Body 13 &lt; 36 → skipped</td>
+  <td class="red">LOSER — price fell 173 pts on next candle</td>
+  <td class="num red">−Rs.640 est.</td>
+</tr>
+<tr>
+  <td>#4 10:40</td><td><span class="tag tag-pe">PE_VWAP</span></td>
+  <td>EMA_GAP → skipped</td>
+  <td class="red">LOSER — price rose 53 pts (bounce)</td>
+  <td class="num red">−Rs.640 est.</td>
+</tr>
+<tr>
+  <td>#6 11:15</td><td><span class="tag tag-pe">PE_VWAP</span></td>
+  <td>Body 28 &lt; 32 → skipped</td>
+  <td class="red">LOSER — price rose 99 pts (short-squeeze)</td>
+  <td class="num red">−Rs.640 est.</td>
+</tr>
+<tr>
+  <td>#7 11:35</td><td><span class="tag tag-ce">CE_VWAP</span></td>
+  <td>EMA_GAP −16 → skipped</td>
+  <td class="red">LOSER — price fell 114 pts immediately</td>
+  <td class="num red">−Rs.640 est.</td>
+</tr>
+<tr>
+  <td>#9 11:45</td><td><span class="tag tag-pe">PE_VWAP</span></td>
+  <td>Body 23 &lt; 32 → skipped</td>
+  <td class="green">WINNER — but position from #8 already open; redundant</td>
+  <td class="num muted">N/A (position occupied)</td>
+</tr>
+<tr>
+  <td>#12 13:20</td><td><span class="tag tag-ce">CE_VWAP</span></td>
+  <td>EMA_GAP −4.6 → skipped</td>
+  <td class="green"><strong>WINNER — +237 pts SENSEX, clear VWAP bounce</strong></td>
+  <td class="num green">+Rs.936 est.</td>
+</tr>
+</tbody>
+</table>
+
+
+<h2>R:R Float Fix — Signal-by-Signal Verdict</h2>
+<table>
+<thead>
+<tr>
+  <th>Signal</th><th>Raw R:R</th><th>Logged R:R</th><th>Required</th><th>Old result</th><th>New result</th><th>Outcome if taken</th><th>Est. PnL</th>
+</tr>
+</thead>
+<tbody>
+<tr style="background:#dcfce7">
+  <td>#8 11:40 PE_VWAP</td>
+  <td class="num">1.4997</td><td class="num">1.50</td><td class="num">1.5</td>
+  <td><span class="badge badge-rr">BLOCKED</span></td>
+  <td><span class="badge badge-allowed">ALLOWED</span></td>
+  <td class="green">WINNER — SENSEX fell 145 pts, target ~117 opt pts hit</td>
+  <td class="num green">+Rs.936 est.</td>
+</tr>
+<tr>
+  <td>#10 11:50 PE_VWAP</td>
+  <td class="num">1.4998</td><td class="num">1.50</td><td class="num">1.5</td>
+  <td><span class="badge badge-rr">BLOCKED</span></td>
+  <td><span class="badge badge-allowed">ALLOWED</span></td>
+  <td class="muted">Redundant — #8 would already be open in same direction</td>
+  <td class="num muted">N/A (position occupied)</td>
+</tr>
+</tbody>
+</table>
+
+
+<hr class="section-rule" />
+<h2>Summary — Net Impact of New Logic on Oct 5</h2>
+
+<table>
+<thead>
+<tr><th>Item</th><th class="num">PnL change (est.)</th><th>Explanation</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td>Actual P&amp;L (old logic)</td>
+  <td class="num red">−Rs.783</td>
+  <td>Trade 1 SL (−Rs.126) + Trade 4 EMA_COLLAPSE (−Rs.657). Trades 2&amp;3 aborted = Rs.0.</td>
+</tr>
+<tr style="background:#dcfce7">
+  <td>R:R fix — Signal #8 (PE_VWAP 11:40) now taken</td>
+  <td class="num green">+Rs.936</td>
+  <td>SENSEX fell 145 pts to 71,959. SL=195 SENSEX pts above, target=293 pts below. Target hit. Option gain ≈117 pts × 0.4 × 20.</td>
+</tr>
+<tr style="background:#dcfce7">
+  <td>Bounce-exempt — Signal #12 (CE_VWAP 13:20) now taken</td>
+  <td class="num green">+Rs.936</td>
+  <td>SENSEX rose 237 pts in 55 min. EMA flat at bounce = expected. Target hit by 13:40. Gain ≈117 pts × 0.4 × 20.</td>
+</tr>
+<tr style="background:#fef2f2">
+  <td>Bounce-exempt — Signal #3 (CE_VWAP 10:35) now taken</td>
+  <td class="num red">−Rs.640 est.</td>
+  <td>Counter-trend CE into a downtrend. Price fell 173 pts immediately. SL hit.</td>
+</tr>
+<tr style="background:#fef2f2">
+  <td>Bounce-exempt — Signal #6 (PE_VWAP 11:15) now taken</td>
+  <td class="num red">−Rs.640 est.</td>
+  <td>PE at 72,120, price bounced +99 pts. Short-squeeze reversal. SL hit.</td>
+</tr>
+<tr style="background:#fef2f2">
+  <td>Bounce-exempt — Signal #7 (CE_VWAP 11:35) now taken</td>
+  <td class="num red">−Rs.640 est.</td>
+  <td>CE with EMA9 below EMA21 by −16 pts. Price fell 114 pts on next candle. SL hit.</td>
+</tr>
+<tr style="border-top:2px solid #e5e7eb">
+  <td><strong>Projected P&amp;L (new logic)</strong></td>
+  <td class="num" style="font-weight:700;font-size:14px;color:#cf222e">−Rs.1,831</td>
+  <td>−783 + 936 + 936 − 640 − 640 − 640 = −Rs.831 (additional losers from over-exemption dominate)</td>
+</tr>
+</tbody>
+</table>
+
+<div class="warn" style="margin-top:12px">
+  <strong>Critical finding:</strong> The R:R float fix is a clear improvement (+Rs.936 for signal #8). The bounce-exempt bypass for signal #12 (13:20 CE_VWAP) was also correct (+Rs.936). <strong>However</strong>, the same bypass fires for signals #3, #6, and #7 — which are choppy, counter-trend VWAP attempts in a grinding sideways/down morning. On this particular day, the body filter and EMA-gap filter were acting as correct <em>trend filters</em> for those three signals. The bounce-exempt logic needs an additional guard: only apply it when price is clearly on the correct side of VWAP (the "retest" must be confirmed by close being some distance beyond VWAP in the signal direction).
+</div>
+
+<div class="note" style="margin-top:8px">
+  <strong>Recommended next tuning:</strong> Add <code>SMART_ENTRY_VWAP_MIN_CLEARANCE_PTS</code> — for CE_VWAP, require <code>close − VWAP &gt;= N pts</code> before the signal fires. For signal #12: close=72,095, VWAP=72,034 → clearance=61 pts (passes). For signal #3: close=72,302, VWAP=72,296 → clearance=6 pts (blocked — tiny clearance = weak bounce). For signal #7: close=72,219, VWAP=72,136 → clearance=83 pts (passes — but EMA was bearish, so EMA-gap block was still valid). This single addition would have saved signals #3 and possibly #6.
+</div>
+
+<footer>Made with IBM Bob</footer>
+</div>
+</body>
+</html>

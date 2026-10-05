@@ -530,3 +530,78 @@ class TestFilter6_15mTrend:
         flt = SmartEntryFilter(require_15m_trend=True)
         candles_15m = self._make_15m_candles(close_above_ema=False)
         assert flt.allow("PE_TRB", self._basic_ce_candles(), candles_15m=candles_15m) is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bounce-exempt strategy bypass (Filters 1, 4 & 5)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestBounceExemptStrategies:
+    """
+    VWAP and NATR signals must bypass Filters 1 (body/ATR), 4 (min EMA gap),
+    and 5 (EMA gap widening) because bounce setups have flat EMAs by definition.
+    """
+
+    def _flat_candles(self, n: int = 30) -> list[Candle]:
+        """Candles with tiny bodies and near-zero EMA gap (flat/noise zone)."""
+        base = 72000.0
+        candles = []
+        for i in range(n):
+            ts = datetime(_TODAY.year, _TODAY.month, _TODAY.day, 9, 15) + timedelta(minutes=i * 5)
+            # All candles close at base ± 1 — body = 1, ATR ≈ 1, EMA gap ≈ 0
+            c = base + (1.0 if i % 2 == 0 else -1.0)
+            candles.append(_make_candle(ts, base, base + 2, base - 2, c))
+        return candles
+
+    def test_vwap_bypasses_body_filter(self) -> None:
+        """CE_VWAP must pass even when body << ATR threshold."""
+        flt = SmartEntryFilter(min_body_atr_ratio=0.5, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_body_and_atr(body=1, atr_range=20)  # body/ATR = 0.05 << 0.5
+        assert flt.allow("CE_VWAP", candles) is True
+
+    def test_natr_bypasses_body_filter(self) -> None:
+        """PE_NATR must pass even when body << ATR threshold."""
+        flt = SmartEntryFilter(min_body_atr_ratio=0.5, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_body_and_atr(body=1, atr_range=20, direction="PE")
+        assert flt.allow("PE_NATR", candles) is True
+
+    def test_non_exempt_strategy_still_blocked_by_body(self) -> None:
+        """CE_EMA (not in exempt set) must still be blocked by body filter."""
+        flt = SmartEntryFilter(min_body_atr_ratio=0.5, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_body_and_atr(body=1, atr_range=20)
+        assert flt.allow("CE_EMA", candles) is False
+
+    def test_vwap_bypasses_ema_gap_filter(self) -> None:
+        """CE_VWAP must pass even when EMA gap is flat/negative (noise zone)."""
+        flt = SmartEntryFilter(min_ema_gap_pts=10.0, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_ema_gap(widening=True, side="CE", large_gap=False)
+        # EMA gap is small → CE_EMA would be blocked, CE_VWAP must pass
+        assert flt.allow("CE_VWAP", candles) is True
+
+    def test_vwap_bypasses_ema_gap_widening_filter(self) -> None:
+        """CE_VWAP must pass even when EMA gap is shrinking."""
+        flt = SmartEntryFilter(require_ema_gap_widening=True, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_ema_gap(widening=False, side="CE")
+        assert flt.allow("CE_VWAP", candles) is True
+
+    def test_non_exempt_still_blocked_by_ema_gap(self) -> None:
+        """CE_EMA (not exempt) must still be blocked by EMA gap filter."""
+        flt = SmartEntryFilter(min_ema_gap_pts=10.0, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_ema_gap(widening=True, side="CE", large_gap=False)
+        assert flt.allow("CE_EMA", candles) is False
+
+    def test_empty_exempt_set_disables_bypass(self) -> None:
+        """When bounce_exempt_strategies=set(), no strategy gets the bypass."""
+        flt = SmartEntryFilter(min_body_atr_ratio=0.5, bounce_exempt_strategies=set())
+        candles = _candles_with_body_and_atr(body=1, atr_range=20)
+        # CE_VWAP should be blocked when exemption is explicitly disabled
+        assert flt.allow("CE_VWAP", candles) is False
+
+    def test_default_exempt_set_includes_vwap_and_natr(self) -> None:
+        """Default SmartEntryFilter exempt set is VWAP and NATR (body bypass)."""
+        flt = SmartEntryFilter(min_body_atr_ratio=0.5)  # no bounce_exempt_strategies → default
+        candles = _candles_with_body_and_atr(body=1, atr_range=20)
+        assert flt.allow("CE_VWAP", candles) is True
+        assert flt.allow("PE_NATR", candles) is True
+        # EMA/ORB are NOT in default exempt set
+        assert flt.allow("CE_EMA", candles) is False

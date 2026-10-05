@@ -1139,6 +1139,10 @@ function _initLwChart(){
   const h=el.clientHeight||el.offsetHeight||400;
   _lwChart.applyOptions({width:w,height:h});
   new ResizeObserver(()=>{if(_lwChart)_lwChart.applyOptions({width:el.clientWidth,height:el.clientHeight});}).observe(el);
+  // Detect manual zoom/pan — once the user interacts, suppress all auto-fitContent calls
+  // until they explicitly click Reset or change the interval.
+  _userZoomed=false;
+  _lwChart.timeScale().subscribeVisibleLogicalRangeChange(()=>{_userZoomed=true;});
 }
 
 function _calcEma(closes,period){
@@ -1171,8 +1175,8 @@ function _renderCandles(candles){
   if(closes.length>=9){const e9=_calcEma(closes,9);_ema9Series.setData(data.map((c,i)=>({time:c.time,value:+e9[i].toFixed(2)})));}
   if(closes.length>=21){const e21=_calcEma(closes,21);_ema21Series.setData(data.map((c,i)=>({time:c.time,value:+e21[i].toFixed(2)})));}
   document.getElementById('candle-count').textContent=`${data.length} candles`;
-  // fitContent shows all loaded candles — avoids scrollToRealTime clock-skew blank.
-  try{_lwChart.timeScale().fitContent();}catch(e){}
+  // fitContent on initial full load only — skip if user has manually zoomed/panned.
+  if(!_userZoomed)try{_lwChart.timeScale().fitContent();}catch(e){}
 }
 
 function _fmtDate(d){const p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;}
@@ -1280,11 +1284,16 @@ function _applyActiveTradeLines(liveStop,liveTarget){
 }
 
 // ── Chart scale helpers ────────────────────────────────────────────────────
+// _userZoomed: set true the moment the user manually scrolls or scales the chart.
+// When true, all automatic fitContent() calls are suppressed so the view stays
+// exactly where the user left it.  Reset to false on interval change or Reset button.
+let _userZoomed=false;
 let _chartFitTimer=null;
 function _scheduleChartFit(){
+  if(_userZoomed)return;          // user has zoomed — never auto-fit
   if(_chartFitTimer)clearTimeout(_chartFitTimer);
   _chartFitTimer=setTimeout(()=>{
-    if(_lwChart)try{
+    if(_lwChart&&!_userZoomed)try{
       _lwChart.timeScale().fitContent();
       _updateAnchorSeries();
     }catch(e){}
@@ -1329,6 +1338,7 @@ function _updateAnchorSeries(){
 // Uses the anchor series mechanism so it works with LWC's auto-scale.
 function chartFitAll(){
   if(!_lwChart)return;
+  _userZoomed=false;   // explicit user action — re-enable auto-fit
   try{
     _updateAnchorSeries();
     _lwChart.applyOptions({rightPriceScale:{autoScale:true,scaleMargins:{top:0.15,bottom:0.15}}});
@@ -1336,9 +1346,10 @@ function chartFitAll(){
   }catch(e){}
 }
 
-// ↺ Reset — restore default autoScale and fit all candles
+// ↺ Reset — restore default autoScale, fit all candles, and re-enable auto-fit
 function chartResetZoom(){
   if(!_lwChart)return;
+  _userZoomed=false;
   try{
     if(_anchorSeries)try{_anchorSeries.setData([]);}catch(e){}
     _lwChart.applyOptions({rightPriceScale:{autoScale:true,scaleMargins:{top:0.15,bottom:0.15}}});
@@ -1432,6 +1443,7 @@ async function _fetchAndRender(){
 
 function setChartInterval(iv){
   _chartInterval=iv;
+  _userZoomed=false;   // interval change = fresh chart — restore auto-fit
   // keep dropdown in sync (called both from onchange and programmatically)
   const sel=document.getElementById('chart-interval-select');
   if(sel&&sel.value!==iv)sel.value=iv;
