@@ -189,6 +189,7 @@ class SmartEntryFilter:
         structure_bypass_candles: int = 0,
         structure_bypass_ema_confirm: bool = True,
         bounce_exempt_strategies: set[str] | None = None,
+        slope_exempt_strategies: set[str] | None = None,
     ) -> None:
         self._min_body_atr       = min_body_atr_ratio
         self._require_slope      = require_ema_slope
@@ -209,6 +210,14 @@ class SmartEntryFilter:
             self._bounce_exempt: frozenset[str] = frozenset({"VWAP", "NATR"})
         else:
             self._bounce_exempt = frozenset(s.upper() for s in bounce_exempt_strategies)
+        # Strategies that bypass the EMA9 slope filter (Filter 2).
+        # NATR is exempt by default: its trailing-stop crossover IS the trend-flip
+        # signal — EMA9 lags by 1-2 candles and will be pointing the wrong way
+        # right at the inflection point where NATR fires.
+        if slope_exempt_strategies is None:
+            self._slope_exempt: frozenset[str] = frozenset({"NATR"})
+        else:
+            self._slope_exempt = frozenset(s.upper() for s in slope_exempt_strategies)
         # {tradingsymbol: (date, first_ltp)} — resets automatically per day
         self._first_ltp: dict[str, tuple[date, float]] = {}
         # {tradingsymbol: (date, highest_ltp)} — rolling intraday high per symbol
@@ -466,7 +475,11 @@ class SmartEntryFilter:
                     return False
 
         # ── Filter 2: EMA9 slope ───────────────────────────────────────────────
-        if self._require_slope and not _squeeze_active and len(candles_5m) >= 10:
+        # Slope-exempt strategies (default: NATR) skip this filter.
+        # Rationale: NATR's trailing-stop crossover is the trend-flip signal itself —
+        # EMA9 lags by 1-2 candles and points the wrong way at the inflection point.
+        _slope_exempt = bool(self._slope_exempt) and any(s in direction for s in self._slope_exempt)
+        if self._require_slope and not _squeeze_active and not _slope_exempt and len(candles_5m) >= 10:
             ema9_series = ema(candles_5m, 9)
             e9_now  = ema9_series[-1]
             e9_prev = ema9_series[-2]

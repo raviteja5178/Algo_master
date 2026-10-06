@@ -24,20 +24,31 @@ Logic (mirrors the Pine Script exactly):
   CE_OB signal fires when:
       The current candle's close is inside a valid (non-breaker) bullish OB
       — i.e. OB.bottom <= close <= OB.top.
+      OR (when approach_buffer_atr_mult > 0) close is within buffer_pts
+      ABOVE the OB top (approaching from above).
 
   PE_OB signal fires when:
       The current candle's close is inside a valid (non-breaker) bearish OB.
+      OR (when approach_buffer_atr_mult > 0) close is within buffer_pts
+      BELOW the OB bottom (approaching the zone from below on a retest).
 
   ATR size cap (maxATRMult = 3.5):
       A newly detected OB is discarded if its height > ATR(10) * 3.5.
 
 Config knobs (all in settings.py):
-    ENABLE_OB_STRATEGY          bool  (default False — opt-in)
-    OB_SWING_LENGTH             int   (default 10)
-    OB_MAX_ATR_MULT             float (default 3.5)
-    OB_ATR_PERIOD               int   (default 10)
-    OB_MAX_BLOCKS               int   (default 3, "Low" zone count)
-    OB_INVALIDATION             str   "Wick" | "Close"  (default "Wick")
+    ENABLE_OB_STRATEGY              bool  (default False — opt-in)
+    OB_SWING_LENGTH                 int   (default 10)
+    OB_MAX_ATR_MULT                 float (default 3.5)
+    OB_ATR_PERIOD                   int   (default 10)
+    OB_MAX_BLOCKS                   int   (default 3, "Low" zone count)
+    OB_INVALIDATION                 str   "Wick" | "Close"  (default "Wick")
+    OB_APPROACH_BUFFER_ATR_MULT     float (default 0.0 — disabled)
+        Extend the signal window so it fires when price *approaches* the OB
+        from outside, not only when it is already inside the zone.
+        buffer_pts = OB_APPROACH_BUFFER_ATR_MULT × ATR(OB_ATR_PERIOD)
+        PE_OB: fires when close >= ob.bottom - buffer_pts  (retest approach)
+        CE_OB: fires when close <= ob.top   + buffer_pts  (pullback approach)
+        0.2 is the recommended value (~22 pts at ATR5=111 on SENSEX).
 """
 
 from __future__ import annotations
@@ -257,9 +268,15 @@ def is_ob_ce_signal(
     atr_period:   int   = 10,
     max_blocks:   int   = 3,
     invalidation: str   = "Wick",
+    approach_buffer_atr_mult: float = 0.0,
 ) -> bool:
     """
-    CE signal: latest candle close is inside a valid (non-breaker) bullish OB.
+    CE signal: latest candle close is inside a valid (non-breaker) bullish OB,
+    OR (when approach_buffer_atr_mult > 0) is within buffer_pts ABOVE the OB
+    top — i.e. price is pulling back toward the OB from above.
+
+    approach_buffer_atr_mult = 0.0  →  original behaviour (inside zone only).
+    approach_buffer_atr_mult = 0.2  →  also fires when close <= ob.top + 0.2×ATR.
 
     Requires today's candle and at least swing_length + 2 candles.
     """
@@ -281,14 +298,29 @@ def is_ob_ce_signal(
 
     close = latest.close
 
-    # Signal: close is inside a valid (non-breaker) bullish OB zone
+    # Compute approach buffer in price points (0 when feature is disabled)
+    buffer_pts = 0.0
+    if approach_buffer_atr_mult > 0.0:
+        current_atr = atr_at(candles_5m, period=atr_period)
+        if current_atr:
+            buffer_pts = approach_buffer_atr_mult * current_atr
+
     for ob in bull_obs:
         if ob.breaker:
             continue
+        # Inside the zone (original behaviour)
         if ob.bottom <= close <= ob.top:
             logger.debug(
                 "CE_OB: close %.2f inside bull OB [%.2f - %.2f]",
                 close, ob.bottom, ob.top,
+            )
+            return True
+        # Approach from above — price pulling back toward the OB top
+        if buffer_pts > 0.0 and ob.top < close <= ob.top + buffer_pts:
+            logger.debug(
+                "CE_OB approach: close %.2f within %.2f pts above bull OB top %.2f "
+                "(buffer=%.2f, mult=%.2f)",
+                close, close - ob.top, ob.top, buffer_pts, approach_buffer_atr_mult,
             )
             return True
 
@@ -303,9 +335,18 @@ def is_ob_pe_signal(
     atr_period:   int   = 10,
     max_blocks:   int   = 3,
     invalidation: str   = "Wick",
+    approach_buffer_atr_mult: float = 0.0,
 ) -> bool:
     """
-    PE signal: latest candle close is inside a valid (non-breaker) bearish OB.
+    PE signal: latest candle close is inside a valid (non-breaker) bearish OB,
+    OR (when approach_buffer_atr_mult > 0) is within buffer_pts BELOW the OB
+    bottom — i.e. price is retesting the OB from below ("sell the retest").
+
+    approach_buffer_atr_mult = 0.0  →  original behaviour (inside zone only).
+    approach_buffer_atr_mult = 0.2  →  also fires when close >= ob.bottom - 0.2×ATR.
+
+    Mirrors TradingView AI Copilot which fires on the approach/retest of the
+    bearish OB 1–2 candles before price actually enters the zone.
     """
     if len(candles_5m) < swing_length + 2:
         return False
@@ -325,14 +366,29 @@ def is_ob_pe_signal(
 
     close = latest.close
 
-    # Signal: close is inside a valid (non-breaker) bearish OB zone
+    # Compute approach buffer in price points (0 when feature is disabled)
+    buffer_pts = 0.0
+    if approach_buffer_atr_mult > 0.0:
+        current_atr = atr_at(candles_5m, period=atr_period)
+        if current_atr:
+            buffer_pts = approach_buffer_atr_mult * current_atr
+
     for ob in bear_obs:
         if ob.breaker:
             continue
+        # Inside the zone (original behaviour)
         if ob.bottom <= close <= ob.top:
             logger.debug(
                 "PE_OB: close %.2f inside bear OB [%.2f - %.2f]",
                 close, ob.bottom, ob.top,
+            )
+            return True
+        # Approach from below — price retesting the OB bottom from underneath
+        if buffer_pts > 0.0 and ob.bottom - buffer_pts <= close < ob.bottom:
+            logger.debug(
+                "PE_OB approach: close %.2f within %.2f pts below bear OB bottom %.2f "
+                "(buffer=%.2f, mult=%.2f)",
+                close, ob.bottom - close, ob.bottom, buffer_pts, approach_buffer_atr_mult,
             )
             return True
 

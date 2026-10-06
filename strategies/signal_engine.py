@@ -210,6 +210,7 @@ def evaluate_signals(
             atr_period=settings.OB_ATR_PERIOD,
             max_blocks=settings.OB_MAX_BLOCKS,
             invalidation=settings.OB_INVALIDATION,
+            approach_buffer_atr_mult=settings.OB_APPROACH_BUFFER_ATR_MULT,
         )
 
         if is_ob_ce_signal(candles_5m, **_ob_kwargs):

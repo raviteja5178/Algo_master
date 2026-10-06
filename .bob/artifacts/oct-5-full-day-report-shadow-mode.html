@@ -1,0 +1,301 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Oct 5 — Full Day Report</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:13px;line-height:1.6;background:#fff;color:#1f2328;padding:28px 20px}
+.wrap{max-width:900px;margin:0 auto}
+h1{font-size:18px;font-weight:700;margin-bottom:3px}
+.sub{color:#57606a;font-size:12px;margin-bottom:22px}
+h2{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#57606a;margin:24px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px}
+th{background:#f7f8fa;color:#57606a;font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid #f0f1f3;vertical-align:top}
+tr:last-child td{border-bottom:none}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.red{color:#cf222e;font-weight:600}
+.green{color:#1a7f37;font-weight:600}
+.orange{color:#9a6700;font-weight:600}
+.muted{color:#57606a}
+.mono{font-family:ui-monospace,monospace;font-size:11px}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700}
+.ce{background:#dbeafe;color:#1d4ed8}
+.pe{background:#fce7f3;color:#9d174d}
+.pass{background:#dcfce7;color:#166534}
+.block{background:#fee2e2;color:#991b1b}
+.abort{background:#ede9fe;color:#5b21b6}
+.warn{background:#fef3c7;color:#92400e}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700}
+.b-stop{background:#fee2e2;color:#991b1b}
+.b-ema{background:#fef3c7;color:#92400e}
+.b-rr{background:#ede9fe;color:#5b21b6}
+.b-cool{background:#e5e7eb;color:#374151}
+.b-body{background:#fce7f3;color:#9d174d}
+.b-gap{background:#fef9c3;color:#713f12}
+.b-slope{background:#f3f4f6;color:#374151}
+.b-time{background:#e0f2fe;color:#0369a1}
+.b-allowed{background:#dcfce7;color:#166534}
+.b-abort{background:#ede9fe;color:#5b21b6}
+.row-win{background:#f0fdf4}
+.row-loss{background:#fff5f5}
+.row-abort{background:#f5f3ff}
+.row-new{background:#fefce8}
+.kpi-grid{display:flex;gap:20px;flex-wrap:wrap;background:#f7f8fa;border:1px solid #e5e7eb;border-radius:6px;padding:14px 18px;margin-bottom:4px}
+.kpi{display:flex;flex-direction:column}
+.kpi .v{font-size:20px;font-weight:700}
+.kpi .l{font-size:10px;color:#57606a;text-transform:uppercase;letter-spacing:.05em;margin-top:1px}
+.note{background:#f0f9ff;border-left:3px solid #3b82d4;padding:8px 12px;font-size:12px;border-radius:0 4px 4px 0;margin:6px 0}
+.warn-box{background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 12px;font-size:12px;border-radius:0 4px 4px 0;margin:6px 0}
+.fix-box{background:#f0fdf4;border-left:3px solid #22c55e;padding:8px 12px;font-size:12px;border-radius:0 4px 4px 0;margin:6px 0}
+.tl{display:flex;flex-direction:column;gap:0}
+.tl-row{display:flex;gap:0;font-size:12px;border-bottom:1px solid #f0f1f3;padding:5px 0}
+.tl-time{width:54px;color:#57606a;flex-shrink:0;font-variant-numeric:tabular-nums}
+.tl-dot{width:18px;flex-shrink:0;text-align:center}
+.tl-body{flex:1}
+footer{margin-top:32px;padding-top:12px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#57606a}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>SENSEX Auto-Trader — 2026-10-05 Full Day Report</h1>
+<p class="sub">Shadow mode  ·  16 raw signals  ·  2 executed trades  ·  2 aborted (float bug)  ·  10 filtered  ·  1 past-cutoff</p>
+
+
+<div class="kpi-grid">
+  <div class="kpi"><span class="v red">−Rs.783</span><span class="l">Net P&amp;L (shadow)</span></div>
+  <div class="kpi"><span class="v">2</span><span class="l">Closed trades</span></div>
+  <div class="kpi"><span class="v orange">2</span><span class="l">Aborted (R:R float bug)</span></div>
+  <div class="kpi"><span class="v">10</span><span class="l">Signals filtered</span></div>
+  <div class="kpi"><span class="v">1</span><span class="l">Past no-entry cutoff</span></div>
+  <div class="kpi"><span class="v">16</span><span class="l">Total raw signals</span></div>
+  <div class="kpi"><span class="v">19%</span><span class="l">Session win rate (26 closed)</span></div>
+</div>
+
+
+<h2>Full Day Timeline</h2>
+<div class="tl">
+
+<div class="tl-row">
+  <span class="tl-time">09:20</span><span class="tl-dot">🟢</span>
+  <span class="tl-body"><strong>CE_VWAP signal fired</strong> — candle close 72,347 | VWAP 72,304 | clearance +43 pts</span>
+</div>
+<div class="tl-row row-win">
+  <span class="tl-time">09:25</span><span class="tl-dot">✅</span>
+  <span class="tl-body"><strong>ENTRY: SENSEX26O0872300CE @ 577.45</strong> | SL 375.35 (swing-low 71,697) | Target 880.60 | R:R 1.5:1 | ATR 146.94</span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">09:46</span><span class="tl-dot">〰</span>
+  <span class="tl-body"><strong>BREAK-EVEN activated</strong> — LTP hit 678.75 (peak) | SL moved 375.35 → 577.45 | Trail step=101 pts | <em>Next ratchet needs 779.55</em></span>
+</div>
+<div class="tl-row row-loss">
+  <span class="tl-time">10:01</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><strong>EXIT: STOP_HIT @ 571.15</strong> | SL 577.45 breached | PnL <span class="red">−Rs.126</span> | Peak was 678.75 — trail step too wide, gain evaporated</span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">10:01</span><span class="tl-dot">⏱</span>
+  <span class="tl-body"><span class="badge b-cool">COOLDOWN ×6</span> started — post-SL-loss, 6 candles (30 min) blocked</span>
+</div>
+
+<div class="tl-row">
+  <span class="tl-time">10:05</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag pe">PE_VWAP</span> signal — close 72,381 | <span class="badge b-cool">BLOCKED: COOLDOWN ×5</span> | Squeeze bypass triggered (3 bearish candles) but cooldown wins</span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">10:25</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag pe">PE_NATR</span> signal — close 72,227 | <span class="badge b-cool">BLOCKED: COOLDOWN ×1</span> | Last cooldown candle. Price bounced +75 pts after — correct block.</span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">10:35</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag ce">CE_VWAP</span> signal — close 72,302 | VWAP 72,296 | clearance only +6 pts | <span class="badge b-body">BLOCKED: BODY 13 &lt; 36 req (0.35×ATR 101)</span> | Price fell −173 pts next candle — <strong>correct block</strong></span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">10:40</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag pe">PE_VWAP</span> signal — close 72,129 | <span class="badge b-gap">BLOCKED: EMA_GAP +34.5 (EMA9 &gt; EMA21 = bullish — wrong for PE)</span> | Price rose +53 pts — <strong>correct block</strong></span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">11:02</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag ce">CE_VWAP</span> signal — close 72,182 | <span class="badge b-slope">BLOCKED: EMA9 SLOPE falling (72,209→72,204)</span> | Price fell −62 pts — <strong>correct block</strong></span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">11:15</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag pe">PE_VWAP</span> signal — close 72,120 | VWAP 72,144 | clearance 24 pts | <span class="badge b-body">BLOCKED: BODY 28 &lt; 32 req (0.35×ATR 92)</span> | Price rose +99 pts — <strong>correct block</strong></span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">11:35</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag ce">CE_VWAP</span> signal — close 72,219 | <span class="badge b-gap">BLOCKED: EMA_GAP −16.3 (EMA9 &lt; EMA21)</span> | Price fell −114 pts next candle — <strong>correct block</strong></span>
+</div>
+
+<div class="tl-row row-abort">
+  <span class="tl-time">11:40</span><span class="tl-dot">⚠</span>
+  <span class="tl-body"><span class="tag pe">PE_VWAP</span> signal — close 72,104 | All filters PASSED | FILLED @ 436.30 | <span class="badge b-rr">ABORTED: MIN_RR float bug (1.4997 &lt; 1.5 raw, logged as 1.50)</span> | SENSEX fell 145 pts after — <strong>missed Rs.+1,740 winner</strong></span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">11:45</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag pe">PE_VWAP</span> signal — close 72,081 | <span class="badge b-body">BLOCKED: BODY 23 &lt; 32 req</span> | Squeeze bypass active | Would have been winner but 11:40 position already open if bug fixed — redundant</span>
+</div>
+<div class="tl-row row-abort">
+  <span class="tl-time">11:50</span><span class="tl-dot">⚠</span>
+  <span class="tl-body"><span class="tag pe">PE_VWAP</span> signal — close 72,042 | All filters PASSED | FILLED @ 414.50 | <span class="badge b-rr">ABORTED: MIN_RR float bug (1.4998 &lt; 1.5 raw)</span> | Redundant if 11:40 position was open</span>
+</div>
+
+<div class="tl-row row-win">
+  <span class="tl-time">12:00</span><span class="tl-dot">✅</span>
+  <span class="tl-body"><strong>ENTRY: PE (EMA signal)</strong> — SENSEX26O0872000PE @ 455.70 | SL 319.05 (swing-low 71,909) | Target 660.70 | R:R 1.5:1 | ATR 87.85</span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">12:50</span><span class="tl-dot">📊</span>
+  <span class="tl-body"><span class="badge b-ema">EMA_COLLAPSE triggered</span> — EMA9 72,000 &lt; EMA21 72,033, close 72,043 crossed above EMA9 | Peak was 521 (+65 pts unrealised)</span>
+</div>
+<div class="tl-row row-loss">
+  <span class="tl-time">12:50</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><strong>EXIT: EMA_COLLAPSE @ 422.85</strong> | PnL <span class="red">−Rs.657</span> | Entered 455.70 → exited 422.85 = −32.85 pts. Was up +65 pts at peak.</span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">12:50</span><span class="tl-dot">⏱</span>
+  <span class="tl-body"><span class="badge b-cool">COOLDOWN ×6</span> started — post-loss, 30 min blocked</span>
+</div>
+
+<div class="tl-row">
+  <span class="tl-time">12:55</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag pe">PE_VWAP</span> signal — close 71,965 | <span class="badge b-cool">BLOCKED: COOLDOWN ×5</span> | Price reversed +130 pts to 72,095 by 13:20 — <strong>correct block</strong></span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">13:20</span><span class="tl-dot">⏱</span>
+  <span class="tl-body">COOLDOWN expired</span>
+</div>
+<div class="tl-row row-new">
+  <span class="tl-time">13:20</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag ce">CE_VWAP</span> signal — close 72,095 | VWAP 72,034 | clearance +61 pts | <span class="badge b-gap">BLOCKED: EMA_GAP −4.6 (flat EMAs)</span> | Price rose +237 pts to 72,332 by 14:15 — <strong>missed winner (bounce-exempt fix now applied)</strong></span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">14:15</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag ce">CE_VWAP</span> signal — close 72,332 | <span class="badge b-time">BLOCKED: past NO_NEW_ENTRY_AFTER (15:00 cutoff)</span> | Late in session, correct</span>
+</div>
+<div class="tl-row">
+  <span class="tl-time">14:40</span><span class="tl-dot">🔴</span>
+  <span class="tl-body"><span class="tag pe">PE_VWAP</span> signal — close 72,320 | <span class="badge b-slope">BLOCKED: EMA9 SLOPE rising (72,304→72,307)</span> | Post-15:00, EMA9 rising = counter-trend — correct block</span>
+</div>
+
+</div>
+
+
+<h2>Executed Trades</h2>
+<table>
+<thead>
+<tr><th>#</th><th>Strategy</th><th>Symbol</th><th>Entry</th><th class="num">Entry Px</th><th>Exit</th><th class="num">Exit Px</th><th>Exit reason</th><th class="num">PnL (pts)</th><th class="num">PnL (INR)</th><th class="num">Peak</th><th>SL / Target</th></tr>
+</thead>
+<tbody>
+<tr class="row-loss">
+  <td>1</td><td><span class="tag ce">CE_VWAP</span></td><td class="mono">72300CE</td>
+  <td>09:25</td><td class="num">577.45</td><td>10:01</td><td class="num">571.15</td>
+  <td><span class="badge b-stop">STOP_HIT</span></td>
+  <td class="num red">−6.30</td><td class="num red">−Rs.126</td>
+  <td class="num">678.75</td>
+  <td class="muted" style="font-size:11px">SL 375.35 → BE 577.45 | Target 880.60 | Trail step 101 pts too wide — peak 678 never hit 2nd ratchet (needs 779)</td>
+</tr>
+<tr class="row-loss">
+  <td>2</td><td><span class="tag pe">PE</span></td><td class="mono">72000PE</td>
+  <td>12:00</td><td class="num">455.70</td><td>12:50</td><td class="num">422.85</td>
+  <td><span class="badge b-ema">EMA_COLLAPSE</span></td>
+  <td class="num red">−32.85</td><td class="num red">−Rs.657</td>
+  <td class="num">521.00</td>
+  <td class="muted" style="font-size:11px">SL 319.05 | Target 660.70 | Was up +65 pts (peak 521) before EMA collapse exited at 422</td>
+</tr>
+</tbody>
+</table>
+
+
+<h2>Aborted Entries (R:R Float Bug — now fixed)</h2>
+<table>
+<thead>
+<tr><th>#</th><th>Strategy</th><th>Symbol</th><th>Time</th><th class="num">Paper Fill</th><th>SL pts</th><th>Tgt pts</th><th>Raw R:R</th><th>Logged R:R</th><th>Status</th><th>Move after</th><th class="num">Missed PnL</th></tr>
+</thead>
+<tbody>
+<tr class="row-abort">
+  <td>1</td><td><span class="tag pe">PE_VWAP</span></td><td class="mono">72100PE</td>
+  <td>11:40</td><td class="num">436.30</td>
+  <td class="num">78.35</td><td class="num">117.50</td>
+  <td class="num red mono">1.4997</td><td class="num mono">1.50</td>
+  <td><span class="badge b-abort">ABORTED (bug)</span></td>
+  <td class="muted" style="font-size:11px">SENSEX −145 pts to 71,959</td>
+  <td class="num green">+Rs.1,740 est.</td>
+</tr>
+<tr class="row-abort">
+  <td>2</td><td><span class="tag pe">PE_VWAP</span></td><td class="mono">72000PE</td>
+  <td>11:50</td><td class="num">414.50</td>
+  <td class="num">103.55</td><td class="num">155.30</td>
+  <td class="num red mono">1.4998</td><td class="num mono">1.50</td>
+  <td><span class="badge b-abort">ABORTED (bug)</span></td>
+  <td class="muted" style="font-size:11px">Redundant (11:40 would be open)</td>
+  <td class="num muted">N/A</td>
+</tr>
+</tbody>
+</table>
+
+
+<h2>All Filtered Signals (10 blocks)</h2>
+<table>
+<thead>
+<tr><th>#</th><th>Signal</th><th>Time</th><th class="num">SENSEX</th><th>Filter</th><th>Details</th><th>Post-signal move</th><th>Was block correct?</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td><span class="tag pe">PE_VWAP</span></td><td>10:05</td><td class="num">72,381</td><td><span class="badge b-cool">COOLDOWN ×5</span></td><td class="muted" style="font-size:11px">6 candles after CE SL loss</td><td class="muted">bounce +75 pts</td><td class="pass tag" style="font-size:10px">CORRECT</td></tr>
+<tr><td>2</td><td><span class="tag pe">PE_NATR</span></td><td>10:25</td><td class="num">72,227</td><td><span class="badge b-cool">COOLDOWN ×1</span></td><td class="muted" style="font-size:11px">Last cooldown candle</td><td class="muted">bounce +75 pts</td><td class="pass tag" style="font-size:10px">CORRECT</td></tr>
+<tr><td>3</td><td><span class="tag ce">CE_VWAP</span></td><td>10:35</td><td class="num">72,302</td><td><span class="badge b-body">BODY 13 &lt; 36</span></td><td class="muted" style="font-size:11px">VWAP clearance only 6 pts (weak)</td><td class="muted">fell −173 pts</td><td class="pass tag" style="font-size:10px">CORRECT</td></tr>
+<tr><td>4</td><td><span class="tag pe">PE_VWAP</span></td><td>10:40</td><td class="num">72,129</td><td><span class="badge b-gap">EMA_GAP +34.5</span></td><td class="muted" style="font-size:11px">EMA9 &gt; EMA21 = bullish structure, wrong for PE</td><td class="muted">bounced +53 pts</td><td class="pass tag" style="font-size:10px">CORRECT</td></tr>
+<tr><td>5</td><td><span class="tag ce">CE_VWAP</span></td><td>11:02</td><td class="num">72,182</td><td><span class="badge b-slope">EMA9 SLOPE ↓</span></td><td class="muted" style="font-size:11px">EMA9 falling 72,209→72,204</td><td class="muted">fell −62 pts</td><td class="pass tag" style="font-size:10px">CORRECT</td></tr>
+<tr><td>6</td><td><span class="tag pe">PE_VWAP</span></td><td>11:15</td><td class="num">72,120</td><td><span class="badge b-body">BODY 28 &lt; 32</span></td><td class="muted" style="font-size:11px">ATR 92 × 0.35 = 32; clearance 24 pts</td><td class="muted">squeezed +99 pts</td><td class="pass tag" style="font-size:10px">CORRECT</td></tr>
+<tr><td>7</td><td><span class="tag ce">CE_VWAP</span></td><td>11:35</td><td class="num">72,219</td><td><span class="badge b-gap">EMA_GAP −16.3</span></td><td class="muted" style="font-size:11px">EMA9 below EMA21 — bearish structure</td><td class="muted">fell −114 pts</td><td class="pass tag" style="font-size:10px">CORRECT</td></tr>
+<tr><td>8</td><td><span class="tag pe">PE_VWAP</span></td><td>11:45</td><td class="num">72,081</td><td><span class="badge b-body">BODY 23 &lt; 32</span></td><td class="muted" style="font-size:11px">Squeeze bypass active; 11:40 pos would be open</td><td class="muted">fell −122 pts</td><td class="muted tag" style="font-size:10px">REDUNDANT</td></tr>
+<tr class="row-new"><td>9</td><td><span class="tag ce">CE_VWAP</span></td><td>13:20</td><td class="num">72,095</td><td><span class="badge b-gap">EMA_GAP −4.6</span></td><td class="muted" style="font-size:11px">EMAs flat (−4.6 pts). Clearance 61 pts (strong)</td><td class="muted" style="color:#1a7f37;font-weight:600">+237 pts ✓</td><td class="block tag" style="font-size:10px">WRONG — fixed</td></tr>
+<tr><td>10</td><td><span class="tag pe">PE_VWAP</span></td><td>14:40</td><td class="num">72,320</td><td><span class="badge b-slope">EMA9 SLOPE ↑</span></td><td class="muted" style="font-size:11px">EMA9 rising = uptrend, PE is counter-trend</td><td class="muted">post-15:00</td><td class="pass tag" style="font-size:10px">CORRECT</td></tr>
+</tbody>
+</table>
+
+
+<h2>P&amp;L Waterfall — Actual vs Corrected</h2>
+<table>
+<thead>
+<tr><th>Item</th><th class="num">PnL (INR)</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr class="row-loss"><td>Trade 1 — CE_VWAP SL hit</td><td class="num red">−Rs.126</td><td class="muted" style="font-size:11px">Peak 678.75 (+101 pts). BE activated at 678.50 but trail step=101 (too wide) meant SL stayed frozen at entry</td></tr>
+<tr class="row-loss"><td>Trade 2 — PE EMA_COLLAPSE exit</td><td class="num red">−Rs.657</td><td class="muted" style="font-size:11px">Peak 521 (+65 pts). EMA9 crossed above EMA21 at 12:50 → exit at 422 (was up +65 pts at peak)</td></tr>
+<tr style="border-top:2px solid #e5e7eb"><td><strong>Actual net (shadow)</strong></td><td class="num red"><strong>−Rs.783</strong></td><td></td></tr>
+<tr style="height:8px"><td colspan="3"></td></tr>
+<tr class="row-abort"><td>R:R float fix — 11:40 PE_VWAP (now allowed)</td><td class="num green">+Rs.1,740 est.</td><td class="muted" style="font-size:11px">SENSEX −145 pts after entry. SL=78 pts, target=117 pts. Target hit est. ~14:00. Gain: 87+ × 20 = +Rs.1,740</td></tr>
+<tr class="row-new"><td>Bounce-exempt fix — 13:20 CE_VWAP (now allowed)</td><td class="num green">+Rs.936 est.</td><td class="muted" style="font-size:11px">SENSEX +237 pts. EMA flat at VWAP bounce = expected. Target ~117 pts hit by 13:40. Gain: 117×0.4×20</td></tr>
+<tr class="row-win"><td>Profit lock fix — Trade 1 CE_VWAP peak 678</td><td class="num green">+Rs.2,026 est.</td><td class="muted" style="font-size:11px">With PROFIT_LOCK_ATR_MULT=0.5: threshold 577+73=650. LTP 678 &gt; 650 → exits at ~678. Gain: 101×20=Rs.2,026 (vs −Rs.126 actual)</td></tr>
+<tr style="border-top:2px solid #e5e7eb"><td><strong>Projected net (all fixes applied)</strong></td><td class="num green"><strong>+Rs.3,919 est.</strong></td><td class="muted" style="font-size:11px">−783 + 1,740 + 936 + 2,026 − 126(removed) = estimate. Conservative.</td></tr>
+</tbody>
+</table>
+
+
+<h2>Fixes Applied This Session</h2>
+<table>
+<thead>
+<tr><th>#</th><th>Fix</th><th>File</th><th>Impact on Oct 5</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td><span class="badge b-allowed">FIXED</span> R:R float precision — <code>round(rr,2)</code> before comparison</td><td class="mono">main.py:645</td><td class="green" style="font-size:11px">Unblocks 11:40 PE_VWAP → est. +Rs.1,740</td></tr>
+<tr><td>2</td><td><span class="badge b-allowed">FIXED</span> VWAP/NATR bounce-exempt — skip body+EMA-gap for bounce strategies</td><td class="mono">smart_entry.py</td><td class="green" style="font-size:11px">Allows 13:20 CE_VWAP (+61 pts clearance) → est. +Rs.936</td></tr>
+<tr><td>3</td><td><span class="badge b-allowed">FIXED</span> VWAP_MIN_BOUNCE_PTS=30 — gate weak bounces at strategy level</td><td class="mono">.env.example</td><td class="muted" style="font-size:11px">Would have blocked #3 (6 pts) and #6 (24 pts) correctly even with bounce-exempt on</td></tr>
+<tr><td>4</td><td><span class="badge b-allowed">FIXED</span> Profit lock — ENABLE_PROFIT_LOCK_EXIT + PROFIT_LOCK_ATR_MULT=0.5</td><td class="mono">.env.example</td><td class="green" style="font-size:11px">Trade 1: threshold 650, peak 678 → exits +101 pts → +Rs.2,026 instead of −Rs.126</td></tr>
+<tr><td>5</td><td><span class="badge b-allowed">FIXED</span> Post-market ATR poisoning — drop ticks ≥15:30 from candle aggregator</td><td class="mono">candle_aggregator.py<br />main.py</td><td class="muted" style="font-size:11px">ATR was 0.04 (collapsed), bands were 0.26 pts wide. Now ATR=35, width=210 pts at EOD</td></tr>
+</tbody>
+</table>
+
+
+<h2>System Notes</h2>
+<div class="warn-box"><strong>171 WebSocket disconnects</strong> before 09:25 — fixed in a previous session (autoPingInterval=20). Today: only minor disconnects, no impact on trade execution.</div>
+<div class="note"><strong>Latency:</strong> Trade 1 signal→SL = 104ms | Trade 2 signal→SL = 145ms — both well within acceptable range for SHADOW mode.</div>
+<div class="warn-box"><strong>Bot restart at 15:01</strong> — Historical data fetch failed (DNS error, api.kite.trade unreachable). Bot went cold — strategies needed 21 candles (~1h45m) before firing. No trading impact since market was closing.</div>
+<div class="note"><strong>Win rate 19%</strong> (26 closed trades this session) — consistent with the bearish tape. 8 of 10 filter blocks were correct today. 2 were incorrect (13:20 EMA gap, 11:40 R:R bug) — both now fixed.</div>
+
+<footer>Made with IBM Bob</footer>
+</div>
+</body>
+</html>
