@@ -1,11 +1,12 @@
 """
 Tests for SmartEntryFilter.
 
-Covers all five filters independently and in combination:
+Covers all filters independently and in combination:
   - Filter 1: candle body / ATR ratio
   - Filter 2: EMA9 slope (rising for CE, falling for PE)
   - Filter 3: post-loss cooldown
   - Filter 4: minimum EMA gap magnitude
+  - Filter 4b: gap rate-of-change bypass
   - Filter 5: EMA gap must be widening
 """
 
@@ -326,6 +327,99 @@ class TestMinEMAGapFilter:
         # Fewer than 21 candles → filter skips (fail-open)
         flt = SmartEntryFilter(min_ema_gap_pts=10.0)
         candles = _candles_with_ema_gap(widening=True, side="CE", large_gap=False, n=10)
+        assert flt.allow("CE", candles) is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Filter 4b — gap rate-of-change bypass
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _candles_with_closing_gap(side: str, fast_close: bool, n: int = 30) -> list[Candle]:
+    """
+    Build a candle series where the EMA gap is on the WRONG side for the signal
+    (EMA9 < EMA21 for CE, EMA9 > EMA21 for PE) so Filter 4 triggers, then the
+    last two candles either close the gap fast (fast_close=True, ~20 pts/candle
+    of EMA velocity) or barely move it (fast_close=False, ~1 pt/candle).
+
+    Construction:
+      - Warmup (n-2 candles): steady trend AGAINST the signal direction so
+        EMA9 builds a clear negative directed gap.
+        CE warmup: falling prices → EMA9 < EMA21 (gap negative for CE).
+        PE warmup: rising prices  → EMA9 > EMA21 (gap positive = bad for PE).
+      - Penultimate candle: price nudges 1 pt toward signal direction.
+      - Signal candle: big jump (fast_close) or another 1-pt nudge (slow).
+    """
+    base = 74000.0
+    candles: list[Candle] = []
+    # CE: build a falling warmup so EMA9 lags below EMA21
+    # PE: build a rising warmup so EMA9 lags above EMA21
+    for i in range(n - 2):
+        if side == "CE":
+            price = base - i * 5          # steadily falling
+        else:
+            price = base + i * 5          # steadily rising
+        candles.append(_make_candle(_yesterday_ts(i), price, price + 2, price - 2, price))
+
+    # Penultimate candle: tiny move toward signal direction
+    prev_price = candles[-1].close + (1.0 if side == "CE" else -1.0)
+    candles.append(_make_candle(_yesterday_ts(n - 2),
+                                prev_price, prev_price + 2, prev_price - 2, prev_price))
+
+    # Signal candle: fast reversal jump or tiny nudge.
+    # A 150-pt single-candle move produces ~17 pts of EMA-gap velocity
+    # (above the 15-pt bypass threshold); a 20-pt move produces ~3 pts (below).
+    if fast_close:
+        sig_price = prev_price + (150.0 if side == "CE" else -150.0)
+    else:
+        sig_price = prev_price + (20.0 if side == "CE" else -20.0)
+
+    candles.append(_make_candle(_ts(9, 25),
+                                sig_price, sig_price + 2, sig_price - 2, sig_price))
+    return candles
+
+
+class TestGapCloseRateBypass:
+    """Filter 4b — gap rate-of-change bypass."""
+
+    def test_ce_bypasses_gap_block_when_velocity_sufficient(self) -> None:
+        # Gap below threshold BUT closing fast → should pass
+        flt = SmartEntryFilter(min_ema_gap_pts=10.0, gap_close_rate=15.0)
+        candles = _candles_with_closing_gap(side="CE", fast_close=True)
+        assert flt.allow("CE", candles) is True
+
+    def test_ce_still_blocked_when_velocity_insufficient(self) -> None:
+        # Gap below threshold and barely closing → still blocked
+        flt = SmartEntryFilter(min_ema_gap_pts=10.0, gap_close_rate=15.0)
+        candles = _candles_with_closing_gap(side="CE", fast_close=False)
+        assert flt.allow("CE", candles) is False
+
+    def test_pe_bypasses_gap_block_when_velocity_sufficient(self) -> None:
+        # PE mirror: gap above threshold (wrong side) BUT closing fast
+        flt = SmartEntryFilter(min_ema_gap_pts=10.0, gap_close_rate=15.0)
+        candles = _candles_with_closing_gap(side="PE", fast_close=True)
+        assert flt.allow("PE", candles) is True
+
+    def test_pe_still_blocked_when_velocity_insufficient(self) -> None:
+        flt = SmartEntryFilter(min_ema_gap_pts=10.0, gap_close_rate=15.0)
+        candles = _candles_with_closing_gap(side="PE", fast_close=False)
+        assert flt.allow("PE", candles) is False
+
+    def test_disabled_at_zero_preserves_original_block(self) -> None:
+        # gap_close_rate=0 → no bypass, hard block as before
+        flt = SmartEntryFilter(min_ema_gap_pts=10.0, gap_close_rate=0.0)
+        candles = _candles_with_closing_gap(side="CE", fast_close=True)
+        assert flt.allow("CE", candles) is False
+
+    def test_gap_already_sufficient_passes_without_velocity_check(self) -> None:
+        # When directed gap >= threshold, bypass logic is never evaluated
+        flt = SmartEntryFilter(min_ema_gap_pts=10.0, gap_close_rate=15.0)
+        candles = _candles_with_ema_gap(widening=True, side="CE", large_gap=True)
+        assert flt.allow("CE", candles) is True
+
+    def test_skipped_when_too_few_candles(self) -> None:
+        # < 21 candles → whole Filter 4 skips (fail-open), velocity never checked
+        flt = SmartEntryFilter(min_ema_gap_pts=10.0, gap_close_rate=15.0)
+        candles = _candles_with_closing_gap(side="CE", fast_close=False, n=10)
         assert flt.allow("CE", candles) is True
 
 

@@ -94,6 +94,20 @@ SPOT_ATR_TRAIL_RR: float        = _getfloat("SPOT_ATR_TRAIL_RR", 0.5)
 USE_SWING_SL: bool              = _getbool("USE_SWING_SL", False)
 SWING_SL_LENGTH: int            = _getint("SWING_SL_LENGTH", 10)
 MIN_RR: float                   = _getfloat("MIN_RR", 0.0)
+# SWING_SL_MIN_ATR_MULT: Mode D adequacy guard.
+#   If the swing level is so close to entry that the resulting index-point SL
+#   is less than  ATR(SPOT_ATR_PERIOD) × this multiplier, Mode D is treated as
+#   "structurally too tight" and the bot falls through to Mode C instead.
+#
+#   Problem it solves (today's trade):
+#     ATR(5) = 90.77 pts  →  swing_low 44 pts away  →  44 < 90.77 × 0.6 = 54.5
+#     Mode D rejected; Mode C used: SL = 90.77 × 3.0 × 0.4 = 108 pts (proper width)
+#
+#   0.0 = disabled (original behaviour — always trust the swing level). Default.
+#   0.5 = fall through when swing SL index pts < ATR × 0.5  (mild gate)
+#   0.6 = fall through when swing SL index pts < ATR × 0.6  (recommended for SENSEX 5m)
+#   1.0 = fall through unless swing is at least 1 full ATR away  (strict)
+SWING_SL_MIN_ATR_MULT: float    = _getfloat("SWING_SL_MIN_ATR_MULT", 0.0)
 
 # ── Smart Exit Engine ─────────────────────────────────────────────────────────
 # All Smart Exit sub-features default OFF.
@@ -149,8 +163,23 @@ SMART_ENTRY_MIN_BODY_ATR_RATIO: float    = _getfloat("SMART_ENTRY_MIN_BODY_ATR_R
 SMART_ENTRY_REQUIRE_EMA_SLOPE: bool      = _getbool("SMART_ENTRY_REQUIRE_EMA_SLOPE",      False)
 SMART_ENTRY_COOLDOWN_CANDLES: int        = _getint("SMART_ENTRY_COOLDOWN_CANDLES",         0)
 # Filter 4 — minimum EMA gap (0 = disabled; recommended: 10)
+#
+# Filter 4b — gap rate-of-change bypass (0 = disabled; recommended: 15)
+#   When the directed EMA gap is below SMART_ENTRY_MIN_EMA_GAP_PTS, the block is
+#   waived if the gap is CLOSING toward the signal direction by at least this many
+#   points per candle.  This lets a fast V-reversal through while still blocking
+#   flat / diverging gaps.
+#
+#   Calculation (CE example):
+#     gap_velocity = (EMA9[0] - EMA21[0]) - (EMA9[-1] - EMA21[-1])
+#     CE: gap_velocity > gap_close_rate → bypass the gap block
+#     PE: -gap_velocity > gap_close_rate → bypass the gap block
+#
+#   Recommended: 15 pts/candle on SENSEX 5m (today's reversal moved +21–24 pts/candle)
+#   0 = disabled (original hard-block behaviour, no rate-of-change check).
 # Filter 5 — EMA gap must be widening (false = disabled; recommended: true)
 SMART_ENTRY_MIN_EMA_GAP_PTS: float       = _getfloat("SMART_ENTRY_MIN_EMA_GAP_PTS",       0.0)
+SMART_ENTRY_GAP_CLOSE_RATE: float        = _getfloat("SMART_ENTRY_GAP_CLOSE_RATE",         0.0)
 SMART_ENTRY_REQUIRE_EMA_GAP_WIDENING: bool = _getbool("SMART_ENTRY_REQUIRE_EMA_GAP_WIDENING", False)
 # Filter 6 — 15m trend alignment (false = disabled; recommended: true)
 # CE only fires when latest 15m candle closes above 15m EMA21; PE vice-versa.

@@ -184,6 +184,7 @@ class BotContext:
             require_ema_slope           = settings.SMART_ENTRY_REQUIRE_EMA_SLOPE,
             cooldown_candles            = settings.SMART_ENTRY_COOLDOWN_CANDLES,
             min_ema_gap_pts             = settings.SMART_ENTRY_MIN_EMA_GAP_PTS,
+            gap_close_rate              = settings.SMART_ENTRY_GAP_CLOSE_RATE,
             require_ema_gap_widening    = settings.SMART_ENTRY_REQUIRE_EMA_GAP_WIDENING,
             require_15m_trend           = settings.SMART_ENTRY_REQUIRE_15M_TREND,
             max_15m_gap_pts             = settings.SMART_ENTRY_15M_MAX_GAP_PTS,
@@ -616,11 +617,12 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         target_rr           = settings.SPOT_ATR_TARGET_RR,
         trail_rr            = settings.SPOT_ATR_TRAIL_RR,
         # Mode D: swing high/low as SL (structure-based)
-        use_swing_sl        = settings.USE_SWING_SL,
-        option_type         = _option_type,
-        sensex_ltp          = sensex_ltp,
-        swing_high          = _swing_high,
-        swing_low           = _swing_low,
+        use_swing_sl           = settings.USE_SWING_SL,
+        option_type            = _option_type,
+        sensex_ltp             = sensex_ltp,
+        swing_high             = _swing_high,
+        swing_low              = _swing_low,
+        swing_sl_min_atr_mult  = settings.SWING_SL_MIN_ATR_MULT,
     )
     sl_pts     = risk.initial_sl_points
     be_pts     = risk.break_even_trigger_points

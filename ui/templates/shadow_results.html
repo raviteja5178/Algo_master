@@ -953,9 +953,28 @@ function buildInsights(t) {
   const reason = t.exit_reason || '';
 
   if (reason === 'STOP_HIT' || reason === 'SL_FILLED_AT_EXCHANGE') {
-    lines.push('🔴 <b>SL was hit</b> — consider whether a tighter entry filter (EMA gap widening, body ATR ratio) could have avoided this signal.');
-    if (t.atr_value && t.sl_points && t.sl_points < t.atr_value * 0.5)
-      lines.push('⚠️ SL was <b>smaller than 0.5× ATR</b> — market noise alone can trigger this. Consider increasing SL multiplier.');
+    const maxGain  = (t.highest_ltp && t.entry_price) ? t.highest_ltp - t.entry_price : null;
+    const exitGain = (t.exit_price  && t.entry_price) ? t.exit_price  - t.entry_price : null;
+    const isProfitableTrail = pnl != null && pnl > 0;
+
+    if (isProfitableTrail) {
+      // TSL walked up, price pulled back — this is a good exit, not a failure
+      if (maxGain != null && exitGain != null && maxGain > exitGain + 5)
+        lines.push(`📈 <b>Profitable TSL exit</b> — option peaked at +${maxGain.toFixed(1)} pts (+₹${(maxGain*t.quantity).toFixed(0)}), locked in +${exitGain.toFixed(1)} pts (+₹${(exitGain*t.quantity).toFixed(0)}) after price pulled back. Left ${(maxGain - exitGain).toFixed(1)} pts on the table — normal TSL behaviour.`);
+      else
+        lines.push('✅ <b>Profitable TSL exit</b> — stop trailed up and locked in near-peak profit. No entry issue.');
+      if (t.tsl_points && maxGain != null && maxGain > 0) {
+        const stepPct = ((t.tsl_points / maxGain) * 100).toFixed(0);
+        lines.push(`💡 Trail step was <b>${fmt(t.tsl_points,1)} pts</b> (${stepPct}% of peak gain). To hold longer through bounces, increase <code>SPOT_ATR_TRAIL_RR</code>.`);
+      }
+    } else {
+      // Genuine loss — SL was hit below entry
+      lines.push('🔴 <b>SL was hit at a loss.</b>');
+      if (t.atr_value && t.sl_points && t.sl_points < t.atr_value * 0.5)
+        lines.push('⚠️ SL was <b>smaller than 0.5× ATR</b> — market noise alone can trigger this. Consider increasing <code>SWING_SL_MIN_ATR_MULT</code> or <code>SPOT_ATR_SL_MULT</code>.');
+      if (t.atr_value && t.sl_points && t.sl_points >= t.atr_value * 0.5)
+        lines.push('ℹ️ SL was ATR-appropriate — the signal direction was simply wrong. Check EMA gap widening and body/ATR ratio at entry.');
+    }
   }
   if (reason === 'EMA_COLLAPSE')
     lines.push('🟡 <b>EMA collapsed</b> after entry — the trend reversed. Check if the entry candle had a weak body indicating indecision.');

@@ -491,3 +491,138 @@ class TestModeDSwingSL:
             fixed_sl=50.0, fixed_target=80.0, fixed_trail=15.0,
         )
         assert params.sl_mode == "fixed"
+
+
+# ── Mode D adequacy guard (swing_sl_min_atr_mult) ─────────────────────────────
+
+class TestModeDAdequacyGuard:
+    """
+    swing_sl_min_atr_mult > 0 → reject Mode D when the swing is too close to
+    entry relative to ATR, and fall through to Mode C instead.
+    """
+
+    def _volatile_candles(self, n: int = 25, spread: float = 90.0) -> list:
+        """Candles with ATR ≈ spread (large-range bars simulate high-volatility day)."""
+        from market.candle_builder import Candle
+        from datetime import datetime
+        ts = datetime(2026, 1, 1, 9, 15)
+        return [Candle(timestamp=ts, open=100.0, high=100.0 + spread,
+                       low=100.0 - spread, close=100.0) for _ in range(n)]
+
+    def test_swing_too_close_falls_through_to_mode_c(self):
+        """
+        Swing only 44 pts away, ATR ≈ 90, mult=0.6 → min_required = 54 pts.
+        44 < 54 → Mode D rejected → Mode C used.
+        Mirrors today's SENSEX26O0872900CE trade.
+        """
+        candles = self._volatile_candles(n=25, spread=90.0)
+        params = compute_risk_params(
+            candles,
+            use_swing_sl=True,
+            use_spot_atr=True,
+            option_type="CE",
+            sensex_ltp=80_000.0,
+            swing_low=79_956.0,         # only 44 pts below entry
+            swing_high=None,
+            spot_atr_period=5,
+            spot_sl_mult=3.0,
+            target_rr=1.5,
+            trail_rr=0.5,
+            swing_sl_min_atr_mult=0.6,  # require swing ≥ ATR×0.6
+            min_sl_pts=20.0, min_target_pts=30.0, min_trail_pts=5.0,
+        )
+        assert params.sl_mode == "spot_atr"   # fell through to Mode C
+
+    def test_swing_far_enough_uses_mode_d(self):
+        """
+        ATR(5) on spread=90 candles = 180 (H-L = 180 per bar, Wilder-smoothed).
+        min_required = 180 × 0.6 = 108 pts.
+        Swing 250 pts below entry → 250 >= 108 → Mode D accepted.
+        """
+        candles = self._volatile_candles(n=25, spread=90.0)
+        params = compute_risk_params(
+            candles,
+            use_swing_sl=True,
+            use_spot_atr=True,
+            option_type="CE",
+            sensex_ltp=80_000.0,
+            swing_low=79_750.0,         # 250 pts below entry (> ATR×0.6=108)
+            swing_high=None,
+            spot_atr_period=5,
+            spot_sl_mult=3.0,
+            target_rr=1.5,
+            trail_rr=0.5,
+            swing_sl_min_atr_mult=0.6,
+            min_sl_pts=20.0, min_target_pts=30.0, min_trail_pts=5.0,
+        )
+        assert params.sl_mode == "swing_sl"   # Mode D accepted
+
+    def test_disabled_at_zero_always_uses_mode_d(self):
+        """
+        swing_sl_min_atr_mult=0 → guard disabled, Mode D always wins even for
+        a tiny swing (original behaviour unchanged).
+        """
+        candles = self._volatile_candles(n=25, spread=90.0)
+        params = compute_risk_params(
+            candles,
+            use_swing_sl=True,
+            use_spot_atr=True,
+            option_type="CE",
+            sensex_ltp=80_000.0,
+            swing_low=79_956.0,         # only 44 pts away
+            swing_high=None,
+            spot_atr_period=5,
+            spot_sl_mult=3.0,
+            target_rr=1.5,
+            trail_rr=0.5,
+            swing_sl_min_atr_mult=0.0,  # guard disabled
+            min_sl_pts=20.0, min_target_pts=30.0, min_trail_pts=5.0,
+        )
+        assert params.sl_mode == "swing_sl"   # no guard → Mode D used
+
+    def test_pe_swing_high_too_close_falls_through(self):
+        """PE mirror: swing_high only 44 pts above entry on ATR-90 day → Mode C."""
+        candles = self._volatile_candles(n=25, spread=90.0)
+        params = compute_risk_params(
+            candles,
+            use_swing_sl=True,
+            use_spot_atr=True,
+            option_type="PE",
+            sensex_ltp=80_000.0,
+            swing_high=80_044.0,        # only 44 pts above entry
+            swing_low=None,
+            spot_atr_period=5,
+            spot_sl_mult=3.0,
+            target_rr=1.5,
+            trail_rr=0.5,
+            swing_sl_min_atr_mult=0.6,
+            min_sl_pts=20.0, min_target_pts=30.0, min_trail_pts=5.0,
+        )
+        assert params.sl_mode == "spot_atr"
+
+    def test_calm_day_small_swing_still_valid(self):
+        """
+        On a calm day (ATR ≈ 10), even a 10-pt swing passes mult=0.6:
+        min_required = 10 × 0.6 = 6 pts, swing = 20 pts → Mode D accepted.
+        """
+        from market.candle_builder import Candle
+        from datetime import datetime
+        ts = datetime(2026, 1, 1, 9, 15)
+        calm = [Candle(timestamp=ts, open=100.0, high=105.0,
+                       low=95.0, close=100.0) for _ in range(25)]
+        params = compute_risk_params(
+            calm,
+            use_swing_sl=True,
+            use_spot_atr=True,
+            option_type="CE",
+            sensex_ltp=80_000.0,
+            swing_low=79_980.0,         # 20 pts below entry, ATR ≈ 10
+            swing_high=None,
+            spot_atr_period=5,
+            spot_sl_mult=2.5,
+            target_rr=1.5,
+            trail_rr=0.5,
+            swing_sl_min_atr_mult=0.6,
+            min_sl_pts=5.0, min_target_pts=5.0, min_trail_pts=1.0,
+        )
+        assert params.sl_mode == "swing_sl"

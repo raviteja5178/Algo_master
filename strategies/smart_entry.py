@@ -40,6 +40,18 @@ Seven independent filters (all opt-in, all default OFF):
   that is not a trend, it is oscillation.  Recommended: 10–15 pts on SENSEX 5m.
   Skipped when EMA values are unavailable (fail-open).
 
+  Filter 4b — Gap rate-of-change bypass  (SMART_ENTRY_GAP_CLOSE_RATE > 0)
+  ───────────────────────────────────────────────────────────────────────────
+  When the gap is below the minimum threshold, the block is waived if the gap
+  is CLOSING toward the signal direction by at least gap_close_rate pts per candle:
+    gap_velocity = gap_now - gap_prev   (CE territory: positive = EMA9 rising vs EMA21)
+    CE bypass: gap_velocity  >  gap_close_rate   (gap rapidly closing from below)
+    PE bypass: -gap_velocity >  gap_close_rate   (gap rapidly closing from above)
+  Designed for fast V-reversals where price has already flipped decisively but
+  EMA is still catching up.  Flat or diverging gaps are never bypassed regardless
+  of this setting.  0 = disabled (original hard-block behaviour).
+  Recommended: 15 pts/candle on SENSEX 5m.
+
   Filter 5 — EMA gap widening  (SMART_ENTRY_REQUIRE_EMA_GAP_WIDENING = true)
   ───────────────────────────────────────────────────────────────────────────
   The EMA gap must be larger (in the signal direction) than it was on the
@@ -137,6 +149,9 @@ class SmartEntryFilter:
     require_ema_slope          : bool   — EMA9 must be rising/falling.
     cooldown_candles           : int    — candles blocked after a loss. 0 = disabled.
     min_ema_gap_pts            : float  — |EMA9-EMA21| must be >= this. 0 = disabled.
+    gap_close_rate             : float  — bypass the gap block when gap is closing toward
+                                          signal direction by >= this many pts/candle.
+                                          0 = disabled (hard block). Recommended: 15.
     require_ema_gap_widening   : bool   — EMA gap must be growing. False = disabled.
     require_15m_trend          : bool   — 15m close must align with EMA21. False = disabled.
     max_15m_gap_pts            : float  — only block 15m trend when gap exceeds this.
@@ -158,6 +173,7 @@ class SmartEntryFilter:
         require_ema_slope: bool = False,
         cooldown_candles: int = 0,
         min_ema_gap_pts: float = 0.0,
+        gap_close_rate: float = 0.0,
         require_ema_gap_widening: bool = False,
         require_15m_trend: bool = False,
         max_15m_gap_pts: float = 0.0,
@@ -171,6 +187,7 @@ class SmartEntryFilter:
         self._cooldown_max       = max(0, cooldown_candles)
         self._cooldown_left: int = 0
         self._min_ema_gap        = min_ema_gap_pts
+        self._gap_close_rate     = max(0.0, gap_close_rate)
         self._require_gap_wide   = require_ema_gap_widening
         self._require_15m_trend  = require_15m_trend
         self._max_15m_gap        = max_15m_gap_pts   # 0 = original binary block
@@ -426,15 +443,51 @@ class SmartEntryFilter:
                     # CE needs gap >= +min; PE needs gap <= -min
                     directed_gap = gap_now if side == "CE" else -gap_now
                     if directed_gap < self._min_ema_gap:
-                        log_event(
-                            logger, "SMART_ENTRY_BLOCKED_EMA_GAP",
-                            direction=direction,
-                            ema9=round(e9_now, 2),
-                            ema21=round(e21_now, 2),
-                            gap=round(gap_now, 2),
-                            required=self._min_ema_gap,
-                        )
-                        return False
+                        # ── Filter 4b: gap rate-of-change bypass ──────────────
+                        # Waive the block when the gap is closing fast enough
+                        # toward the signal direction (V-reversal scenario).
+                        if (
+                            self._gap_close_rate > 0
+                            and e9_prev is not None
+                            and e21_prev is not None
+                        ):
+                            gap_prev = e9_prev - e21_prev
+                            # velocity: positive = gap moving in CE direction
+                            gap_velocity = gap_now - gap_prev
+                            directed_velocity = gap_velocity if side == "CE" else -gap_velocity
+                            if directed_velocity >= self._gap_close_rate:
+                                log_event(
+                                    logger, "SMART_ENTRY_GAP_VELOCITY_BYPASS",
+                                    direction=direction,
+                                    ema9=round(e9_now, 2),
+                                    ema21=round(e21_now, 2),
+                                    gap=round(gap_now, 2),
+                                    gap_prev=round(gap_prev, 2),
+                                    gap_velocity=round(directed_velocity, 2),
+                                    required_velocity=self._gap_close_rate,
+                                )
+                                # gap block bypassed — continue to Filter 5
+                            else:
+                                log_event(
+                                    logger, "SMART_ENTRY_BLOCKED_EMA_GAP",
+                                    direction=direction,
+                                    ema9=round(e9_now, 2),
+                                    ema21=round(e21_now, 2),
+                                    gap=round(gap_now, 2),
+                                    gap_velocity=round(directed_velocity, 2),
+                                    required=self._min_ema_gap,
+                                )
+                                return False
+                        else:
+                            log_event(
+                                logger, "SMART_ENTRY_BLOCKED_EMA_GAP",
+                                direction=direction,
+                                ema9=round(e9_now, 2),
+                                ema21=round(e21_now, 2),
+                                gap=round(gap_now, 2),
+                                required=self._min_ema_gap,
+                            )
+                            return False
 
                 # ── Filter 5: gap must be widening ────────────────────────────
                 if self._require_gap_wide and e9_prev is not None and e21_prev is not None:
