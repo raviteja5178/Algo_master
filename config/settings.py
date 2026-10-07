@@ -89,6 +89,15 @@ SPOT_ATR_PERIOD: int            = _getint("SPOT_ATR_PERIOD", 5)
 SPOT_ATR_SL_MULT: float         = _getfloat("SPOT_ATR_SL_MULT", 2.5)
 SPOT_ATR_TARGET_RR: float       = _getfloat("SPOT_ATR_TARGET_RR", 1.2)
 SPOT_ATR_TRAIL_RR: float        = _getfloat("SPOT_ATR_TRAIL_RR", 0.5)
+# ATR-dynamic TSL — replaces the fixed trail_step with a live ATR-based distance.
+# When TSL_ATR_TRAIL_MULT > 0, the trailing stop floats at:
+#   stop = highest_ltp - ATR(TSL_ATR_PERIOD, 5m SENSEX) × TSL_ATR_TRAIL_MULT × ATM_delta(0.4)
+# This adapts automatically: tight trail on calm days, wider on volatile/trending days.
+# The fixed trail_step (SPOT_ATR_TRAIL_RR) is used as the BE-activation step only.
+# 0.0 = disabled (use fixed step trail — legacy behaviour).
+# Recommended: 0.5  →  at ATR=147, trail distance ≈ 29 pts (147 × 0.5 × 0.4)
+TSL_ATR_TRAIL_MULT: float       = _getfloat("TSL_ATR_TRAIL_MULT", 0.0)
+TSL_ATR_PERIOD: int             = _getint("TSL_ATR_PERIOD", 5)
 # Mode D — swing high/low as SL
 # Falls back to Mode C automatically when no swing level is found.
 USE_SWING_SL: bool              = _getbool("USE_SWING_SL", False)
@@ -144,6 +153,23 @@ NO_NEW_ENTRY_AFTER: str = _get("NO_NEW_ENTRY_AFTER", "15:00")
 # ── Strategy Toggles ──────────────────────────────────────────────────────────
 ENABLE_EMA_STRATEGY: bool = _getbool("ENABLE_EMA_STRATEGY", True)
 ENABLE_ORB_STRATEGY: bool = _getbool("ENABLE_ORB_STRATEGY", True)
+
+# ── Structure Breakdown Cooldown Bypass ───────────────────────────────────────
+# When a signal arrives during cooldown AND the market shows a clear structural
+# breakdown (N consecutive lower highs for PE / higher lows for CE) while close
+# is already on the wrong side of EMA9, the cooldown is reduced to 1 candle.
+#
+# Rationale: the cooldown is meant to block re-entries into choppy reversals.
+# When 3+ consecutive lower highs are visible AND close < EMA9 (for PE), the
+# market is NOT choppy — it is trending.  Blocking in that case costs trades
+# exactly as happened on 2026-10-05 with PE_NATR at 10:20.
+#
+# SMART_ENTRY_STRUCTURE_BYPASS_CANDLES : N consecutive lower highs/higher lows
+#   required to trigger the bypass. 0 = disabled. Default 3.
+# SMART_ENTRY_STRUCTURE_BYPASS_EMA_CONFIRM : also require close < EMA9 (PE) or
+#   close > EMA9 (CE) for the bypass to fire. True = stricter. Default true.
+SMART_ENTRY_STRUCTURE_BYPASS_CANDLES: int   = _getint("SMART_ENTRY_STRUCTURE_BYPASS_CANDLES", 0)
+SMART_ENTRY_STRUCTURE_BYPASS_EMA_CONFIRM: bool = _getbool("SMART_ENTRY_STRUCTURE_BYPASS_EMA_CONFIRM", True)
 
 # ── Smart Entry Filter ────────────────────────────────────────────────────────
 # Quality gate applied AFTER a raw signal (EMA / ORB / OB / MOM) fires.
@@ -213,6 +239,46 @@ SMART_ENTRY_SQUEEZE_CANDLES: int         = _getint("SMART_ENTRY_SQUEEZE_CANDLES"
 # 0.0 = use the same ratio as normal (no relaxation).
 # Recommended: 0.25 (vs default 0.35 normal ratio).
 SMART_ENTRY_SQUEEZE_BODY_ATR_RATIO: float = _getfloat("SMART_ENTRY_SQUEEZE_BODY_ATR_RATIO", 0.0)
+
+# Filter 8b — Bounce-exempt strategies.
+# Comma-separated list of strategy name suffixes that bypass Filters 1, 4 & 5
+# (body/ATR ratio, EMA gap magnitude, EMA gap widening).
+# These are "bounce" strategies whose own structural level already confirms the
+# entry — the EMA gap is expected to be flat at a VWAP retest or NATR crossover.
+# Default: "VWAP,NATR" — skip body + EMA-gap filters for CE_VWAP / PE_VWAP /
+#   CE_NATR / PE_NATR signals.
+# "" = disable (all strategies subject to body/EMA-gap filters equally).
+# Example: SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES=VWAP,NATR,OB
+_BOUNCE_EXEMPT_RAW: str = _get("SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES", "VWAP,NATR")
+SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES: set[str] = (
+    {s.strip().upper() for s in _BOUNCE_EXEMPT_RAW.split(",") if s.strip()}
+    if _BOUNCE_EXEMPT_RAW.strip()
+    else set()
+)
+
+# Filter 2b — Slope-exempt strategies.
+# Comma-separated list of strategy name suffixes that bypass Filter 2 (EMA9 slope).
+# NATR is exempt by default: its trailing-stop crossover IS the trend-flip signal —
+# requiring EMA slope confirmation is double-filtering because EMA9 lags the crossover
+# by 1-2 candles and fires in the wrong direction right at the inflection point.
+# Default: "NATR" — skip EMA slope filter for CE_NATR / PE_NATR signals.
+# "" = disable (all strategies subject to slope filter equally).
+# Example: SMART_ENTRY_SLOPE_EXEMPT_STRATEGIES=NATR,ATR
+_SLOPE_EXEMPT_RAW: str = _get("SMART_ENTRY_SLOPE_EXEMPT_STRATEGIES", "NATR")
+SMART_ENTRY_SLOPE_EXEMPT_STRATEGIES: set[str] = (
+    {s.strip().upper() for s in _SLOPE_EXEMPT_RAW.split(",") if s.strip()}
+    if _SLOPE_EXEMPT_RAW.strip()
+    else set()
+)
+
+# Per-strategy minimum option entry price override.
+# Overrides MIN_OPTION_ENTRY_PRICE for specific strategy types.
+# NATR fires early in a trend flip — before the ATM option has inflated to a
+# high premium.  A 300-pt floor blocks legitimate early-move entries at ₹250-280.
+# Set a lower floor specifically for NATR so the global MIN_OPTION_ENTRY_PRICE
+# (intended for deep-OTM / near-expiry protection) does not apply.
+# 0.0 = use MIN_OPTION_ENTRY_PRICE (no override).  Recommended: 150
+NATR_MIN_OPTION_ENTRY_PRICE: float = _getfloat("NATR_MIN_OPTION_ENTRY_PRICE", 0.0)
 
 # Filter 8 — Option premium extension guard.
 # Blocks entry when the option LTP has already risen more than this fraction
@@ -314,6 +380,18 @@ OB_MAX_ATR_MULT: float    = _getfloat("OB_MAX_ATR_MULT", 3.5)
 OB_ATR_PERIOD: int        = _getint("OB_ATR_PERIOD", 10)
 OB_MAX_BLOCKS: int        = _getint("OB_MAX_BLOCKS", 3)
 OB_INVALIDATION: str      = _get("OB_INVALIDATION", "Wick")
+# OB_APPROACH_BUFFER_ATR_MULT : extend the OB signal to fire when price
+#   *approaches* the OB from outside, not only when it is already inside.
+#   For bearish OBs (PE): signal fires when close >= ob.bottom - buffer_pts
+#     (price is within buffer_pts below the OB bottom — on the retest approach).
+#   For bullish OBs (CE): signal fires when close <= ob.top + buffer_pts
+#     (price is within buffer_pts above the OB top).
+#   buffer_pts = OB_APPROACH_BUFFER_ATR_MULT × ATR(OB_ATR_PERIOD)
+#   0.0 = disabled — only fires when close is actually inside the zone (original).
+#   0.2 = recommended — fires ≈ 0.2×ATR (~22 pts at ATR5=111) before zone entry.
+#   Mirrors TradingView AI Copilot "sell the retest" entries which fire 1-2
+#   candles before price reaches the OB bottom.
+OB_APPROACH_BUFFER_ATR_MULT: float = _getfloat("OB_APPROACH_BUFFER_ATR_MULT", 0.0)
 
 # ── TRB (Time Range Breakout) strategy ─────────────────────────────────────────
 ENABLE_TRB_STRATEGY: bool      = _getbool("ENABLE_TRB_STRATEGY", False)

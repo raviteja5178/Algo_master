@@ -66,7 +66,7 @@ from strategies.signal_engine import evaluate_signals
 from market.indicators import atr_at, ema as calc_ema, swing_levels
 from utils.latency import LatencyTracker
 from utils.logging_config import configure_logging, log_event
-from utils.time_utils import IST, is_after_or_equal, now_ist, parse_time_ist
+from utils.time_utils import IST, is_after_or_equal, market_open, now_ist, parse_time_ist
 
 # Shared state file read by the UI process
 _STATE_FILE = Path(__file__).resolve().parent / ".bot_state.json"
@@ -192,6 +192,10 @@ class BotContext:
             squeeze_candles             = settings.SMART_ENTRY_SQUEEZE_CANDLES,
             max_premium_extension_pct   = settings.SMART_ENTRY_MAX_PREMIUM_EXTENSION_PCT,
             squeeze_body_atr_ratio      = settings.SMART_ENTRY_SQUEEZE_BODY_ATR_RATIO,
+            structure_bypass_candles    = settings.SMART_ENTRY_STRUCTURE_BYPASS_CANDLES,
+            structure_bypass_ema_confirm= settings.SMART_ENTRY_STRUCTURE_BYPASS_EMA_CONFIRM,
+            bounce_exempt_strategies    = settings.SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES,
+            slope_exempt_strategies     = settings.SMART_ENTRY_SLOPE_EXEMPT_STRATEGIES,
         )
 
         # AI Confirmation Filter (created only when ENABLE_AI_CONFIRMATION=true)
@@ -221,6 +225,17 @@ class BotContext:
                 )
                 return False
         return self.sm.can_enter()
+
+    def entry_block_reason(self) -> str:
+        """Return why can_create_entry() returned False (called only when it did)."""
+        _now = now_ist().time()
+        if is_after_or_equal(_now, self._no_entry_time):
+            return f"past NO_NEW_ENTRY_AFTER {settings.NO_NEW_ENTRY_AFTER} (now {_now.hour:02d}:{_now.minute:02d})"
+        if self.smart_exit is not None:
+            daily_pnl = fetch_today_realised_pnl()
+            if self.smart_exit.is_daily_loss_limit_hit(daily_pnl):
+                return f"daily loss limit hit (realised={daily_pnl:.2f} pts <= -{settings.DAILY_LOSS_LIMIT_PTS:.2f})"
+        return f"state={self.sm.state} — position already open or bot not IDLE"
 
 
 class _TradeStoreFacade:
@@ -328,7 +343,7 @@ def print_startup_summary() -> None:
 def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
                   signal_candle_ts=None, candle_completed_ts: str | None = None) -> None:
     if not ctx.can_create_entry():
-        logger.info("Entry blocked: state=%s or past no-entry time.", ctx.sm.state)
+        logger.warning("Entry blocked [%s]: %s.", signal_type, ctx.entry_block_reason())
         return
 
     action_id = f"{signal_type}_ENTRY_{now_ist().strftime('%Y-%m-%d_%H-%M')}"
@@ -417,11 +432,21 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
                         _time.sleep(0.5)
 
         # Accept this candidate if premium check passes (or check is disabled).
+        # NATR signals use NATR_MIN_OPTION_ENTRY_PRICE when set (> 0), because
+        # NATR fires early in a trend flip before the ATM option has inflated —
+        # the global MIN_OPTION_ENTRY_PRICE (intended for deep-OTM protection)
+        # would otherwise block legitimate ₹250-280 early-move NATR entries.
+        _is_natr = signal_type is not None and "NATR" in signal_type
+        _effective_min = (
+            settings.NATR_MIN_OPTION_ENTRY_PRICE
+            if _is_natr and settings.NATR_MIN_OPTION_ENTRY_PRICE > 0
+            else settings.MIN_OPTION_ENTRY_PRICE
+        )
         _below_min = (
-            settings.MIN_OPTION_ENTRY_PRICE > 0
+            _effective_min > 0
             and _ltp is not None
             and _ltp > 0
-            and _ltp < settings.MIN_OPTION_ENTRY_PRICE
+            and _ltp < _effective_min
         )
         if _below_min:
             _is_itm_fallback = _candidate["strike"] != _candidates[0]["strike"]
@@ -429,7 +454,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
                 logger, "ENTRY_BLOCKED_MIN_PREMIUM",
                 symbol=_sym,
                 ltp=_ltp,
-                min_required=settings.MIN_OPTION_ENTRY_PRICE,
+                min_required=_effective_min,
                 signal=signal_type,
                 itm_fallback_attempted=_is_itm_fallback,
             )
@@ -642,7 +667,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
 
     # ── MIN_RR gate: block entry if R:R is below the configured minimum ──
     if settings.MIN_RR > 0 and sl_pts > 0:
-        actual_rr = target_pts / sl_pts
+        actual_rr = round(target_pts / sl_pts, 2)
         if actual_rr < settings.MIN_RR:
             log_event(
                 logger, "ENTRY_BLOCKED_MIN_RR",
@@ -708,6 +733,8 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     # Trailing and target managers
     ctx.trailing = TrailingStopManager(
         ctx.entry_price, sl_pts, be_pts, trail_pts,
+        tsl_atr_trail_mult=settings.TSL_ATR_TRAIL_MULT,
+        tsl_atr_period=settings.TSL_ATR_PERIOD,
     )
     ctx.target = DynamicTargetManager(
         ctx.entry_price, target_pts, trail_pts,
@@ -807,8 +834,13 @@ def on_option_ltp(ctx: BotContext, ltp: float) -> None:
             execute_exit(ctx, reason="STOP_HIT", exit_ltp=ltp)
             return
 
-    # Trailing stop logic
-    new_stop = ctx.trailing.update(ltp)
+    # Trailing stop logic — pass latest candles for ATR-dynamic mode
+    _candles_for_tsl = (
+        ctx.agg_5m.get_completed()
+        if settings.TSL_ATR_TRAIL_MULT > 0
+        else None
+    )
+    new_stop = ctx.trailing.update(ltp, _candles_for_tsl)
     if new_stop is not None:
         # Modify broker stop order
         if ctx.stop_order_id:
@@ -993,6 +1025,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
                 ctx.trade_id, exit_price, now_ist().isoformat(), pnl,
                 exit_reason="SL_FILLED_AT_EXCHANGE",
                 smart_exit_trigger=reason if reason not in ("", "STOP_HIT") else None,
+                highest_ltp=ctx.trailing.highest_ltp if ctx.trailing else None,
             )
             notify("EXIT_FILLED", symbol=ctx.tradingsymbol,
                    exit_price=exit_price, pnl=pnl, reason="SL_FILLED_AT_EXCHANGE")
@@ -1041,6 +1074,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
         ctx.trade_id, exit_price, now_ist().isoformat(), pnl,
         exit_reason=reason or "MANUAL",
         smart_exit_trigger=_smart_trigger,
+        highest_ltp=ctx.trailing.highest_ltp if ctx.trailing else None,
     )
     notify("EXIT_FILLED", symbol=ctx.tradingsymbol, exit_price=exit_price, pnl=pnl, reason=reason)
 
@@ -1124,6 +1158,8 @@ def recover_from_restart(ctx: BotContext) -> None:
         initial_sl_points=settings.INITIAL_SL_POINTS,
         break_even_trigger_points=settings.BREAK_EVEN_TRIGGER_POINTS,
         trail_step_points=settings.TRAIL_STEP_POINTS,
+        tsl_atr_trail_mult=settings.TSL_ATR_TRAIL_MULT,
+        tsl_atr_period=settings.TSL_ATR_PERIOD,
     )
     ctx.trailing.current_stop = active["current_stop"] or ctx.trailing.current_stop
     ctx.trailing.highest_ltp = active["highest_ltp"] or ctx.entry_price
@@ -1216,8 +1252,15 @@ def _write_state(ctx: BotContext) -> None:
     Failures are silently swallowed — never crash the trading loop.
     """
     try:
-        candles_5m  = ctx.agg_5m.get_completed()
-        candles_15m = ctx.agg_15m.get_completed()
+        # Strip any post-market frozen candles (15:30+) that may have accumulated
+        # in the deque from a previous run or before the session-close guard was
+        # applied.  Without this, Wilder ATR smooths toward zero on TR=0 bars,
+        # collapsing the ATR Copilot bands to a single line.
+        _close_hm = (15, 30)
+        candles_5m  = [c for c in ctx.agg_5m.get_completed()
+                       if (c.timestamp.hour, c.timestamp.minute) < _close_hm]
+        candles_15m = [c for c in ctx.agg_15m.get_completed()
+                       if (c.timestamp.hour, c.timestamp.minute) < _close_hm]
 
         def _ser(candles, limit=60):
             sliced = candles[-limit:]
@@ -1380,7 +1423,16 @@ _FULL_WRITE_INTERVAL = 5
 _tick_counter = 0
 
 
-_MARKET_OPEN_TIME = parse_time_ist("09:15")
+_MARKET_OPEN_TIME  = parse_time_ist("09:15")
+# After 15:30 the market is closed and Zerodha streams the last-traded price
+# as a heartbeat on every WebSocket keepalive.  These heartbeat ticks have
+# True Range = 0, which Wilder-smooths ATR to near-zero after ~25 candles,
+# collapsing Upper/Lower bands to a single line.  candle_aggregator.on_tick()
+# also drops these, but _write_state must stop recomputing bands from the
+# already-in-memory deque (which may still hold frozen candles from before a
+# restart).  Solution: _write_state is never called from the tick handler after
+# 15:30 — only the cheap _write_ltp (scalar LTP update) keeps the UI live.
+_MARKET_CLOSE_TIME = parse_time_ist("15:30")
 
 
 def _make_tick_handler(ctx: BotContext):
@@ -1406,10 +1458,11 @@ def _make_tick_handler(ctx: BotContext):
             # so trail/SL checks run against the SENSEX LTP directly.
             if settings.TRADING_MODE == "PAPER" and ctx.sm.state == State.POSITION_OPEN:
                 on_option_ltp(ctx, ltp)
-            # Always write LTP immediately so the UI shows every price update.
-            # Full state (candles + EMA) only recalculated every N ticks.
+            # After 15:30 only update the scalar LTP — never recompute bands/EMA
+            # from the candle buffer, which may contain post-market frozen candles.
             _tick_counter += 1
-            if _tick_counter % _FULL_WRITE_INTERVAL == 0:
+            _after_close = now_ist().time() >= _MARKET_CLOSE_TIME
+            if not _after_close and _tick_counter % _FULL_WRITE_INTERVAL == 0:
                 _write_state(ctx)
             else:
                 _write_ltp(ctx)
@@ -1475,6 +1528,10 @@ def _make_candle_handler_5m(ctx: BotContext):
 
         # ── Reversal signal check (smart exit trigger 1) ────────────────────────
         # evaluate_signals runs here for both entry AND reversal detection.
+        # Skip signal evaluation outside market hours — post-15:30 flat candles
+        # built from frozen PaperFeed LTP ticks must never reach strategy logic.
+        if not market_open():
+            return
         if ctx.sm.is_entry_blocked():
             return
 

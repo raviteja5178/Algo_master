@@ -624,3 +624,255 @@ class TestFilter6_15mTrend:
         flt = SmartEntryFilter(require_15m_trend=True)
         candles_15m = self._make_15m_candles(close_above_ema=False)
         assert flt.allow("PE_TRB", self._basic_ce_candles(), candles_15m=candles_15m) is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bounce-exempt strategy bypass (Filters 1, 4 & 5)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestBounceExemptStrategies:
+    """
+    VWAP and NATR signals must bypass Filters 1 (body/ATR), 4 (min EMA gap),
+    and 5 (EMA gap widening) because bounce setups have flat EMAs by definition.
+    """
+
+    def _flat_candles(self, n: int = 30) -> list[Candle]:
+        """Candles with tiny bodies and near-zero EMA gap (flat/noise zone)."""
+        base = 72000.0
+        candles = []
+        for i in range(n):
+            ts = datetime(_TODAY.year, _TODAY.month, _TODAY.day, 9, 15) + timedelta(minutes=i * 5)
+            # All candles close at base ± 1 — body = 1, ATR ≈ 1, EMA gap ≈ 0
+            c = base + (1.0 if i % 2 == 0 else -1.0)
+            candles.append(_make_candle(ts, base, base + 2, base - 2, c))
+        return candles
+
+    def test_vwap_bypasses_body_filter(self) -> None:
+        """CE_VWAP must pass even when body << ATR threshold."""
+        flt = SmartEntryFilter(min_body_atr_ratio=0.5, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_body_and_atr(body=1, atr_range=20)  # body/ATR = 0.05 << 0.5
+        assert flt.allow("CE_VWAP", candles) is True
+
+    def test_natr_bypasses_body_filter(self) -> None:
+        """PE_NATR must pass even when body << ATR threshold."""
+        flt = SmartEntryFilter(min_body_atr_ratio=0.5, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_body_and_atr(body=1, atr_range=20, direction="PE")
+        assert flt.allow("PE_NATR", candles) is True
+
+    def test_non_exempt_strategy_still_blocked_by_body(self) -> None:
+        """CE_EMA (not in exempt set) must still be blocked by body filter."""
+        flt = SmartEntryFilter(min_body_atr_ratio=0.5, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_body_and_atr(body=1, atr_range=20)
+        assert flt.allow("CE_EMA", candles) is False
+
+    def test_vwap_bypasses_ema_gap_filter(self) -> None:
+        """CE_VWAP must pass even when EMA gap is flat/negative (noise zone)."""
+        flt = SmartEntryFilter(min_ema_gap_pts=10.0, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_ema_gap(widening=True, side="CE", large_gap=False)
+        # EMA gap is small → CE_EMA would be blocked, CE_VWAP must pass
+        assert flt.allow("CE_VWAP", candles) is True
+
+    def test_vwap_bypasses_ema_gap_widening_filter(self) -> None:
+        """CE_VWAP must pass even when EMA gap is shrinking."""
+        flt = SmartEntryFilter(require_ema_gap_widening=True, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_ema_gap(widening=False, side="CE")
+        assert flt.allow("CE_VWAP", candles) is True
+
+    def test_non_exempt_still_blocked_by_ema_gap(self) -> None:
+        """CE_EMA (not exempt) must still be blocked by EMA gap filter."""
+        flt = SmartEntryFilter(min_ema_gap_pts=10.0, bounce_exempt_strategies={"VWAP", "NATR"})
+        candles = _candles_with_ema_gap(widening=True, side="CE", large_gap=False)
+        assert flt.allow("CE_EMA", candles) is False
+
+    def test_empty_exempt_set_disables_bypass(self) -> None:
+        """When bounce_exempt_strategies=set(), no strategy gets the bypass."""
+        flt = SmartEntryFilter(min_body_atr_ratio=0.5, bounce_exempt_strategies=set())
+        candles = _candles_with_body_and_atr(body=1, atr_range=20)
+        # CE_VWAP should be blocked when exemption is explicitly disabled
+        assert flt.allow("CE_VWAP", candles) is False
+
+    def test_default_exempt_set_includes_vwap_and_natr(self) -> None:
+        """Default SmartEntryFilter exempt set is VWAP and NATR (body bypass)."""
+        flt = SmartEntryFilter(min_body_atr_ratio=0.5)  # no bounce_exempt_strategies → default
+        candles = _candles_with_body_and_atr(body=1, atr_range=20)
+        assert flt.allow("CE_VWAP", candles) is True
+        assert flt.allow("PE_NATR", candles) is True
+        # EMA/ORB are NOT in default exempt set
+        assert flt.allow("CE_EMA", candles) is False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fix 1: Slope-exempt bypass for NATR (Filter 2)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSlopeExemptStrategies:
+    """
+    NATR signals must bypass the EMA9 slope filter (Filter 2).
+
+    NATR fires at the trend-flip inflection point — EMA9 will be pointing the
+    wrong way (still falling on a CE signal, still rising on a PE signal)
+    because EMA lags by 1-2 candles.  Requiring slope confirmation here blocks
+    the exact setups NATR is designed to capture.
+
+    Oct 01 real case: PE_NATR blocked because EMA9 rose 3 pts (72,432→72,435).
+    """
+
+    def test_natr_ce_bypasses_slope_filter_when_ema9_falling(self) -> None:
+        """CE_NATR must pass even when EMA9 is falling (slope filter would block)."""
+        flt = SmartEntryFilter(
+            require_ema_slope=True,
+            slope_exempt_strategies={"NATR"},
+        )
+        # EMA9 falling candles — would block CE for normal strategies
+        candles = _candles_with_ema_slope(rising=False, n=25)
+        assert flt.allow("CE_NATR", candles) is True
+
+    def test_natr_pe_bypasses_slope_filter_when_ema9_rising(self) -> None:
+        """PE_NATR must pass even when EMA9 is rising (slope filter would block)."""
+        flt = SmartEntryFilter(
+            require_ema_slope=True,
+            slope_exempt_strategies={"NATR"},
+        )
+        candles = _candles_with_ema_slope(rising=True, n=25)
+        assert flt.allow("PE_NATR", candles) is True
+
+    def test_non_natr_still_blocked_by_slope(self) -> None:
+        """CE_VWAP (not in slope-exempt set) must still be blocked when EMA9 falls."""
+        flt = SmartEntryFilter(
+            require_ema_slope=True,
+            slope_exempt_strategies={"NATR"},   # only NATR exempt
+        )
+        candles = _candles_with_ema_slope(rising=False, n=25)
+        assert flt.allow("CE_VWAP", candles) is False
+
+    def test_default_slope_exempt_includes_natr(self) -> None:
+        """Default SmartEntryFilter slope-exempt set is NATR."""
+        flt = SmartEntryFilter(require_ema_slope=True)  # default → NATR exempt
+        candles = _candles_with_ema_slope(rising=False, n=25)
+        assert flt.allow("CE_NATR", candles) is True
+        # CE (EMA strategy) is NOT slope-exempt by default
+        assert flt.allow("CE", candles) is False
+
+    def test_empty_slope_exempt_set_disables_bypass(self) -> None:
+        """When slope_exempt_strategies=set(), NATR is also blocked by slope."""
+        flt = SmartEntryFilter(
+            require_ema_slope=True,
+            slope_exempt_strategies=set(),   # explicitly disable all exemptions
+        )
+        candles = _candles_with_ema_slope(rising=False, n=25)
+        assert flt.allow("CE_NATR", candles) is False
+
+    def test_slope_exempt_does_not_affect_other_filters(self) -> None:
+        """Slope-exempt only skips Filter 2 — cooldown still applies to NATR."""
+        flt = SmartEntryFilter(
+            require_ema_slope=True,
+            slope_exempt_strategies={"NATR"},
+            cooldown_candles=3,
+        )
+        candles = _candles_with_ema_slope(rising=False, n=25)
+        # Trigger cooldown
+        flt.on_trade_closed(-10.0)
+        # Even though slope is exempt, cooldown must still block
+        assert flt.allow("CE_NATR", candles) is False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fix 2: Bounce-exempt set explicitly hardened — NATR in default
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestBounceExemptHardened:
+    """
+    Verify that the bounce-exempt set correctly covers both Filters 4 and 5
+    for NATR — the gap-widening filter (Filter 5) fires at NATR inflection
+    points where the gap is naturally narrowing before it reverses.
+    """
+
+    def test_natr_bypasses_gap_widening_filter(self) -> None:
+        """PE_NATR must pass even when EMA gap is not widening (shrinking)."""
+        flt = SmartEntryFilter(
+            require_ema_gap_widening=True,
+            bounce_exempt_strategies={"VWAP", "NATR"},
+        )
+        candles = _candles_with_ema_gap(widening=False, side="PE")
+        assert flt.allow("PE_NATR", candles) is True
+
+    def test_natr_bypasses_min_gap_filter(self) -> None:
+        """PE_NATR must pass even when EMA gap is below the minimum threshold."""
+        flt = SmartEntryFilter(
+            min_ema_gap_pts=10.0,
+            bounce_exempt_strategies={"VWAP", "NATR"},
+        )
+        candles = _candles_with_ema_gap(widening=True, side="PE", large_gap=False)
+        assert flt.allow("PE_NATR", candles) is True
+
+    def test_natr_in_default_bounce_exempt_set(self) -> None:
+        """Default bounce-exempt set must include NATR for both gap filters."""
+        flt = SmartEntryFilter(
+            min_ema_gap_pts=10.0,
+            require_ema_gap_widening=True,
+        )
+        candles = _candles_with_ema_gap(widening=False, side="CE", large_gap=False)
+        # CE_NATR must be exempt (default set = {"VWAP", "NATR"})
+        assert flt.allow("CE_NATR", candles) is True
+        # CE_EMA must still be blocked
+        assert flt.allow("CE_EMA", candles) is False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fix 3: NATR_MIN_OPTION_ENTRY_PRICE override logic (unit test of selection)
+# ─────────────────────────────────────────────────────────────────────────────
+# The full premium-floor logic lives in execute_entry (main.py), which requires
+# broker/DB infrastructure.  We test the core decision logic in isolation.
+
+class TestNatrPremiumFloorLogic:
+    """
+    Verify the effective-minimum computation that execute_entry uses:
+      NATR signals  → NATR_MIN_OPTION_ENTRY_PRICE when > 0
+      Other signals → MIN_OPTION_ENTRY_PRICE always
+    """
+
+    def _effective_min(
+        self,
+        signal: str,
+        global_min: float,
+        natr_min: float,
+    ) -> float:
+        """Mirror the logic from execute_entry for isolated testing."""
+        is_natr = "NATR" in signal
+        return (
+            natr_min
+            if is_natr and natr_min > 0
+            else global_min
+        )
+
+    def test_natr_signal_uses_natr_floor_when_set(self) -> None:
+        assert self._effective_min("CE_NATR", global_min=300, natr_min=150) == 150
+        assert self._effective_min("PE_NATR", global_min=300, natr_min=150) == 150
+
+    def test_natr_signal_falls_back_to_global_when_natr_min_zero(self) -> None:
+        assert self._effective_min("CE_NATR", global_min=300, natr_min=0) == 300
+        assert self._effective_min("PE_NATR", global_min=300, natr_min=0) == 300
+
+    def test_non_natr_signal_always_uses_global_floor(self) -> None:
+        assert self._effective_min("CE_VWAP", global_min=300, natr_min=150) == 300
+        assert self._effective_min("CE_EMA",  global_min=300, natr_min=150) == 300
+        assert self._effective_min("CE_TRB",  global_min=300, natr_min=150) == 300
+        assert self._effective_min("CE_ORB",  global_min=300, natr_min=150) == 300
+
+    def test_natr_allowed_at_ltp_250_with_natr_floor_150(self) -> None:
+        """ltp=250 < global 300 → blocked normally; with natr_min=150 → allowed."""
+        ltp = 250.0
+        effective_min = self._effective_min("CE_NATR", global_min=300, natr_min=150)
+        assert ltp >= effective_min  # not below floor → allowed
+
+    def test_natr_allowed_at_ltp_281_with_natr_floor_150(self) -> None:
+        """Sep 30 11:45 CE_NATR real case: ltp=281 was blocked by 300 floor."""
+        ltp = 281.25
+        effective_min = self._effective_min("CE_NATR", global_min=300, natr_min=150)
+        assert ltp >= effective_min  # would have been allowed ✓
+
+    def test_natr_blocked_below_natr_floor(self) -> None:
+        """ltp=100 < natr_min=150 → still blocked (floor protects against junk options)."""
+        ltp = 100.0
+        effective_min = self._effective_min("CE_NATR", global_min=300, natr_min=150)
+        assert ltp < effective_min  # correctly blocked

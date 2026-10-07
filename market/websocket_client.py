@@ -42,9 +42,12 @@ _RECONNECT_MAX_DELAY = 5    # seconds — library minimum; prevents long blind w
 _RECONNECT_MAX_TRIES = 300  # ~5 hours of 1s retries — effectively unlimited
 
 # Application-level WS ping interval.
-# Zerodha drops idle TCP connections (no WS ping/pong) after ~20–60 min.
-# Sending a ping every 30s keeps the connection alive.
-_PING_INTERVAL_SECONDS = 30
+# Zerodha drops idle TCP connections (no WS ping/pong) after ~30s of silence.
+# We use autobahn's built-in autoPingInterval (set on the factory after connect())
+# rather than a manual thread — the manual thread's getattr(ticker, "ws") path
+# returns the factory's ws reference which does NOT have sendPing(), so the ping
+# silently fails and the connection drops every exactly 30 seconds.
+_PING_INTERVAL_SECONDS = 20   # ping every 20s — well inside Zerodha's 30s drop window
 
 # Market hours in IST (hour, minute) — stale monitor is suppressed outside this window
 _MARKET_OPEN  = (9, 15)
@@ -154,8 +157,12 @@ class WebSocketClient:
         self._last_tick_time = time.monotonic()
         self._last_option_tick_time = time.monotonic()
         self._start_stale_monitor()
-        self._start_ping_thread()
         self._ticker.connect(threaded=True)
+        # Enable autobahn's built-in auto-ping AFTER connect() so the factory
+        # exists.  This is reliable — it runs inside Twisted's reactor on the
+        # correct thread, unlike the manual ping thread which was silently failing
+        # because ticker.ws (factory ref) doesn't expose sendPing() directly.
+        self._enable_auto_ping()
         log_event(logger, "WEBSOCKET_STARTED", tokens=list(self._tokens))
 
     def stop(self) -> None:
@@ -330,33 +337,36 @@ class WebSocketClient:
         self._last_tick_time = time.monotonic()
         self._last_option_tick_time = time.monotonic()
 
-    def _start_ping_thread(self) -> None:
+    def _enable_auto_ping(self) -> None:
         """
-        Send a WebSocket ping every _PING_INTERVAL_SECONDS to prevent
-        Zerodha's server from dropping the idle TCP connection.
+        Enable autobahn's built-in auto-ping on the KiteTicker factory.
 
-        KiteTicker wraps the underlying autobahn WebSocket protocol object.
-        The protocol exposes sendPing(); we call it if available.  If the
-        KiteTicker version doesn't expose it, the thread just sleeps harmlessly.
+        The previous approach (manual ping thread calling ticker.ws.sendPing())
+        was silently broken: ticker.ws is the factory's ws reference — a
+        WebSocketClientFactory attribute, NOT the live protocol instance.
+        WebSocketClientFactory doesn't have sendPing(); the hasattr() check
+        returned False every time, the except swallowed the AttributeError,
+        and no ping was ever sent.  Result: Zerodha dropped the connection
+        every exactly 30 seconds (their idle TCP timeout).
+
+        autobahn's autoPingInterval is set directly on the factory and runs
+        inside Twisted's reactor on the correct thread — fully reliable.
         """
-        def _ping_loop() -> None:
-            while self._running:
-                time.sleep(_PING_INTERVAL_SECONDS)
-                if not self._running:
-                    break
-                try:
-                    if self._ticker and self._ticker.is_connected():
-                        # autobahn WebSocketClientProtocol.sendPing() — present in
-                        # kiteconnect ≥ 4.x which bundles autobahn.
-                        ws_proto = getattr(self._ticker, "ws", None)
-                        if ws_proto and hasattr(ws_proto, "sendPing"):
-                            ws_proto.sendPing()
-                            logger.debug("WebSocket ping sent.")
-                except Exception as exc:
-                    logger.debug("WebSocket ping failed (non-fatal): %s", exc)
-
-        _t = threading.Thread(target=_ping_loop, daemon=True, name="ws-ping")
-        _t.start()
+        try:
+            factory = getattr(self._ticker, "factory", None)
+            if factory is not None:
+                factory.setProtocolOptions(
+                    autoPingInterval=_PING_INTERVAL_SECONDS,
+                    autoPingTimeout=10,   # treat as dead if no pong in 10s
+                )
+                logger.info(
+                    "WebSocket auto-ping enabled: interval=%ds timeout=10s",
+                    _PING_INTERVAL_SECONDS,
+                )
+            else:
+                logger.warning("WebSocket factory not available — auto-ping not set.")
+        except Exception as exc:
+            logger.warning("WebSocket auto-ping setup failed (non-fatal): %s", exc)
 
     def _start_stale_monitor(self) -> None:
         import datetime as _dt

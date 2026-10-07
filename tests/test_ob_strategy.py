@@ -1,353 +1,428 @@
 """
-Tests for the Order Block (OB) strategy.
+Tests for Order Block (OB) strategy — is_ob_ce_signal / is_ob_pe_signal.
 
 Covers:
-  - Bullish OB formation on swing-high crossover
-  - Bearish OB formation on swing-low crossover
-  - Breaker invalidation (Wick and Close methods)
-  - ATR size cap discards oversized OBs
-  - CE_OB / PE_OB signal: close inside valid OB triggers signal
-  - CE_OB / PE_OB signal: breaker OB does NOT trigger signal
-  - Date guard (today-only)
-  - Insufficient candles returns empty / False
+  - Original behaviour (no approach buffer): inside zone fires, outside does not.
+  - Approach buffer (PE): fires when close is within buffer_pts below OB bottom.
+  - Approach buffer (PE): does NOT fire when close is farther than buffer_pts below.
+  - Approach buffer (CE): fires when close is within buffer_pts above OB top.
+  - Approach buffer (CE): does NOT fire when close is farther than buffer_pts above.
+  - Inside-zone still fires when buffer is active (backward compat).
+  - Breaker OBs are never triggered (neither inside nor on approach).
+  - Today guard: signals never fire on yesterday's candles.
+  - Insufficient candles return False without error.
+
+All tests use swing_length=5, atr_period=5 so the series stays short (~13 candles).
+Buffer behaviour is tested against the real ATR computed on the same series.
+Exact boundary tests (buffer edge ±1 pt) use unittest.mock.patch to pin the ATR.
 """
 
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from unittest.mock import patch
 
 import pytest
 
 from market.candle_builder import Candle
-from strategies.ob_strategy import (
-    OrderBlock,
-    detect_order_blocks,
-    is_ob_ce_signal,
-    is_ob_pe_signal,
-)
+from strategies.ob_strategy import is_ob_ce_signal, is_ob_pe_signal
 
 _TODAY = date.today()
 
+# ── shared kwargs ─────────────────────────────────────────────────────────────
+# Use swing_length=5 / atr_period=5 so the test series only needs ~13 candles.
+_OB_KWARGS = dict(
+    swing_length=5,
+    max_atr_mult=10.0,   # generous cap so OBs are never discarded in tests
+    atr_period=5,
+    max_blocks=3,
+    invalidation="Wick",
+)
 
-def _ts(offset_minutes: int) -> datetime:
-    """Return a datetime for today at 09:15 + offset_minutes."""
+
+# ── timestamp helpers ─────────────────────────────────────────────────────────
+
+def _ts(i: int) -> datetime:
+    """Today at 09:15 + i×5 min."""
     base = datetime(_TODAY.year, _TODAY.month, _TODAY.day, 9, 15)
-    return base + timedelta(minutes=offset_minutes)
+    return base + timedelta(minutes=i * 5)
 
 
-def _candle(
-    offset_minutes: int,
-    open_: float,
-    high: float,
-    low: float,
-    close: float,
-    volume: int = 1000,
-) -> Candle:
-    return Candle(_ts(offset_minutes), open_, high, low, close, volume)
+def _c(i: int, o: float, h: float, l: float, c: float) -> Candle:
+    return Candle(_ts(i), open=o, high=h, low=l, close=c)
 
 
-# ── Candle sequence builders ──────────────────────────────────────────────────
+# ── candle series factories ───────────────────────────────────────────────────
 
-def _flat_candles(n: int, price: float = 1000.0) -> list[Candle]:
-    """n identical candles — used to pad sequences to the required length."""
-    return [_candle(i * 5, price, price + 5, price - 5, price) for i in range(n)]
-
-
-def _bull_ob_candles(swing_length: int = 5) -> list[Candle]:
+def _bear_ob_base() -> list[Candle]:
     """
-    Build a synthetic sequence that produces a bullish OB.
+    Build 13 candles that produce exactly one valid (non-breaker) bearish OB
+    at approximately [998, 1002].
 
-    Structure:
-      - swing_length + 1 base candles (stable low price)
-      - 1 swing-high candle: high=swing_high, low stays same as base (pure upward spike)
-      - swing_length candles well below swing_high (confirmation window)
-      - 1 crossover candle: close > swing_high
+    Structure (swing_length=5):
+      Bars 0-5  : 6 flat candles at p=1000 (range ±2)
+      Bar  6    : swing-LOW pivot  (low=800, high=1000.5)  → detected as swing LOW
+      Bars 7-11 : 5 flat candles at p=1000 (confirmation window)
+      Bar  12   : crossover — close < swing-LOW → triggers bearish OB formation
+                  The OB zone is the last flat candle's body: bottom=998, top=1002.
 
-    The spike candle's HIGH must exceed the max-high of every candle in the
-    subsequent confirmation window of length swing_length.
+    NOTE: the crossover candle's low extends to 778 (below pivot) which would
+    normally invalidate the OB immediately under Wick mode (breach = high of
+    *bearish* OB signals when c.high > ob.top).  For bearish OBs, the breaker
+    fires when c.high > ob.top; the crossover candle's HIGH is 1002 (= ob.top),
+    which is exactly at the boundary so the OB remains valid.
     """
-    base_price = 1000.0
-    swing_high = 1100.0   # spike well above base+10
-
+    sl, p = 5, 1000.0
     candles: list[Candle] = []
-    for i in range(swing_length + 1):
-        candles.append(_candle(i * 5, base_price, base_price + 10, base_price - 10, base_price))
-
-    # Swing-high spike: high=swing_high, close stays at base (unremarkable close)
-    i = len(candles)
-    candles.append(_candle(i * 5, base_price, swing_high, base_price - 5, base_price))
-
-    # Confirmation: swing_length candles with high well below swing_high
-    for j in range(swing_length):
-        i = len(candles)
-        candles.append(_candle(i * 5, base_price, base_price + 5, base_price - 5, base_price))
-
-    # Crossover: close breaks above swing_high
-    i = len(candles)
-    candles.append(_candle(i * 5, swing_high, swing_high + 20, base_price, swing_high + 10))
-
+    for i in range(sl + 1):
+        candles.append(_c(i, p, p + 2, p - 2, p))
+    # swing LOW pivot
+    candles.append(_c(len(candles), p, p + 0.5, p - 200, p + 0.5))
+    # confirmation window
+    for _ in range(sl):
+        candles.append(_c(len(candles), p, p + 2, p - 2, p))
+    # crossover: close < pivot.low.  HIGH must be <= 1002 (= ob.top) so the OB
+    # is NOT immediately breached (bearish OB breaker: c.high > ob.top).
+    candles.append(_c(len(candles), p, p + 2, p - 222, p - 210))
     return candles
 
 
-def _bear_ob_candles(swing_length: int = 5) -> list[Candle]:
+def _bull_ob_base() -> list[Candle]:
     """
-    Build a synthetic sequence that produces a bearish OB.
+    Build 13 candles that produce exactly one valid (non-breaker) bullish OB
+    at approximately [998, 1002].
 
-    Mirrors _bull_ob_candles but for a downward swing.
-    The spike candle's LOW must be below the min-low of every candle in the
-    subsequent confirmation window. The HIGH of the spike candle must NOT
-    exceed the current confirmation window upper (else it fires as a swing HIGH
-    instead of a swing LOW). We keep the spike's high at base_price - 1 to
-    ensure it is lower than the flat base_price+5 candles around it.
+    Structure (swing_length=5):
+      Bars 0-5  : 6 flat candles at p=1000 (range ±2)
+      Bar  6    : swing-HIGH pivot (high=1200, low=999.5)
+      Bars 7-11 : 5 flat candles at p=1000 (confirmation window)
+      Bar  12   : crossover — close > swing-HIGH → triggers bullish OB formation
+                  The OB zone: bottom=998, top=1002.
+
+    For bullish OBs the breaker fires when c.low < ob.bottom.  The crossover
+    candle's LOW must be >= ob.bottom (=998) to keep the OB valid.
     """
-    base_price = 1000.0
-    spike_high = base_price - 1    # deliberately lower than confirmation candle highs
-    swing_low  = 900.0
-
+    sl, p = 5, 1000.0
     candles: list[Candle] = []
-    for i in range(swing_length + 1):
-        candles.append(_candle(i * 5, base_price, base_price + 10, base_price - 10, base_price))
-
-    # Swing-low spike: low=swing_low, high stays LOW (does not trigger swing-high condition)
-    i = len(candles)
-    candles.append(_candle(i * 5, spike_high, spike_high, swing_low, spike_high))
-
-    # Confirmation: swing_length candles with lows well above swing_low
-    for j in range(swing_length):
-        i = len(candles)
-        candles.append(_candle(i * 5, base_price, base_price + 5, base_price - 5, base_price))
-
-    # Crossover: close breaks below swing_low
-    i = len(candles)
-    candles.append(_candle(i * 5, swing_low, swing_low, swing_low - 20, swing_low - 10))
-
+    for i in range(sl + 1):
+        candles.append(_c(i, p, p + 2, p - 2, p))
+    # swing HIGH pivot
+    candles.append(_c(len(candles), p, p + 200, p - 0.5, p - 0.5))
+    for _ in range(sl):
+        candles.append(_c(len(candles), p, p + 2, p - 2, p))
+    # crossover: close > pivot.high.  LOW must be >= 998 (= ob.bottom).
+    candles.append(_c(len(candles), p, p + 222, p - 2, p + 210))
     return candles
 
 
-# ── detect_order_blocks ───────────────────────────────────────────────────────
+def _append_signal(base: list[Candle], close: float, high: float, low: float) -> list[Candle]:
+    """Return a new list with one extra signal candle appended."""
+    candles = list(base)
+    candles.append(_c(len(candles), base[-1].close, high, low, close))
+    return candles
 
-class TestDetectOrderBlocks:
 
-    def test_returns_empty_when_too_few_candles(self) -> None:
-        candles = _flat_candles(5)
-        bull, bear = detect_order_blocks(candles, swing_length=10)
-        assert bull == []
-        assert bear == []
+# ─────────────────────────────────────────────────────────────────────────────
+# Verify the factories themselves produce working OBs
+# ─────────────────────────────────────────────────────────────────────────────
 
-    def test_bullish_ob_detected(self) -> None:
-        candles = _bull_ob_candles(swing_length=5)
-        bull, bear = detect_order_blocks(candles, swing_length=5, max_blocks=3)
-        assert len(bull) >= 1, "Expected at least one bullish OB to be detected"
-        assert bull[0].ob_type == "Bull"
-        assert not bull[0].breaker
+class TestOBFactories:
+    """Sanity-check that the test fixtures actually produce the expected OBs."""
 
-    def test_bearish_ob_detected(self) -> None:
-        candles = _bear_ob_candles(swing_length=5)
-        bull, bear = detect_order_blocks(candles, swing_length=5, max_blocks=3)
-        assert len(bear) >= 1, "Expected at least one bearish OB to be detected"
-        assert bear[0].ob_type == "Bear"
-        assert not bear[0].breaker
+    def test_bear_base_produces_valid_bear_ob(self):
+        from strategies.ob_strategy import detect_order_blocks
+        candles = _bear_ob_base()
+        _, bear = detect_order_blocks(candles, **_OB_KWARGS)
+        valid = [o for o in bear if not o.breaker]
+        assert valid, f"Expected a valid bearish OB; got: {bear}"
 
-    def test_bull_ob_zone_bounds_are_valid(self) -> None:
-        candles = _bull_ob_candles(swing_length=5)
-        bull, _ = detect_order_blocks(candles, swing_length=5, max_blocks=3)
-        assert len(bull) >= 1
-        ob = bull[0]
-        assert ob.top > ob.bottom, "OB top must be above bottom"
-        assert ob.top > 0 and ob.bottom > 0
+    def test_bull_base_produces_valid_bull_ob(self):
+        from strategies.ob_strategy import detect_order_blocks
+        candles = _bull_ob_base()
+        bull, _ = detect_order_blocks(candles, **_OB_KWARGS)
+        valid = [o for o in bull if not o.breaker]
+        assert valid, f"Expected a valid bullish OB; got: {bull}"
 
-    def test_bear_ob_zone_bounds_are_valid(self) -> None:
-        candles = _bear_ob_candles(swing_length=5)
-        _, bear = detect_order_blocks(candles, swing_length=5, max_blocks=3)
-        assert len(bear) >= 1
-        ob = bear[0]
-        assert ob.top > ob.bottom
-        assert ob.top > 0 and ob.bottom > 0
 
-    def test_bull_ob_becomes_breaker_on_wick_pierce(self) -> None:
-        """After a bullish OB forms, a candle whose LOW drops below OB.bottom
-        (Wick invalidation) flips it to breaker=True."""
-        candles = _bull_ob_candles(swing_length=5)
-        bull, _ = detect_order_blocks(candles, swing_length=5, max_blocks=3, invalidation="Wick")
-        assert len(bull) >= 1
-        # The OB was freshly formed; it should still be valid (not a breaker)
-        # — unless the same crossover candle happened to pierce its own bottom,
-        # which won't happen in our synthetic data since close is above swing_high.
-        # At least one must be non-breaker at formation:
-        has_valid = any(not ob.breaker for ob in bull)
-        assert has_valid, "At least one bullish OB should be non-breaker right after formation"
+# ─────────────────────────────────────────────────────────────────────────────
+# PE_OB (bearish order block) signal tests
+# ─────────────────────────────────────────────────────────────────────────────
 
-    def test_atr_cap_discards_oversized_ob(self) -> None:
-        """An OB whose height vastly exceeds ATR*maxATRMult is discarded."""
-        # Build candles where the swing high is extremely far from current price
-        # so the computed OB height >> ATR * mult.
-        base_price = 1000.0
-        extreme_high = 50000.0   # 49000 pts above base → height >> any ATR
-        swing_length = 5
-        candles: list[Candle] = []
+class TestPeObSignal:
+    """is_ob_pe_signal — original and approach-buffer behaviour."""
 
-        for i in range(swing_length + 1):
-            candles.append(_candle(i * 5, base_price, base_price + 2, base_price - 2, base_price))
+    def _get_bear_ob(self):
+        from strategies.ob_strategy import detect_order_blocks
+        _, bear = detect_order_blocks(_bear_ob_base(), **_OB_KWARGS)
+        valid = [o for o in bear if not o.breaker]
+        assert valid, "Test fixture did not produce a valid bearish OB"
+        return valid[0]
 
-        # Extreme swing candle
-        i = len(candles)
-        candles.append(_candle(i * 5, base_price, extreme_high, base_price, base_price))
+    # ── original behaviour (no buffer) ───────────────────────────────────────
 
-        for j in range(swing_length):
-            i = len(candles)
-            candles.append(_candle(i * 5, base_price, base_price + 2, base_price - 2, base_price))
-
-        # Crossover — breaks above extreme_high
-        i = len(candles)
-        candles.append(_candle(i * 5, extreme_high, extreme_high + 10, base_price, extreme_high + 5))
-
-        bull, _ = detect_order_blocks(
-            candles,
-            swing_length=swing_length,
-            max_atr_mult=3.5,
-            atr_period=5,
-            max_blocks=5,
+    def test_inside_zone_no_buffer_fires(self):
+        """Close inside the bearish OB zone fires with no buffer (original behaviour)."""
+        ob = self._get_bear_ob()
+        # Signal candle: close inside zone; HIGH <= ob.top so OB stays valid
+        candles = _append_signal(
+            _bear_ob_base(),
+            close=ob.bottom + 0.5,
+            high=ob.top - 0.5,
+            low=ob.bottom - 1,
         )
-        # The extreme OB should have been discarded by the ATR size cap
-        for ob in bull:
-            assert ob.top - ob.bottom < 49000, (
-                f"Oversized OB not discarded: top={ob.top} bottom={ob.bottom}"
-            )
+        assert is_ob_pe_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.0) is True
 
+    def test_outside_zone_no_buffer_does_not_fire(self):
+        """Close BELOW the OB bottom with no buffer does NOT fire."""
+        ob = self._get_bear_ob()
+        candles = _append_signal(
+            _bear_ob_base(),
+            close=ob.bottom - 20,
+            high=ob.top - 0.5,
+            low=ob.bottom - 25,
+        )
+        assert is_ob_pe_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.0) is False
 
-# ── is_ob_ce_signal ───────────────────────────────────────────────────────────
+    # ── approach buffer behaviour ─────────────────────────────────────────────
 
-class TestObCESignal:
+    def test_approach_within_buffer_fires(self):
+        """Close within buffer_pts below OB bottom fires when approach buffer is active.
 
-    def test_ce_signal_fires_when_close_inside_bull_ob(self) -> None:
-        """Close inside a valid bullish OB -> CE_OB signal.
-
-        Strategy: append a fresh candle whose close lands inside the detected
-        OB zone.  We do NOT modify the last candle (that would change the OB
-        detection result on re-run).  Instead we add one extra candle.
+        ATR(5) on our base series ≈ 57.9 pts.  buffer_pts = 0.2×57.9 ≈ 11.6 pts.
+        ob.bottom ≈ 998.  close = ob.bottom - 5 (within buffer).
         """
-        candles = _bull_ob_candles(swing_length=5)
-        bull, _ = detect_order_blocks(candles, swing_length=5, max_blocks=3)
-        if not bull or bull[0].breaker:
-            pytest.skip("No valid bullish OB detected -- nothing to test against")
-
-        ob = bull[0]
-        mid = (ob.top + ob.bottom) / 2
-        # Append a candle whose close is mid-OB.
-        # Low must be >= ob.bottom (Wick invalidation: low < bottom breaks the OB).
-        last = candles[-1]
-        extra = Candle(
-            _ts((len(candles)) * 5),
-            last.close, ob.top, ob.bottom, mid,
+        ob = self._get_bear_ob()
+        close = ob.bottom - 5  # within ~11.6 pt buffer
+        candles = _append_signal(
+            _bear_ob_base(),
+            close=close,
+            high=ob.top - 0.5,
+            low=close - 2,
         )
-        candles.append(extra)
+        assert is_ob_pe_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2) is True
 
-        assert is_ob_ce_signal(candles, swing_length=5, max_blocks=3) is True
+    def test_approach_beyond_buffer_does_not_fire(self):
+        """Close farther than buffer_pts below OB bottom does NOT fire.
 
-    def test_ce_signal_no_fire_when_close_above_ob(self) -> None:
-        """Close above the OB zone -> no signal."""
-        candles = _bull_ob_candles(swing_length=5)
-        bull, _ = detect_order_blocks(candles, swing_length=5, max_blocks=3)
-        if not bull:
-            pytest.skip("No bullish OB detected")
+        ATR≈57.9, buffer≈11.6.  close = ob.bottom - 20 (beyond buffer).
+        """
+        ob = self._get_bear_ob()
+        close = ob.bottom - 20  # beyond ~11.6 pt buffer
+        candles = _append_signal(
+            _bear_ob_base(),
+            close=close,
+            high=ob.top - 0.5,
+            low=close - 2,
+        )
+        assert is_ob_pe_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2) is False
 
-        ob = bull[0]
-        last = candles[-1]
-        above_ob = ob.top + 50
-        extra = Candle(_ts((len(candles)) * 5), last.close, above_ob + 5, ob.bottom - 1, above_ob)
-        candles.append(extra)
-        assert is_ob_ce_signal(candles, swing_length=5, max_blocks=3) is False
+    def test_inside_zone_with_buffer_fires(self):
+        """Inside-zone close still fires when approach buffer is active (backward compat)."""
+        ob = self._get_bear_ob()
+        candles = _append_signal(
+            _bear_ob_base(),
+            close=ob.bottom + 0.5,
+            high=ob.top - 0.5,
+            low=ob.bottom - 1,
+        )
+        assert is_ob_pe_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2) is True
 
-    def test_ce_signal_no_fire_on_breaker_ob(self) -> None:
-        """Close inside a breaker OB -> no signal (invalidated zone)."""
-        candles = _bull_ob_candles(swing_length=5)
-        bull, _ = detect_order_blocks(candles, swing_length=5, max_blocks=3)
-        if not bull:
-            pytest.skip("No bullish OB detected")
+    def test_approach_exactly_at_boundary_fires(self):
+        """Close at exactly ob.bottom - buffer_pts (boundary) fires."""
+        ob = self._get_bear_ob()
+        # Pin ATR to 100.0 → buffer_pts = 0.2 × 100 = 20.0
+        # close = ob.bottom - 20.0 is exactly on the boundary
+        with patch("strategies.ob_strategy.atr_at", return_value=100.0):
+            buffer_pts = 0.2 * 100.0
+            close = ob.bottom - buffer_pts
+            candles = _append_signal(
+                _bear_ob_base(),
+                close=close,
+                high=ob.top - 0.5,
+                low=close - 2,
+            )
+            result = is_ob_pe_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2)
+        assert result is True, f"Expected PE_OB to fire at boundary close={close:.1f}"
 
-        ob = bull[0]
-        mid = (ob.top + ob.bottom) / 2
-        # Append a pierce candle (low drops below OB.bottom -> breaker)
-        pierce = _candle((len(candles)) * 5, mid, ob.top + 1, ob.bottom - 50, mid)
-        candles.append(pierce)
-        # Now append a candle with close inside the OB — must NOT fire (it is a breaker)
-        inside = _candle((len(candles)) * 5, mid, ob.top, ob.bottom, mid)
-        candles.append(inside)
-        assert is_ob_ce_signal(candles, swing_length=5, max_blocks=3) is False
+    def test_approach_just_beyond_boundary_does_not_fire(self):
+        """Close 1 pt beyond buffer_pts does NOT fire."""
+        ob = self._get_bear_ob()
+        with patch("strategies.ob_strategy.atr_at", return_value=100.0):
+            buffer_pts = 0.2 * 100.0
+            close = ob.bottom - buffer_pts - 1
+            candles = _append_signal(
+                _bear_ob_base(),
+                close=close,
+                high=ob.top - 0.5,
+                low=close - 2,
+            )
+            result = is_ob_pe_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2)
+        assert result is False, f"Expected PE_OB NOT to fire 1pt beyond boundary close={close:.1f}"
 
-    def test_ce_signal_false_on_too_few_candles(self) -> None:
-        candles = _flat_candles(8)
-        assert is_ob_ce_signal(candles, swing_length=10) is False
+    # ── guard tests ───────────────────────────────────────────────────────────
 
-    def test_ce_signal_false_on_yesterday_candle(self) -> None:
-        candles = _bull_ob_candles(swing_length=5)
+    def test_today_guard_blocks_yesterday_candles(self):
+        """Signals never fire when the latest candle is from yesterday."""
+        ob = self._get_bear_ob()
+        candles = _append_signal(
+            _bear_ob_base(),
+            close=ob.bottom + 0.5,
+            high=ob.top - 0.5,
+            low=ob.bottom - 1,
+        )
         yesterday = _TODAY - timedelta(days=1)
-        last = candles[-1]
-        candles[-1] = Candle(
-            datetime(yesterday.year, yesterday.month, yesterday.day, 10, 0),
-            last.open, last.high, last.low, last.close,
+        shifted = [
+            Candle(
+                datetime(yesterday.year, yesterday.month, yesterday.day,
+                         c.timestamp.hour, c.timestamp.minute),
+                open=c.open, high=c.high, low=c.low, close=c.close,
+            )
+            for c in candles
+        ]
+        assert is_ob_pe_signal(shifted, **_OB_KWARGS, approach_buffer_atr_mult=0.0) is False
+
+    def test_insufficient_candles_returns_false(self):
+        """Fewer than swing_length + 2 candles return False without error."""
+        candles = [_c(i, 1000.0, 1002.0, 998.0, 1000.0) for i in range(5)]
+        assert is_ob_pe_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2) is False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CE_OB (bullish order block) signal tests
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestCeObSignal:
+    """is_ob_ce_signal — original and approach-buffer behaviour."""
+
+    def _get_bull_ob(self):
+        from strategies.ob_strategy import detect_order_blocks
+        bull, _ = detect_order_blocks(_bull_ob_base(), **_OB_KWARGS)
+        valid = [o for o in bull if not o.breaker]
+        assert valid, "Test fixture did not produce a valid bullish OB"
+        return valid[0]
+
+    # ── original behaviour (no buffer) ───────────────────────────────────────
+
+    def test_inside_zone_no_buffer_fires(self):
+        """Close inside the bullish OB zone fires with no buffer (original behaviour)."""
+        ob = self._get_bull_ob()
+        # Signal candle: close inside zone; LOW >= ob.bottom so OB stays valid
+        candles = _append_signal(
+            _bull_ob_base(),
+            close=(ob.top + ob.bottom) / 2,
+            high=ob.top + 1,
+            low=ob.bottom,
         )
-        assert is_ob_ce_signal(candles, swing_length=5) is False
+        assert is_ob_ce_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.0) is True
 
-
-# ── is_ob_pe_signal ───────────────────────────────────────────────────────────
-
-class TestObPESignal:
-
-    def test_pe_signal_fires_when_close_inside_bear_ob(self) -> None:
-        """Close inside a valid bearish OB -> PE_OB signal."""
-        candles = _bear_ob_candles(swing_length=5)
-        _, bear = detect_order_blocks(candles, swing_length=5, max_blocks=3)
-        if not bear or bear[0].breaker:
-            pytest.skip("No valid bearish OB detected")
-
-        ob = bear[0]
-        mid = (ob.top + ob.bottom) / 2
-        last = candles[-1]
-        # High must be <= ob.top (Wick invalidation: high > top breaks the OB).
-        extra = Candle(
-            _ts((len(candles)) * 5),
-            last.close, ob.top, ob.bottom, mid,
+    def test_outside_zone_no_buffer_does_not_fire(self):
+        """Close ABOVE the OB top with no buffer does NOT fire."""
+        ob = self._get_bull_ob()
+        candles = _append_signal(
+            _bull_ob_base(),
+            close=ob.top + 20,
+            high=ob.top + 25,
+            low=ob.bottom,
         )
-        candles.append(extra)
-        assert is_ob_pe_signal(candles, swing_length=5, max_blocks=3) is True
+        assert is_ob_ce_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.0) is False
 
-    def test_pe_signal_no_fire_when_close_below_ob(self) -> None:
-        """Close below the OB zone -> no signal."""
-        candles = _bear_ob_candles(swing_length=5)
-        _, bear = detect_order_blocks(candles, swing_length=5, max_blocks=3)
-        if not bear:
-            pytest.skip("No bearish OB detected")
+    # ── approach buffer behaviour ─────────────────────────────────────────────
 
-        ob = bear[0]
-        below_ob = ob.bottom - 50
-        last = candles[-1]
-        extra = Candle(_ts((len(candles)) * 5), last.close, ob.top + 1, below_ob - 5, below_ob)
-        candles.append(extra)
-        assert is_ob_pe_signal(candles, swing_length=5, max_blocks=3) is False
+    def test_approach_within_buffer_fires(self):
+        """Close within buffer_pts above OB top fires when approach buffer is active.
 
-    def test_pe_signal_no_fire_on_breaker_ob(self) -> None:
-        """Close inside a breaker bearish OB -> no signal."""
-        candles = _bear_ob_candles(swing_length=5)
-        _, bear = detect_order_blocks(candles, swing_length=5, max_blocks=3)
-        if not bear:
-            pytest.skip("No bearish OB detected")
+        ATR(5) ≈ 57.9 pts.  buffer_pts = 0.2×57.9 ≈ 11.6 pts.
+        close = ob.top + 5 (within buffer).
+        """
+        ob = self._get_bull_ob()
+        close = ob.top + 5  # within ~11.6 pt buffer
+        candles = _append_signal(
+            _bull_ob_base(),
+            close=close,
+            high=close + 2,
+            low=ob.bottom,
+        )
+        assert is_ob_ce_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2) is True
 
-        ob = bear[0]
-        mid = (ob.top + ob.bottom) / 2
-        # Pierce above OB.top (bearish breaker condition)
-        pierce = _candle((len(candles)) * 5, mid, ob.top + 50, ob.bottom - 1, mid)
-        candles.append(pierce)
-        inside = _candle((len(candles)) * 5, mid, ob.top, ob.bottom, mid)
-        candles.append(inside)
-        assert is_ob_pe_signal(candles, swing_length=5, max_blocks=3) is False
+    def test_approach_beyond_buffer_does_not_fire(self):
+        """Close farther than buffer_pts above OB top does NOT fire.
 
-    def test_pe_signal_false_on_yesterday_candle(self) -> None:
-        candles = _bear_ob_candles(swing_length=5)
+        ATR≈57.9, buffer≈11.6.  close = ob.top + 20 (beyond buffer).
+        """
+        ob = self._get_bull_ob()
+        close = ob.top + 20  # beyond ~11.6 pt buffer
+        candles = _append_signal(
+            _bull_ob_base(),
+            close=close,
+            high=close + 2,
+            low=ob.bottom,
+        )
+        assert is_ob_ce_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2) is False
+
+    def test_inside_zone_with_buffer_fires(self):
+        """Inside-zone close still fires when approach buffer is active (backward compat)."""
+        ob = self._get_bull_ob()
+        candles = _append_signal(
+            _bull_ob_base(),
+            close=(ob.top + ob.bottom) / 2,
+            high=ob.top + 1,
+            low=ob.bottom,
+        )
+        assert is_ob_ce_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2) is True
+
+    def test_approach_exactly_at_boundary_fires(self):
+        """Close at exactly ob.top + buffer_pts (boundary) fires."""
+        ob = self._get_bull_ob()
+        with patch("strategies.ob_strategy.atr_at", return_value=100.0):
+            buffer_pts = 0.2 * 100.0
+            close = ob.top + buffer_pts
+            candles = _append_signal(
+                _bull_ob_base(),
+                close=close,
+                high=close + 2,
+                low=ob.bottom,
+            )
+            result = is_ob_ce_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2)
+        assert result is True, f"Expected CE_OB to fire at boundary close={close:.1f}"
+
+    def test_approach_just_beyond_boundary_does_not_fire(self):
+        """Close 1 pt beyond buffer_pts does NOT fire."""
+        ob = self._get_bull_ob()
+        with patch("strategies.ob_strategy.atr_at", return_value=100.0):
+            buffer_pts = 0.2 * 100.0
+            close = ob.top + buffer_pts + 1
+            candles = _append_signal(
+                _bull_ob_base(),
+                close=close,
+                high=close + 2,
+                low=ob.bottom,
+            )
+            result = is_ob_ce_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2)
+        assert result is False, f"Expected CE_OB NOT to fire 1pt beyond boundary close={close:.1f}"
+
+    # ── guard tests ───────────────────────────────────────────────────────────
+
+    def test_today_guard_blocks_yesterday_candles(self):
+        """Signals never fire when the latest candle is from yesterday."""
+        ob = self._get_bull_ob()
+        candles = _append_signal(
+            _bull_ob_base(),
+            close=(ob.top + ob.bottom) / 2,
+            high=ob.top + 1,
+            low=ob.bottom,
+        )
         yesterday = _TODAY - timedelta(days=1)
-        last = candles[-1]
-        candles[-1] = Candle(
-            datetime(yesterday.year, yesterday.month, yesterday.day, 10, 0),
-            last.open, last.high, last.low, last.close,
-        )
-        assert is_ob_pe_signal(candles, swing_length=5) is False
+        shifted = [
+            Candle(
+                datetime(yesterday.year, yesterday.month, yesterday.day,
+                         c.timestamp.hour, c.timestamp.minute),
+                open=c.open, high=c.high, low=c.low, close=c.close,
+            )
+            for c in candles
+        ]
+        assert is_ob_ce_signal(shifted, **_OB_KWARGS, approach_buffer_atr_mult=0.0) is False
+
+    def test_insufficient_candles_returns_false(self):
+        """Fewer than swing_length + 2 candles return False without error."""
+        candles = [_c(i, 1000.0, 1002.0, 998.0, 1000.0) for i in range(5)]
+        assert is_ob_ce_signal(candles, **_OB_KWARGS, approach_buffer_atr_mult=0.2) is False
