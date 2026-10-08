@@ -38,6 +38,7 @@ def _getbool(key: str, default: bool = False) -> bool:
 KITE_API_KEY: str = _get("KITE_API_KEY")
 KITE_API_SECRET: str = _get("KITE_API_SECRET")
 KITE_ACCESS_TOKEN: str = _get("KITE_ACCESS_TOKEN")
+KITE_TOKEN_DATE: str = _get("KITE_TOKEN_DATE")   # ISO date when token was generated (YYYY-MM-DD)
 
 # ── Trading mode ──────────────────────────────────────────────────────────────
 TRADING_MODE: Literal["PAPER", "SHADOW", "LIVE"] = _get("TRADING_MODE", "PAPER").upper()  # type: ignore[assignment]
@@ -117,6 +118,12 @@ MIN_RR: float                   = _getfloat("MIN_RR", 0.0)
 #   0.6 = fall through when swing SL index pts < ATR × 0.6  (recommended for SENSEX 5m)
 #   1.0 = fall through unless swing is at least 1 full ATR away  (strict)
 SWING_SL_MIN_ATR_MULT: float    = _getfloat("SWING_SL_MIN_ATR_MULT", 0.0)
+# MAX_SL_PCT: caps the initial SL at this fraction of the option entry price.
+#   Prevents the swing/ATR SL from being crushed on cheap OTM options.
+#   e.g. entry=128, max_sl_pct=0.50 → SL ceiling = 64 pts (was 35% = 44 pts)
+#   Raise this when trades are stopping out within seconds of entry.
+#   0.50 recommended for SENSEX weekly options (was 0.35 default).
+MAX_SL_PCT: float               = _getfloat("MAX_SL_PCT", 0.35)
 
 # ── Smart Exit Engine ─────────────────────────────────────────────────────────
 # All Smart Exit sub-features default OFF.

@@ -233,6 +233,19 @@ class WebSocketClient:
                 logger.info("WebSocket MODE_FULL set for index tokens: %s", index_tokens)
             if other_tokens:
                 ws.set_mode(ws.MODE_LTP, other_tokens)
+                logger.info("WebSocket MODE_LTP re-subscribed for option tokens: %s", other_tokens)
+        # Restore option-token tracking set so stale monitor and tick handler
+        # know which tokens belong to open positions.  This MUST run after
+        # subscribe/set_mode so the set is populated before the first tick.
+        for t in self._tokens:
+            if t not in _INDEX_TOKENS:
+                self._option_tokens.add(t)
+        self._last_option_tick_time = time.monotonic()
+        # Re-enable auto-ping on every reconnect — the factory's protocol options
+        # are reset when the connection drops, so a one-time call at startup is
+        # not sufficient.  Without this the ping stops after the first reconnect
+        # and Zerodha drops the idle TCP connection again after ~30 seconds.
+        self._enable_auto_ping()
 
     def _on_order_update(self, ws, message: dict) -> None:  # type: ignore[no-untyped-def]
         """
@@ -317,10 +330,16 @@ class WebSocketClient:
                 "Attempting token refresh before next reconnect...", code,
             )
             self._try_refresh_token()
-        # Reset option-token tracking on any close so orphaned tokens from a
-        # previous session don't keep the stale monitor firing after market close.
-        # Tokens will be re-subscribed by _on_connect when the connection recovers.
-        self._option_tokens.clear()
+        # DO NOT clear _option_tokens here.
+        # Clearing it on every disconnect caused two problems:
+        #   1. The stale monitor saw no option tokens → suppressed reconnect logic
+        #      while a position was open and ticks were missing.
+        #   2. _on_ticks stopped updating _last_option_tick_time because the
+        #      token was no longer in _option_tokens — even though it was still
+        #      in _tokens and ticks were flowing after reconnect.
+        # _on_connect now restores _option_tokens from _tokens on every reconnect.
+        # We only reset the clock so the stale monitor doesn't fire immediately
+        # after a normal reconnect cycle.
         self._last_option_tick_time = time.monotonic()
 
     def _on_error(self, ws, code, reason) -> None:  # type: ignore[no-untyped-def]

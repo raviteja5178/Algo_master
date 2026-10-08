@@ -6,12 +6,18 @@ Usage:
      request_token back.  Call `complete_login(request_token)` which
      persists the access token to the .env file.
   2. Subsequent runs: KITE_ACCESS_TOKEN in .env is used directly.
+     KITE_TOKEN_DATE is written alongside the token; if it doesn't match
+     today's date the token is treated as stale and auto-login runs before
+     even calling profile().  This catches the WebSocket 1006 case where
+     Zerodha's REST API still accepts a day-old token but the streaming
+     endpoint rejects it immediately.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+from datetime import date
 from dotenv import set_key
 from kiteconnect import KiteConnect  # type: ignore
 
@@ -21,19 +27,56 @@ from utils.logging_config import log_event
 logger = logging.getLogger(__name__)
 
 
+def _save_token(access_token: str) -> None:
+    """Persist access_token and today's date to .env and settings."""
+    today_str = date.today().isoformat()
+    set_key(".env", "KITE_ACCESS_TOKEN", access_token)
+    set_key(".env", "KITE_TOKEN_DATE", today_str)
+    settings.KITE_ACCESS_TOKEN = access_token
+    settings.KITE_TOKEN_DATE = today_str
+
+
+def _token_is_stale() -> bool:
+    """
+    Return True if the cached token was not generated today.
+    Zerodha tokens are valid for one calendar day (midnight IST rollover).
+    The WebSocket endpoint rejects day-old tokens immediately even though
+    the REST profile() call may still succeed briefly.
+    """
+    token_date = getattr(settings, "KITE_TOKEN_DATE", "")
+    if not token_date:
+        return True   # no date recorded — treat as stale
+    try:
+        return date.fromisoformat(token_date) != date.today()
+    except ValueError:
+        return True   # malformed date — treat as stale
+
+
 def get_kite() -> KiteConnect:
     """Return an authenticated KiteConnect instance."""
     kite = KiteConnect(api_key=settings.KITE_API_KEY)
-    
+
     token_valid = False
-    if settings.KITE_ACCESS_TOKEN:
+
+    # ── Date-based stale check (before any REST call) ─────────────────────────
+    # If the token was issued on a previous calendar day, skip it entirely and
+    # go straight to auto-login.  This avoids the WebSocket 1006 problem where
+    # Zerodha's REST profile() still accepts a stale token but the streaming
+    # endpoint drops the connection ~25 seconds after connect.
+    if settings.KITE_ACCESS_TOKEN and not _token_is_stale():
         kite.set_access_token(settings.KITE_ACCESS_TOKEN)
         try:
-            # Validate if the current token is active by calling profile()
             kite.profile()
             token_valid = True
+            logger.info("KITE_ACCESS_TOKEN is valid for today — reusing cached token.")
         except Exception:
-            logger.info("Cached KITE_ACCESS_TOKEN is invalid/expired. Attempting automated login...")
+            logger.info("Cached KITE_ACCESS_TOKEN failed profile() check. Attempting automated login...")
+    elif settings.KITE_ACCESS_TOKEN:
+        logger.info(
+            "KITE_ACCESS_TOKEN is from a previous day (KITE_TOKEN_DATE=%s) — "
+            "forcing re-login to get a fresh token.",
+            getattr(settings, "KITE_TOKEN_DATE", "unknown"),
+        )
 
     if not token_valid:
         user_id = os.environ.get("KITE_USER_ID") or os.environ.get("KITE_USERNAME")
@@ -51,9 +94,7 @@ def get_kite() -> KiteConnect:
                     totp_secret,
                 )
                 if access_token:
-                    # Update .env file so the token is cached for subsequent runs
-                    set_key(".env", "KITE_ACCESS_TOKEN", access_token)
-                    settings.KITE_ACCESS_TOKEN = access_token
+                    _save_token(access_token)
                     kite.set_access_token(access_token)
                     token_valid = True
                     logger.info("Automated login successful! KITE_ACCESS_TOKEN updated in .env")
@@ -89,6 +130,7 @@ def complete_login(request_token: str) -> str:
         safe_msg = str(exc).encode("ascii", errors="replace").decode("ascii")
         raise RuntimeError(f"generate_session failed: {safe_msg}") from exc
     access_token: str = session["access_token"]
+    _save_token(access_token)
     log_event(logger, "AUTH_SUCCESS", user=session.get("user_name", "?"))
     logger.info("Access token obtained successfully.")
     return access_token

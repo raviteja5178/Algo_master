@@ -648,6 +648,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         swing_high             = _swing_high,
         swing_low              = _swing_low,
         swing_sl_min_atr_mult  = settings.SWING_SL_MIN_ATR_MULT,
+        max_sl_pct             = settings.MAX_SL_PCT,
     )
     sl_pts     = risk.initial_sl_points
     be_pts     = risk.break_even_trigger_points

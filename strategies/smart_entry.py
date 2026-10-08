@@ -165,6 +165,15 @@ class SmartEntryFilter:
                                           first_seen_ltp × (1 + this value).
                                           0 = disabled.  1.5 = block after 150% rise.
                                           Recommended: 1.5 for SENSEX weekly options.
+    structure_bypass_candles   : int    — after this many consecutive same-direction
+                                          candles, bypass the 15m/slope/gap filters.
+                                          0 = disabled.
+    structure_bypass_ema_confirm: bool  — when structure bypass is active, still require
+                                          EMA9 slope alignment as a minimum confirmation.
+    bounce_exempt_strategies   : set    — strategy names (e.g. {'NATR','VWAP'}) that skip
+                                          the 15m trend / gap-widening filters. These
+                                          strategies trade bounces/retests, not trends.
+    slope_exempt_strategies    : set    — strategy names that skip the EMA9 slope filter.
     """
 
     def __init__(
@@ -181,6 +190,10 @@ class SmartEntryFilter:
         squeeze_candles: int = 3,
         max_premium_extension_pct: float = 0.0,
         squeeze_body_atr_ratio: float = 0.0,
+        structure_bypass_candles: int = 0,
+        structure_bypass_ema_confirm: bool = False,
+        bounce_exempt_strategies: set | None = None,
+        slope_exempt_strategies: set | None = None,
     ) -> None:
         self._min_body_atr       = min_body_atr_ratio
         self._require_slope      = require_ema_slope
@@ -195,6 +208,10 @@ class SmartEntryFilter:
         self._squeeze_n          = max(0, squeeze_candles)
         self._squeeze_body_atr   = squeeze_body_atr_ratio  # 0 = same as normal ratio
         self._max_ext_pct        = max_premium_extension_pct  # 0 = disabled
+        self._structure_bypass_n = max(0, structure_bypass_candles)
+        self._structure_bypass_ema_confirm = structure_bypass_ema_confirm
+        self._bounce_exempt      = set(bounce_exempt_strategies) if bounce_exempt_strategies else set()
+        self._slope_exempt       = set(slope_exempt_strategies) if slope_exempt_strategies else set()
         # {tradingsymbol: (date, first_ltp)} — resets automatically per day
         self._first_ltp: dict[str, tuple[date, float]] = {}
         # {tradingsymbol: (date, highest_ltp)} — rolling intraday high per symbol

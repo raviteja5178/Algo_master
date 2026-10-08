@@ -857,6 +857,20 @@ def api_shadow_active():
         except Exception:
             pass
 
+    # Expose the break-even trigger points so the UI can compute TSL steps
+    # correctly.  be_points is not stored in the DB — derive it from the .env
+    # BREAK_EVEN_TRIGGER_POINTS setting (global for all trades).
+    try:
+        env_path = Path(__file__).resolve().parent.parent / ".env"
+        _env = {k: v for k, v in (
+            line.strip().split("=", 1)
+            for line in env_path.read_text().splitlines()
+            if "=" in line and not line.strip().startswith("#")
+        )}
+        trade["be_points"] = float(_env.get("BREAK_EVEN_TRIGGER_POINTS", 30))
+    except Exception:
+        trade["be_points"] = 30.0
+
     return jsonify(trade)
 
 

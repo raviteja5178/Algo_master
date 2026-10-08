@@ -536,6 +536,7 @@ function renderLiveTracker(t) {
   const entry       = parseFloat(t.entry_price || 0);
   const slPts       = parseFloat(t.sl_points   || 0);
   const tslPts      = parseFloat(t.tsl_points  || 0);
+  const bePts       = parseFloat(t.be_points   || 0);
   const tgtPts      = parseFloat(t.target_points || 0);
   const slPrice     = parseFloat(t.current_stop || (entry - slPts));
   const tgtPrice    = parseFloat(t.target_reference || (entry + tgtPts));
@@ -649,17 +650,24 @@ function renderLiveTracker(t) {
   }).join('');
 
   // ── TSL steps indicator ───────────────────────────────────────
-  const beTriggered = highestLtp >= entry + (slPts || 0); // break-even reached
-  const trailSteps  = tslPts > 0 ? Math.floor(Math.max(0, highestLtp - entry) / tslPts) : 0;
+  // Break-even fires when highestLtp crosses entry + be_points (not sl_points).
+  // Trail steps are counted only ABOVE the BE threshold, not from entry.
+  const beThreshold = entry + (bePts > 0 ? bePts : slPts); // fallback to slPts if bePts missing
+  const beTriggered = highestLtp >= beThreshold;
+  const trailSteps  = (tslPts > 0 && beTriggered)
+      ? Math.floor((highestLtp - beThreshold) / tslPts)
+      : 0;
 
   let stepsHtml = '<span class="tsl-label">TSL Steps:</span>';
   const MAX_DOTS = 8;
-  for (let i = 0; i < MAX_DOTS; i++) {
+  // Dot 0 = BE activation dot (green when BE triggered, grey otherwise)
+  const beDotClass = beTriggered ? 'be' : '';
+  stepsHtml += `<div class="step-dot ${beDotClass}" title="${beTriggered ? 'Break-even activated @ '+beThreshold.toFixed(2) : 'Break-even not yet reached (need LTP >= '+beThreshold.toFixed(2)+')'}"></div>`;
+  for (let i = 0; i < MAX_DOTS - 1; i++) {
     const done = i < trailSteps;
-    const isBE = (i === 0 && beTriggered);
-    stepsHtml += `<div class="step-dot ${done ? (isBE ? 'be' : 'done') : ''}" title="${done ? 'step '+i+' cleared' : 'pending'}"></div>`;
+    stepsHtml += `<div class="step-dot ${done ? 'done' : ''}" title="${done ? 'Trail step '+(i+1)+' cleared' : 'pending'}"></div>`;
   }
-  if (trailSteps > MAX_DOTS) stepsHtml += `<span style="font-size:11px;color:var(--amber)">+${trailSteps-MAX_DOTS} more</span>`;
+  if (trailSteps >= MAX_DOTS) stepsHtml += `<span style="font-size:11px;color:var(--amber)">+${trailSteps-MAX_DOTS+1} more</span>`;
   stepsHtml += `<span style="font-size:11px;color:var(--muted);margin-left:4px;">(${trailSteps} × ${tslPts.toFixed(0)} pts = +${(trailSteps*tslPts).toFixed(0)} pts SL raise)</span>`;
   document.getElementById('tslSteps').innerHTML = stepsHtml;
 
