@@ -18,9 +18,11 @@ import sys
 import time
 import signal
 import os
+import atexit
 from datetime import datetime, time as dtime
 
 # ── Config ────────────────────────────────────────────────────────────────────
+_LAUNCHER_PID_FILE   = ".launcher.pid"
 RESTART_DELAY_SECS   = 10    # wait before restarting after unexpected exit
 MARKET_OPEN_H        = 9     # don't restart before this hour (IST)
 MARKET_CLOSE_H       = 15    # don't restart after this hour (IST)
@@ -29,6 +31,73 @@ MARKET_CLOSE_M       = 30    # don't restart after 15:30 IST
 # ── State ─────────────────────────────────────────────────────────────────────
 _stop_launcher = False
 _last_ctrlc    = 0.0
+
+
+def _acquire_launcher_lock() -> None:
+    """
+    Write this process's PID to .launcher.pid.
+
+    If the file already exists and the recorded PID belongs to a running
+    process, print an error and exit immediately — prevents two concurrent
+    launcher instances from managing the same bot.
+
+    The file is removed automatically on clean exit via atexit.
+    """
+    pid = os.getpid()
+
+    if os.path.exists(_LAUNCHER_PID_FILE):
+        try:
+            existing_pid = int(open(_LAUNCHER_PID_FILE).read().strip())
+        except (ValueError, OSError):
+            existing_pid = None
+
+        if existing_pid is not None and existing_pid != pid:
+            # Check whether the recorded PID is actually alive.
+            alive = False
+            try:
+                # os.kill(pid, 0) does NOT send a signal; it only checks
+                # whether the process exists.  Raises OSError if it does not.
+                os.kill(existing_pid, 0)
+                alive = True
+            except OSError:
+                alive = False  # process is gone — stale lock file
+
+            if alive:
+                print(
+                    f"[Launcher] ERROR: Another launcher is already running "
+                    f"(PID {existing_pid}, found in {_LAUNCHER_PID_FILE}). "
+                    f"Exiting to prevent duplicate bot instances.",
+                    flush=True,
+                )
+                sys.exit(1)
+            else:
+                print(
+                    f"[Launcher] Stale lock file found (PID {existing_pid} is not running). "
+                    f"Removing and continuing.",
+                    flush=True,
+                )
+
+    # Write our own PID.
+    with open(_LAUNCHER_PID_FILE, "w") as fh:
+        fh.write(str(pid))
+
+    atexit.register(_release_launcher_lock)
+
+
+def _release_launcher_lock() -> None:
+    """Remove the .launcher.pid file on clean exit."""
+    try:
+        if os.path.exists(_LAUNCHER_PID_FILE):
+            # Only remove if it still contains our own PID (guard against
+            # an edge case where a new launcher overwrote the file first).
+            try:
+                recorded = int(open(_LAUNCHER_PID_FILE).read().strip())
+            except (ValueError, OSError):
+                recorded = None
+            if recorded == os.getpid():
+                os.remove(_LAUNCHER_PID_FILE)
+    except OSError:
+        pass
 
 def _sigint_handler(sig, frame):
     global _stop_launcher, _last_ctrlc
@@ -57,6 +126,7 @@ def _ts() -> str:
 
 def main():
     global _stop_launcher
+    _acquire_launcher_lock()
 
     print("=" * 60)
     print("  SENSEX Auto-Trader — Persistent Launcher")

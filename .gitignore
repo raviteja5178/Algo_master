@@ -10,3 +10,6 @@ build/
 venv/
 bot.log
 *.log
+
+.launcher.pid
+.bot.pid

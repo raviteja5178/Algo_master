@@ -273,6 +273,14 @@
   <h1>Shadow / Paper Trade Results</h1>
   <p class="subtitle">Live-market simulation — no real money placed. Active order tracker updates every 2 s.</p>
 
+  <!-- Issue 5: LIVE mode banner — shown by JS when /api/status reports TRADING_MODE=LIVE -->
+  <div id="liveModeWarning" style="display:none;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px 18px;margin-bottom:20px;font-size:13px;color:#92400e;">
+    <strong>⚠ Bot is running in LIVE mode.</strong>
+    This page only tracks PAPER / SHADOW simulated trades.
+    Live orders are placed directly on Zerodha and do not appear here.
+    Check the <a href="/" style="color:#c2410c;font-weight:600;">Dashboard</a> for live position status.
+  </div>
+
   <!-- ════════════════════════════════════════
        LIVE ORDER TRACKER
   ════════════════════════════════════════ -->
@@ -306,7 +314,7 @@
       <!-- P&L metrics row -->
       <div class="metrics-row">
         <div class="metric-card">
-          <div class="ml">LTP (SENSEX)</div>
+          <div class="ml" id="mLTPLabel">LTP</div>
           <div class="mv blue" id="mLTP">—</div>
         </div>
         <div class="metric-card">
@@ -540,7 +548,10 @@ function renderLiveTracker(t) {
   const tgtPts      = parseFloat(t.target_points || 0);
   const slPrice     = parseFloat(t.current_stop || (entry - slPts));
   const tgtPrice    = parseFloat(t.target_reference || (entry + tgtPts));
-  const highestLtp  = parseFloat(t.highest_ltp || entry);
+  // Issue 2: do NOT fall back to entry — keep null so UI shows — instead of misleading 0.0
+  const rawHighest  = (t.highest_ltp != null && parseFloat(t.highest_ltp) > 0)
+                        ? parseFloat(t.highest_ltp) : null;
+  const highestLtp  = rawHighest;   // may be null; ladder row filtered out when null
   const atr         = parseFloat(t.atr_value || 0);
 
   // ── State label ──────────────────────────────────────────────
@@ -565,13 +576,13 @@ function renderLiveTracker(t) {
   }
 
   // ── Metrics ──────────────────────────────────────────────────
-  // Show which price source is being used for live P&L
-  document.getElementById('mLTPSource') && (
-    document.getElementById('mLTPSource').textContent =
-      optionLtp > 0 ? '(option premium)' : sensexLtp > 0 ? '(SENSEX spot)' : ''
-  );
+  // Issue 1 & 4: update LTP label on EVERY render — not gated behind isNewTrade
+  document.getElementById('mLTPLabel').textContent =
+    optionLtp > 0 ? 'LTP (option premium)' : sensexLtp > 0 ? 'LTP (SENSEX spot)' : 'LTP';
+
   const unrealPnl  = ltp > 0 && entry > 0 ? (ltp - entry) * (t.quantity || 1) : null;
-  const maxPnlPts  = highestLtp > 0 && entry > 0 ? (highestLtp - entry) : 0;
+  // Issue 3: null when highestLtp is null (no real peak yet) so card shows — correctly
+  const maxPnlPts  = (highestLtp != null && entry > 0) ? (highestLtp - entry) : null;
   const rr         = slPts > 0 && tgtPts > 0 ? (tgtPts / slPts) : null;
 
   document.getElementById('mLTP').textContent   = ltp   > 0 ? '₹'+ltp.toFixed(2)   : '—';
@@ -585,7 +596,9 @@ function renderLiveTracker(t) {
     pnlEl.textContent = '—'; pnlEl.className = 'mv muted';
   }
 
-  document.getElementById('mMaxProfit').textContent = maxPnlPts > 0 ? '+' + maxPnlPts.toFixed(1) + ' pts' : '—';
+  // Issue 3: show — when no real peak data yet; show +0.0 only when peak genuinely equals entry
+  document.getElementById('mMaxProfit').textContent =
+    maxPnlPts == null ? '—' : (maxPnlPts >= 0 ? '+' : '') + maxPnlPts.toFixed(1) + ' pts';
   document.getElementById('mRR').textContent        = rr ? '1 : ' + rr.toFixed(2) : '—';
   const rrEl = document.getElementById('mRR');
   rrEl.className = 'mv ' + (!rr ? 'muted' : rr >= 2 ? 'green' : rr >= 1.5 ? 'amber' : 'red');
@@ -615,12 +628,22 @@ function renderLiveTracker(t) {
   document.getElementById('pbTgtLabel').textContent = 'Target ₹' + tgtPrice.toFixed(0);
 
   // ── Price ladder ─────────────────────────────────────────────
+  // Issue 2: highest row omitted entirely when no real peak data (highestLtp is null)
+  // Issue 6: dist for highest = ltp - highestLtp (negative = we are below the peak, correct sign)
+  //          was highestLtp - ltp which showed a positive badge when price dropped from peak
   const ladderRows = [
-    { key:'target',  icon:'🎯', label:'Target',      price: tgtPrice,  dist: ltp > 0 ? tgtPrice - ltp : null, cls:'target'  },
-    { key:'highest', icon:'⬆',  label:'Highest LTP', price: highestLtp,dist: ltp > 0 ? highestLtp - ltp : null, cls:'highest' },
-    { key:'current', icon:'◆',  label:'LTP (live)',  price: ltp,       dist: 0,                              cls:'current' },
-    { key:'entry',   icon:'⊙',  label:'Entry',       price: entry,     dist: ltp > 0 ? entry - ltp : null,  cls:'entry'   },
-    { key:'sl',      icon:'🛡',  label:'Stop Loss',   price: slPrice,   dist: ltp > 0 ? slPrice - ltp : null,cls:'sl'      },
+    { key:'target',  icon:'🎯', label:'Target',      price: tgtPrice,
+      dist: ltp > 0 ? tgtPrice - ltp : null,          cls:'target'  },
+    ...(highestLtp != null ? [{
+      key:'highest', icon:'⬆', label:'Highest LTP',  price: highestLtp,
+      dist: ltp > 0 ? ltp - highestLtp : null,         cls:'highest',
+    }] : []),
+    { key:'current', icon:'◆',  label:'LTP (live)',  price: ltp,
+      dist: 0,                                         cls:'current' },
+    { key:'entry',   icon:'⊙',  label:'Entry',       price: entry,
+      dist: ltp > 0 ? entry - ltp : null,              cls:'entry'   },
+    { key:'sl',      icon:'🛡',  label:'Stop Loss',   price: slPrice,
+      dist: ltp > 0 ? slPrice - ltp : null,            cls:'sl'      },
   ].filter(r => r.price > 0);
 
   // Sort descending by price so ladder reads top (target) → bottom (SL)
@@ -653,8 +676,9 @@ function renderLiveTracker(t) {
   // Break-even fires when highestLtp crosses entry + be_points (not sl_points).
   // Trail steps are counted only ABOVE the BE threshold, not from entry.
   const beThreshold = entry + (bePts > 0 ? bePts : slPts); // fallback to slPts if bePts missing
-  const beTriggered = highestLtp >= beThreshold;
-  const trailSteps  = (tslPts > 0 && beTriggered)
+  // Issue 2: guard against null highestLtp — treat as not-yet-reached when null
+  const beTriggered = highestLtp != null && highestLtp >= beThreshold;
+  const trailSteps  = (tslPts > 0 && beTriggered && highestLtp != null)
       ? Math.floor((highestLtp - beThreshold) / tslPts)
       : 0;
 
@@ -704,6 +728,17 @@ let _availableDates = [];
 
 (async function init() {
   startTrackerPolling();
+
+  // Issue 5: check trading mode and show LIVE banner if needed
+  try {
+    const sr = await fetch('/api/status');
+    if (sr.ok) {
+      const st = await sr.json();
+      if (st && st.trading_mode === 'LIVE') {
+        document.getElementById('liveModeWarning').style.display = 'block';
+      }
+    }
+  } catch(e) { /* non-fatal — banner stays hidden */ }
 
   // Load available dates for nav
   try {

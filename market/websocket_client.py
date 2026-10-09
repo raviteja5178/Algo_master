@@ -41,13 +41,11 @@ _MAX_RECONNECT_ATTEMPTS = 3  # reconnect attempts before giving up
 _RECONNECT_MAX_DELAY = 5    # seconds — library minimum; prevents long blind windows
 _RECONNECT_MAX_TRIES = 300  # ~5 hours of 1s retries — effectively unlimited
 
-# Application-level WS ping interval.
-# Zerodha drops idle TCP connections (no WS ping/pong) after ~30s of silence.
-# We use autobahn's built-in autoPingInterval (set on the factory after connect())
-# rather than a manual thread — the manual thread's getattr(ticker, "ws") path
-# returns the factory's ws reference which does NOT have sendPing(), so the ping
-# silently fails and the connection drops every exactly 30 seconds.
-_PING_INTERVAL_SECONDS = 20   # ping every 20s — well inside Zerodha's 30s drop window
+# NOTE: WS-level ping/pong is intentionally DISABLED for Zerodha.
+# Zerodha's streaming server does NOT support standard RFC-6455 ping/pong frames.
+# Sending an autobahn autoPingInterval ping causes the server to drop the connection
+# immediately with close code 1006.  The KiteTicker library handles keepalive
+# internally via its own reconnect loop — no application-level ping is needed.
 
 # Market hours in IST (hour, minute) — stale monitor is suppressed outside this window
 _MARKET_OPEN  = (9, 15)
@@ -114,7 +112,13 @@ class WebSocketClient:
             self._option_tokens.add(token)
             self._last_option_tick_time = time.monotonic()
         self._last_tick_time = time.monotonic()
-        if self._ticker and self._running:
+        # Guard: only subscribe immediately when the WebSocket handshake is
+        # complete (ticker.ws is not None).  Calling ticker.subscribe() before
+        # the connection is established raises AttributeError: ws is None.
+        # Tokens queued here are picked up by _on_connect when the handshake
+        # completes, so nothing is lost.
+        ws_ready = self._ticker is not None and getattr(self._ticker, "ws", None) is not None
+        if self._ticker and self._running and ws_ready:
             self._ticker.subscribe([token])
             mode = self._ticker.MODE_FULL if token in _INDEX_TOKENS else self._ticker.MODE_LTP
             self._ticker.set_mode(mode, [token])
@@ -158,11 +162,6 @@ class WebSocketClient:
         self._last_option_tick_time = time.monotonic()
         self._start_stale_monitor()
         self._ticker.connect(threaded=True)
-        # Enable autobahn's built-in auto-ping AFTER connect() so the factory
-        # exists.  This is reliable — it runs inside Twisted's reactor on the
-        # correct thread, unlike the manual ping thread which was silently failing
-        # because ticker.ws (factory ref) doesn't expose sendPing() directly.
-        self._enable_auto_ping()
         log_event(logger, "WEBSOCKET_STARTED", tokens=list(self._tokens))
 
     def stop(self) -> None:
@@ -241,11 +240,6 @@ class WebSocketClient:
             if t not in _INDEX_TOKENS:
                 self._option_tokens.add(t)
         self._last_option_tick_time = time.monotonic()
-        # Re-enable auto-ping on every reconnect — the factory's protocol options
-        # are reset when the connection drops, so a one-time call at startup is
-        # not sufficient.  Without this the ping stops after the first reconnect
-        # and Zerodha drops the idle TCP connection again after ~30 seconds.
-        self._enable_auto_ping()
 
     def _on_order_update(self, ws, message: dict) -> None:  # type: ignore[no-untyped-def]
         """
@@ -303,11 +297,32 @@ class WebSocketClient:
 
     def _try_refresh_token(self) -> bool:
         """
-        Reset the Kite singleton and attempt auto-auth.  If successful, update
-        the ticker's access token so the next reconnect uses the fresh token.
+        Re-read .env from disk, update settings.KITE_ACCESS_TOKEN in memory,
+        reset the Kite singleton, and validate the new token.
+
+        The UI login flow writes a fresh token to .env but the running bot
+        holds the old token in memory.  Without the re-read, rebuilding the
+        Kite singleton still uses the stale in-memory value and the 403 persists.
+
         Returns True on success.
         """
         try:
+            from pathlib import Path
+            from dotenv import dotenv_values
+
+            # Re-read .env from disk to pick up a token written by the UI.
+            env_path = Path(__file__).resolve().parent.parent / ".env"
+            fresh_env = dotenv_values(env_path)
+            fresh_token = fresh_env.get("KITE_ACCESS_TOKEN", "").strip()
+            fresh_date  = fresh_env.get("KITE_TOKEN_DATE",   "").strip()
+            if fresh_token:
+                settings.KITE_ACCESS_TOKEN = fresh_token
+                if fresh_date:
+                    settings.KITE_TOKEN_DATE = fresh_date
+                logger.info(
+                    "WebSocketClient: re-read .env — KITE_ACCESS_TOKEN updated in memory."
+                )
+
             from broker import kite_client as _kc
             _kc._kite = None  # noqa: SLF001
             from broker.kite_client import get_kite
@@ -358,34 +373,14 @@ class WebSocketClient:
 
     def _enable_auto_ping(self) -> None:
         """
-        Enable autobahn's built-in auto-ping on the KiteTicker factory.
+        No-op — intentionally disabled.
 
-        The previous approach (manual ping thread calling ticker.ws.sendPing())
-        was silently broken: ticker.ws is the factory's ws reference — a
-        WebSocketClientFactory attribute, NOT the live protocol instance.
-        WebSocketClientFactory doesn't have sendPing(); the hasattr() check
-        returned False every time, the except swallowed the AttributeError,
-        and no ping was ever sent.  Result: Zerodha dropped the connection
-        every exactly 30 seconds (their idle TCP timeout).
-
-        autobahn's autoPingInterval is set directly on the factory and runs
-        inside Twisted's reactor on the correct thread — fully reliable.
+        Zerodha's WebSocket streaming server does NOT support RFC-6455 ping/pong
+        frames.  Sending any WS ping (whether via autobahn's autoPingInterval or
+        a manual thread) causes the server to close the connection immediately
+        with code 1006.  KiteTicker's built-in reconnect loop keeps the session
+        alive without application-level pings.
         """
-        try:
-            factory = getattr(self._ticker, "factory", None)
-            if factory is not None:
-                factory.setProtocolOptions(
-                    autoPingInterval=_PING_INTERVAL_SECONDS,
-                    autoPingTimeout=10,   # treat as dead if no pong in 10s
-                )
-                logger.info(
-                    "WebSocket auto-ping enabled: interval=%ds timeout=10s",
-                    _PING_INTERVAL_SECONDS,
-                )
-            else:
-                logger.warning("WebSocket factory not available — auto-ping not set.")
-        except Exception as exc:
-            logger.warning("WebSocket auto-ping setup failed (non-fatal): %s", exc)
 
     def _start_stale_monitor(self) -> None:
         import datetime as _dt
