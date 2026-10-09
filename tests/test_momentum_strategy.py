@@ -417,6 +417,8 @@ class TestSignalEngineWithMomentum:
             mock_settings.MOMENTUM_MIN_BODY_PTS        = MIN_BODY
             mock_settings.MOMENTUM_WINDOW_START        = "13:30"
             mock_settings.MOMENTUM_WINDOW_END          = "14:30"
+            mock_settings.EMA_COOLDOWN_CANDLES         = 0
+            mock_settings.ENABLE_PIVOT_STRATEGY        = False
 
             result = evaluate_signals(c5, c15)
             assert result == "CE_MOM"
@@ -448,6 +450,8 @@ class TestSignalEngineWithMomentum:
             mock_settings.MOMENTUM_MIN_BODY_PTS        = MIN_BODY
             mock_settings.MOMENTUM_WINDOW_START        = "13:30"
             mock_settings.MOMENTUM_WINDOW_END          = "14:30"
+            mock_settings.EMA_COOLDOWN_CANDLES         = 0
+            mock_settings.ENABLE_PIVOT_STRATEGY        = False
 
             result = evaluate_signals(c5, c15)
             assert result == "CE"

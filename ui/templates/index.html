@@ -26,23 +26,27 @@
   #app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 
   /* ── ticker tape ── */
-  #ticker{height:var(--ticker);min-height:var(--ticker);background:#1a0f00;border-bottom:1px solid #2e1e08;display:flex;align-items:center;gap:0;overflow:hidden;flex-shrink:0;font-size:11px;font-family:monospace;color:#fbd07a}
-  .tick-item{display:flex;align-items:center;gap:6px;padding:0 14px;border-right:1px solid #2e1e08;height:100%;white-space:nowrap;cursor:default}
-  .tick-sym{font-weight:700;color:#5a3a10;font-size:10px;letter-spacing:.5px}
+  #ticker{height:var(--ticker);min-height:var(--ticker);background:#1a0f00;border-bottom:1px solid #3a2810;display:flex;align-items:center;gap:0;overflow:hidden;flex-shrink:0;font-size:11px;font-family:monospace;color:#fbd07a}
+  .tick-item{display:flex;align-items:center;gap:6px;padding:0 14px;border-right:1px solid #3a2810;height:100%;white-space:nowrap;cursor:default}
+  .tick-sym{font-weight:700;color:#b89a6e;font-size:10px;letter-spacing:.5px}
   .tick-val{font-weight:700;font-size:12px;color:#fbd07a}
   .tick-chg{font-size:10px}
   .tick-sep{flex:1}
-  .tick-time{padding:0 14px;color:var(--muted);font-size:10px;letter-spacing:.5px;white-space:nowrap}
+  .tick-time{padding:0 14px;color:#b89a6e;font-size:10px;letter-spacing:.5px;white-space:nowrap}
   .tick-mode{padding:2px 9px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px;margin-right:10px}
 
   /* ── header ── */
-  #hdr{height:var(--hdr);min-height:var(--hdr);background:#fff;border-bottom:2px solid #f5a623;display:flex;align-items:center;gap:0;flex-shrink:0;z-index:50;box-shadow:0 1px 4px rgba(245,166,35,.1)}
-  .hdr-logo{padding:0 16px;display:flex;align-items:center;gap:7px;font-size:13px;font-weight:800;letter-spacing:-.2px;border-right:1px solid var(--border);height:100%;white-space:nowrap}
+  #hdr{height:var(--hdr);min-height:var(--hdr);background:#24160a;border-bottom:2px solid #f5a623;display:flex;align-items:center;gap:0;flex-shrink:0;z-index:50}
+  .hdr-logo{padding:0 16px;display:flex;align-items:center;gap:7px;font-size:13px;font-weight:800;letter-spacing:-.2px;height:100%;white-space:nowrap}
   .hdr-logo span{color:var(--accent);font-weight:900}
-  .hdr-dot{width:7px;height:7px;border-radius:50%;background:#d0c0a8;flex-shrink:0}
-  .hdr-dot.live{background:var(--green);box-shadow:0 0 6px var(--green)}
-  .hdr-mid{flex:1;display:flex;align-items:center;gap:4px;padding:0 12px;overflow:hidden}
-  .hdr-right{display:flex;align-items:center;gap:0;border-left:1px solid var(--border);height:100%}
+  .hdr-dot{width:7px;height:7px;border-radius:50%;background:#6b5338;flex-shrink:0}
+  .hdr-dot.live{background:#2ecc71;box-shadow:0 0 6px #2ecc71}
+  .hdr-mid{flex:1}
+  .hdr-right{display:flex;align-items:center;gap:0;padding:0 12px;height:100%}
+  #hdr .profile-name-small{color:#d9c4a3;max-width:160px}
+  #hdr .pf-wrap{border-left:none;border-radius:6px;height:32px}
+  #hdr .pf-wrap:hover{background:#3a2810}
+  #hdr .pf-avatar{color:#24160a}
   .hdr-btn{height:100%;padding:0 13px;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;border-right:1px solid var(--border);transition:all .12s;background:none;border-top:none;border-bottom:none;white-space:nowrap}
   .hdr-btn:hover{color:var(--text);background:var(--surface2)}
   .hdr-btn.danger{color:#ef4444}
@@ -382,17 +386,7 @@
       <span style="width:22px;height:22px;border-radius:5px;background:linear-gradient(135deg,#f5a623,#c47a00);display:inline-flex;align-items:center;justify-content:center;font-size:13px">☀️</span>
       <span>Surya Arjun</span>
     </div>
-    <div class="hdr-mid">
-      <select class="hdr-select" id="strategy-dropdown" onchange="applyStrategyProfile(this.value)">
-        <option value="">— Select Strategy Profile —</option>
-        <option value="standard">📊 Standard (EMA)</option>
-        <option value="momentum">⚡ Momentum Phase 2</option>
-        <option value="ob">🧱 Order Block (OB)</option>
-        <option value="atr">📐 ATR Adaptive</option>
-        <option value="smart_exit">🎯 Standard + Smart Exit</option>
-        <option value="full">🚀 Full (All Strategies)</option>
-      </select>
-    </div>
+    <div class="hdr-mid"></div>
     <div class="hdr-right">
       <div class="pf-wrap" id="profile-wrap" style="display:none" onclick="togglePfDd()">
         <div class="pf-avatar" id="pf-avatar">?</div>
@@ -434,6 +428,16 @@
         <div class="sb-row"><span class="sb-lbl" style="color:var(--red)">Prev High</span><span id="sb-pdh" class="sb-val">—</span></div>
         <div class="sb-row"><span class="sb-lbl" style="color:var(--accent)">Prev Low</span><span id="sb-pdl" class="sb-val">—</span></div>
         <div class="sb-divider"></div>
+        <!-- Pivot Levels -->
+        <div class="sb-section" id="sb-pivot-section" style="display:none">Pivot Levels</div>
+        <div id="sb-pivot-rows" style="display:none">
+          <div class="sb-row"><span class="sb-lbl" style="color:#f97316;font-weight:600">R2</span><span id="sb-r2" class="sb-val" style="color:#f97316">—</span></div>
+          <div class="sb-row"><span class="sb-lbl" style="color:#fb923c">R1</span><span id="sb-r1" class="sb-val" style="color:#fb923c">—</span></div>
+          <div class="sb-row"><span class="sb-lbl" style="color:#a78bfa;font-weight:600">Pivot</span><span id="sb-pivot" class="sb-val" style="color:#a78bfa">—</span></div>
+          <div class="sb-row"><span class="sb-lbl" style="color:#60a5fa">S1</span><span id="sb-s1" class="sb-val" style="color:#60a5fa">—</span></div>
+          <div class="sb-row"><span class="sb-lbl" style="color:#3b82f6;font-weight:600">S2</span><span id="sb-s2" class="sb-val" style="color:#3b82f6">—</span></div>
+        </div>
+        <div class="sb-divider" id="sb-pivot-divider" style="display:none"></div>
         <!-- ORB range -->
         <div class="sb-section">ORB Range</div>
         <div class="sb-row"><span class="sb-lbl" style="color:var(--green)">High</span><span id="sb-orb-high" class="sb-val">—</span></div>
@@ -475,6 +479,17 @@
           <div id="auth-banner" style="display:none;background:var(--red-dim);border-bottom:1px solid rgba(239,68,68,.3);padding:6px 14px;flex-shrink:0;align-items:center;justify-content:space-between;gap:8px">
             <div style="display:flex;align-items:center;gap:8px"><span style="color:var(--red)">⚠</span><div><div style="font-weight:700;font-size:11px;color:var(--red)" id="auth-banner-title">Session Expired</div><div style="font-size:10px;color:var(--muted)" id="auth-banner-sub">Re-authenticate to restore live data.</div></div></div>
             <button class="btn btn-red" onclick="openLoginModal()">Re-Login</button>
+          </div>
+          <!-- Feed-disconnect warning (WebSocket 403 / no ticks) -->
+          <div id="feed-banner" style="display:none;background:rgba(212,135,10,.12);border-bottom:1px solid rgba(212,135,10,.4);padding:5px 14px;flex-shrink:0;align-items:center;justify-content:space-between;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="color:var(--yellow);font-size:13px">⚡</span>
+              <div>
+                <div style="font-weight:700;font-size:11px;color:var(--yellow)">Live Feed Disconnected</div>
+                <div style="font-size:10px;color:var(--muted)" id="feed-banner-sub">No SENSEX ticks received — WebSocket may have dropped (403). SENSEX LTP and candle data are frozen. Sidebar shows last-known values.</div>
+              </div>
+            </div>
+            <button class="btn" onclick="document.getElementById('feed-banner').style.display='none'" style="font-size:9px;padding:3px 8px">Dismiss</button>
           </div>
 
           <!-- KPI bar (Kite-style top strip) -->
@@ -611,6 +626,26 @@
               <div class="card"><div class="card-hdr">CE Signal (all &#10003;)</div><div class="cond-grid" id="ce-conds"><div class="cond-item"><span class="cond-dot c-na"></span>5m close &gt; EMA21</div><div class="cond-item"><span class="cond-dot c-na"></span>EMA9 &gt; EMA21</div><div class="cond-item"><span class="cond-dot c-na"></span>close &gt; prev high</div><div class="cond-item"><span class="cond-dot c-na"></span>15m close &gt; EMA21</div></div></div>
               <div class="card"><div class="card-hdr">PE Signal (all &#10003;)</div><div class="cond-grid" id="pe-conds"><div class="cond-item"><span class="cond-dot c-na"></span>5m close &lt; EMA21</div><div class="cond-item"><span class="cond-dot c-na"></span>EMA9 &lt; EMA21</div><div class="cond-item"><span class="cond-dot c-na"></span>close &lt; prev low</div><div class="cond-item"><span class="cond-dot c-na"></span>15m close &lt; EMA21</div></div></div>
             </div>
+            <!-- Pivot filter — inline under EMA since it only affects EMA signals -->
+            <div id="pivot-filter-section" style="display:none;margin-top:6px">
+              <div style="font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px">Pivot Filter</div>
+              <div class="card" style="padding:8px 12px">
+                <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px">
+                  <span style="color:#f97316">R2 <strong id="pf-r2">—</strong></span>
+                  <span style="color:#fb923c">R1 <strong id="pf-r1">—</strong></span>
+                  <span style="color:#a78bfa">P <strong id="pf-pivot">—</strong></span>
+                  <span style="color:#60a5fa">S1 <strong id="pf-s1">—</strong></span>
+                  <span style="color:#3b82f6">S2 <strong id="pf-s2">—</strong></span>
+                  <span style="color:var(--muted)">±<strong id="pf-buf">—</strong> pts</span>
+                </div>
+                <div style="margin-top:6px;font-size:11px;color:var(--muted)" id="pf-status">Waiting for candle…</div>
+                <div style="margin-top:5px;display:flex;gap:8px;flex-wrap:wrap">
+                  <span class="cond-item"><span class="cond-dot" id="pf-zone-dot"></span><span id="pf-zone-lbl">Zone clear</span></span>
+                  <span class="cond-item"><span class="cond-dot" id="pf-trend-dot"></span><span id="pf-trend-lbl">Trend align</span></span>
+                  <span class="cond-item"><span class="cond-dot" id="pf-bo-dot"></span><span id="pf-bo-lbl">Breakout confirm</span></span>
+                </div>
+              </div>
+            </div>
           </div>
           <div id="orb-section" style="display:none">
             <div class="section-lbl">Opening Range Breakout (ORB)</div>
@@ -661,6 +696,13 @@
             <div class="g2">
               <div class="card"><div class="card-hdr">CE_ATR</div><div class="cond-grid" id="ce-atr-conds"><div class="cond-item"><span class="cond-dot c-na"></span>Prev close &lt;= upper band</div><div class="cond-item"><span class="cond-dot c-na"></span>close &gt; upper band</div><div class="cond-item"><span class="cond-dot c-na"></span>clearance &gt;= 0.2 x ATR</div></div></div>
               <div class="card"><div class="card-hdr">PE_ATR</div><div class="cond-grid" id="pe-atr-conds"><div class="cond-item"><span class="cond-dot c-na"></span>Prev close &gt;= lower band</div><div class="cond-item"><span class="cond-dot c-na"></span>close &lt; lower band</div><div class="cond-item"><span class="cond-dot c-na"></span>clearance &gt;= 0.2 x ATR</div></div></div>
+            </div>
+          </div>
+          <div id="pivot-strat-section" style="display:none">
+            <div class="section-lbl">Pivot Sustain (Level Acceptance)</div>
+            <div class="g2">
+              <div class="card"><div class="card-hdr">CE_PIVOT</div><div class="cond-grid" id="ce-pivot-conds"><div class="cond-item"><span class="cond-dot c-na"></span>Last 2 closes &gt; Pivot</div><div class="cond-item"><span class="cond-dot c-na"></span>Fresh cross</div><div class="cond-item"><span class="cond-dot c-na"></span>Below R1 (room)</div></div></div>
+              <div class="card"><div class="card-hdr">PE_PIVOT</div><div class="cond-grid" id="pe-pivot-conds"><div class="cond-item"><span class="cond-dot c-na"></span>Last 2 closes &lt; Pivot</div><div class="cond-item"><span class="cond-dot c-na"></span>Fresh cross</div><div class="cond-item"><span class="cond-dot c-na"></span>Above S1 (room)</div></div></div>
             </div>
           </div>
           <div id="ob-section" style="display:none">
@@ -966,6 +1008,23 @@
             </div>
           </div>
 
+          <!-- Pivot Sustain -->
+          <div class="card" style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                  <span style="font-weight:700;font-size:13px">🎯 Pivot Sustain</span>
+                  <span class="pill p-yellow" style="font-size:9px">Level Acceptance</span>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:6px">CE_PIVOT / PE_PIVOT when 2 completed 5m closes hold above / below the daily Pivot after a fresh cross. T1/T2 = R1/R2 (CE) or S1/S2 (PE); BE at +1R, lock 50% at T1, ATR trail to T2.</div>
+              </div>
+              <label class="st-switch">
+                <input type="checkbox" id="st-ENABLE_PIVOT_STRATEGY" onchange="stToggle('ENABLE_PIVOT_STRATEGY',this.checked)">
+                <span class="st-slider"></span>
+              </label>
+            </div>
+          </div>
+
           <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
             <button class="btn btn-blue" onclick="stSaveAll()" style="padding:6px 16px">💾 Save</button>
             <span id="st-save-msg" style="font-size:10px;color:var(--green);display:none">&#10003; Saved</span>
@@ -989,6 +1048,8 @@ const distChart=new Chart(document.getElementById('dist-chart').getContext('2d')
 let _lwChart=null,_candleSeries=null,_ema9Series=null,_ema21Series=null;
 let _vwapSeries=null,_copUpperSeries=null,_copLowerSeries=null;
 let _slLine=null,_t1Line=null,_t2Line=null,_entryLine=null;
+// Pivot level price lines on the chart
+let _pivotLines={pivot:null,r1:null,r2:null,s1:null,s2:null};
 // Hidden anchor series — one data point per overlay level forces the Y-axis to include them
 let _anchorSeries=null;
 let _signalMarkersCache=[];   // [{time,direction,strategy,entry,sl,t1,t2,status,...}]
@@ -1052,6 +1113,7 @@ function _initLwChart(){
   _candleSeries=null;_ema9Series=null;_ema21Series=null;
   _vwapSeries=null;_copUpperSeries=null;_copLowerSeries=null;
   _slLine=null;_t1Line=null;_t2Line=null;_entryLine=null;_anchorSeries=null;
+  _pivotLines={pivot:null,r1:null,r2:null,s1:null,s2:null};
   const isIntra=_INTRADAY_INTERVALS.has(_chartInterval);
   // ── Theme tokens pulled from CSS vars ───────────────────────
   const cs=getComputedStyle(document.documentElement);
@@ -1416,6 +1478,33 @@ function _paintVwapBands(candlesToday, vwap, ub, lb, ubSeries, lbSeries){
   _updateAnchorSeries();
 }
 
+// Paint pivot level price lines on the chart (P, R1, R2, S1, S2).
+// Called whenever pivot_levels arrives in state. Uses createPriceLine on _candleSeries.
+function _paintPivotLines(pivotLevels){
+  if(!_candleSeries)return;
+  // Remove old lines
+  const keys=['pivot','r1','r2','s1','s2'];
+  keys.forEach(k=>{if(_pivotLines[k]){try{_candleSeries.removePriceLine(_pivotLines[k]);}catch(e){}_pivotLines[k]=null;}});
+  if(!pivotLevels)return;
+  const cfg=[
+    {key:'r2',  price:pivotLevels.r2,    color:'#f97316', label:'R2',    width:1},
+    {key:'r1',  price:pivotLevels.r1,    color:'#fb923c', label:'R1',    width:1},
+    {key:'pivot',price:pivotLevels.pivot, color:'#a78bfa', label:'Pivot', width:2},
+    {key:'s1',  price:pivotLevels.s1,    color:'#60a5fa', label:'S1',    width:1},
+    {key:'s2',  price:pivotLevels.s2,    color:'#3b82f6', label:'S2',    width:1},
+  ];
+  cfg.forEach(c=>{
+    if(c.price==null)return;
+    try{
+      _pivotLines[c.key]=_candleSeries.createPriceLine({
+        price:c.price, color:c.color, lineWidth:c.width,
+        lineStyle:LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible:true, title:c.label,
+      });
+    }catch(e){}
+  });
+}
+
 async function _fetchAndRender(){
   if(!_lwChart)_initLwChart();
   const days=_INTERVAL_DAYS[_chartInterval]||60;
@@ -1435,6 +1524,7 @@ async function _fetchAndRender(){
     if(_INTRADAY_INTERVALS.has(_chartInterval)&&_lastBotState){
       const s=_lastBotState;
       _paintVwapBands(s.candles_today||s.candles_5m||[],s.vwap,s.atr_copilot_upper_band,s.atr_copilot_lower_band,s.atr_copilot_upper_series,s.atr_copilot_lower_series);
+      _paintPivotLines(s.pivot_levels||null);
     }
     // Fetch signal markers for today only
     if(_INTRADAY_INTERVALS.has(_chartInterval))_fetchAndRenderSignals();
@@ -1463,10 +1553,14 @@ let _lastSignalCount=0;
 function updateCandleChart(state){
   if(!state)return;
   _lastBotState=state;
-  // Signal conditions always updated
+  // Signal conditions — only call when there are real candles.
+  // When the feed is disconnected the state arrives with candles_5m=[]
+  // which would wipe sidebar values with nulls; the _sidebarCache in
+  // calcSignalConds handles this now, but skip entirely when empty to
+  // avoid the condition-dot calculations running on stale/empty data.
   const candles5=state.candles_5m||[];
   const ema9=state.ema9_5m,ema21=state.ema21_5m;
-  if(candles5.length>=2&&ema9&&ema21)calcSignalConds(state,candles5,ema9,ema21);
+  if(candles5.length>=2&&ema9&&ema21&&ema9.length>=2&&ema21.length>=2)calcSignalConds(state,candles5,ema9,ema21);
   // Only tick the last bar during intraday intervals (don't replace chart data)
   if(!_INTRADAY_INTERVALS.has(_chartInterval)||!_candleSeries)return;
   const rawCandles=_chartInterval==='5minute'?state.candles_5m:
@@ -1488,6 +1582,8 @@ function updateCandleChart(state){
   // Use candles_today (today-only) to avoid the 60-candle cross-day window problem
   const candlesToday=state.candles_today||state.candles_5m||[];
   _paintVwapBands(candlesToday,state.vwap,ub,lb,state.atr_copilot_upper_series,state.atr_copilot_lower_series);
+  // Pivot level dashed lines on chart
+  _paintPivotLines(state.pivot_levels||null);
   // SL/T1/T2 are updated by _applyActiveTradeLines below
 
   // ── Re-fetch signal markers when new trade appears ──────────────────────
@@ -1507,6 +1603,9 @@ function updateCandleChart(state){
 // Init — fetch full history for the default interval on page load
 document.addEventListener('DOMContentLoaded',()=>{_initLwChart();_fetchAndRender();});
 
+// Persistent cache for sidebar level values — survives feed disconnects
+const _sidebarCache={vwap:null,pdh:null,pdl:null,pl:null};
+
 function calcSignalConds(state,candles,ema9,ema21){
   const c0=candles[candles.length-1],c1=candles[candles.length-2];
   const e9=ema9[ema9.length-1],e21=ema21[ema21.length-1];
@@ -1516,11 +1615,35 @@ function calcSignalConds(state,candles,ema9,ema21){
   // falls back to _envCache which is loaded on every page poll from /api/env.
   const g=id=>{const el=document.getElementById('cfg-'+id);if(el)return el.value;return(_envCache&&_envCache[id])||'';};
   const emaOn=g('ENABLE_EMA_STRATEGY')!=='false',orbOn=g('ENABLE_ORB_STRATEGY')==='true',obOn=g('ENABLE_OB_STRATEGY')==='true',momOn=g('ENABLE_MOMENTUM_PHASE')==='true',trbOn=g('ENABLE_TRB_STRATEGY')==='true',vwapOn=g('ENABLE_VWAP_STRATEGY')==='true',pdhlOn=g('ENABLE_PDHL_STRATEGY')==='true',natrOn=g('ENABLE_NATR_STRATEGY')==='true',atrCopilotOn=g('ENABLE_ATR_COPILOT_STRATEGY')==='true';
-  const vwapVal=state.vwap,pdhVal=state.prev_day_high,pdlVal=state.prev_day_low;
+  const pivotOn=g('ENABLE_PIVOT_LEVELS')==='true';
+  const pivotStratOn=g('ENABLE_PIVOT_STRATEGY')==='true';
+
+  // ── Sticky sidebar values: update cache only when bot sends real data ─────────
+  // This prevents VWAP / PDH / PDL / Pivot from going blank when the feed
+  // disconnects (WebSocket 403) — last-known values stay on screen.
+  if(state.vwap!=null)          _sidebarCache.vwap=state.vwap;
+  if(state.prev_day_high!=null) _sidebarCache.pdh=state.prev_day_high;
+  if(state.prev_day_low!=null)  _sidebarCache.pdl=state.prev_day_low;
+  if(state.pivot_levels!=null)  _sidebarCache.pl=state.pivot_levels;
+
+  const vwapVal=_sidebarCache.vwap, pdhVal=_sidebarCache.pdh, pdlVal=_sidebarCache.pdl;
+  const pl=_sidebarCache.pl;
+
   document.getElementById('sb-vwap').textContent=vwapVal?vwapVal.toFixed(1):'—';
   document.getElementById('sb-pdh').textContent=pdhVal?pdhVal.toFixed(1):'—';
   document.getElementById('sb-pdl').textContent=pdlVal?pdlVal.toFixed(1):'—';
+  // ── Pivot sidebar — show whenever cached data is present ─────────────────────
+  const showPivot=!!pl;
+  ['sb-pivot-section','sb-pivot-rows','sb-pivot-divider'].forEach(id=>document.getElementById(id).style.display=showPivot?'block':'none');
+  if(pl){
+    document.getElementById('sb-r2').textContent=pl.r2.toFixed(1);
+    document.getElementById('sb-r1').textContent=pl.r1.toFixed(1);
+    document.getElementById('sb-pivot').textContent=pl.pivot.toFixed(1);
+    document.getElementById('sb-s1').textContent=pl.s1.toFixed(1);
+    document.getElementById('sb-s2').textContent=pl.s2.toFixed(1);
+  }
   document.getElementById('ema-section').style.display=emaOn?'block':'none';
+  document.getElementById('pivot-filter-section').style.display=(emaOn&&!!pl)?'block':'none';
   document.getElementById('orb-section').style.display=orbOn?'block':'none';
   document.getElementById('ob-section').style.display=obOn?'block':'none';
   document.getElementById('momentum-section').style.display=momOn?'block':'none';
@@ -1529,8 +1652,38 @@ function calcSignalConds(state,candles,ema9,ema21){
   document.getElementById('pdhl-section').style.display=pdhlOn?'block':'none';
   document.getElementById('natr-section').style.display=natrOn?'block':'none';
   document.getElementById('atr-copilot-section').style.display=atrCopilotOn?'block':'none';
-  document.getElementById('signals-empty').style.display=(emaOn||orbOn||obOn||momOn||trbOn||vwapOn||pdhlOn||natrOn||atrCopilotOn)?'none':'block';
+  document.getElementById('pivot-strat-section').style.display=pivotStratOn?'block':'none';
+  document.getElementById('signals-empty').style.display=(emaOn||orbOn||obOn||momOn||trbOn||vwapOn||pdhlOn||natrOn||atrCopilotOn||pivotStratOn)?'none':'block';
   let ceSig=false,peSig=false;
+  // ── Pivot filter panel ─────────────────────────────────────────────────────
+  if(emaOn&&pl){
+    const buf=parseFloat(g('PIVOT_ZONE_BUFFER')||25);
+    const counterBlk=g('PIVOT_COUNTER_TREND_BLOCK')==='true';
+    const boConf=g('PIVOT_BREAKOUT_CONFIRM')==='true';
+    document.getElementById('pf-r2').textContent=pl.r2.toFixed(1);
+    document.getElementById('pf-r1').textContent=pl.r1.toFixed(1);
+    document.getElementById('pf-pivot').textContent=pl.pivot.toFixed(1);
+    document.getElementById('pf-s1').textContent=pl.s1.toFixed(1);
+    document.getElementById('pf-s2').textContent=pl.s2.toFixed(1);
+    document.getElementById('pf-buf').textContent=buf;
+    const allLvls=[pl.pivot,pl.r1,pl.r2,pl.s1,pl.s2];
+    const nearLvl=allLvls.find(lv=>Math.abs(c0.c-lv)<=buf);
+    const zoneOk=!nearLvl;
+    const trendOk=!counterBlk||(c0.c>pl.pivot);  // simplified: just CE bias check
+    const boOk=!boConf;
+    const zdot=document.getElementById('pf-zone-dot');
+    zdot.className='cond-dot '+(zoneOk?'c-ok':'c-fail');
+    const zlbl=document.getElementById('pf-zone-lbl');
+    zlbl.textContent=zoneOk?'Zone clear':`Near ${nearLvl?nearLvl.toFixed(1):'level'} (±${buf}pts)`;
+    const tdot=document.getElementById('pf-trend-dot');
+    tdot.className='cond-dot '+(counterBlk?(c0.c>pl.pivot?'c-ok':'c-fail'):'c-na');
+    document.getElementById('pf-trend-lbl').textContent=counterBlk?(c0.c>pl.pivot?'Bullish (CE ok)':'Bearish (CE blocked)'):'Trend filter off';
+    const bdot=document.getElementById('pf-bo-dot');
+    bdot.className='cond-dot '+(boConf?(c0.c>pl.r1||c0.c<pl.s1?'c-ok':'c-fail'):'c-na');
+    document.getElementById('pf-bo-lbl').textContent=boConf?(c0.c>pl.r1?'Above R1 (CE ok)':c0.c<pl.s1?'Below S1 (PE ok)':'Inside R1–S1'):'Breakout filter off';
+    const biasLabel=c0.c>pl.r1?'Above R1 — breakout zone 🟢':c0.c>pl.pivot?'Above Pivot — CE bias':'Below Pivot — PE bias';
+    document.getElementById('pf-status').textContent=`Close ${c0.c.toFixed(1)} | ${biasLabel}`;
+  }
   if(emaOn){const h15=close15!==null&&ema21_15!==null;const cc=[c0.c>e21,e9>e21,c0.c>c1.h,h15?close15>ema21_15:false],pc=[c0.c<e21,e9<e21,c0.c<c1.l,h15?close15<ema21_15:false];renderConds('ce-conds',cc,['5m close > EMA21','EMA9 > EMA21','close > prev high','15m close > EMA21']);renderConds('pe-conds',pc,['5m close < EMA21','EMA9 < EMA21','close < prev low','15m close < EMA21']);if(cc.every(Boolean))ceSig=true;if(pc.every(Boolean))peSig=true;}
   if(orbOn&&state.candles_5m){let oH=null,oL=null;const ld=new Date(state.candles_5m[state.candles_5m.length-1].t).toDateString();for(const c of state.candles_5m){const d=new Date(c.t);if(d.toDateString()===ld&&d.getHours()===9&&d.getMinutes()===15){oH=c.h;oL=c.l;break;}}const isOp=new Date(c0.t).getHours()===9&&new Date(c0.t).getMinutes()===15;const cco=[!isOp&&oH?c0.c>oH:null,!isOp&&oH?c1.c<=oH:null],pco=[!isOp&&oL?c0.c<oL:null,!isOp&&oL?c1.c>=oL:null];renderConds('ce-orb-conds',cco,[`close > ORB High (${oH?oH.toFixed(2):'—'})`,`Prev ≤ ORB High (${oH?oH.toFixed(2):'—'})`]);renderConds('pe-orb-conds',pco,[`close < ORB Low (${oL?oL.toFixed(2):'—'})`,`Prev ≥ ORB Low (${oL?oL.toFixed(2):'—'})`]);if(cco.every(Boolean))ceSig=true;if(pco.every(Boolean))peSig=true;}
   if(obOn&&state.ob_zones){const b=state.ob_zones.bull||[],be=state.ob_zones.bear||[];const bA=b.length>0,beA=be.length>0,bV=bA&&!b[0].breaker,beV=beA&&!be[0].breaker;const bZ=bA?`${b[0].bottom.toFixed(1)}–${b[0].top.toFixed(1)}`:'—',eZ=beA?`${be[0].bottom.toFixed(1)}–${be[0].top.toFixed(1)}`:'—';renderConds('ce-ob-conds',[bA,bV],[`Bullish OB (${bZ})`,'Not a breaker']);renderConds('pe-ob-conds',[beA,beV],[`Bearish OB (${eZ})`,'Not a breaker']);if(bV)ceSig=true;if(beV)peSig=true;}
@@ -1563,6 +1716,21 @@ function calcSignalConds(state,candles,ema9,ema21){
     if(copAtrEl)copAtrEl.textContent=copAtr!==null?copAtr.toFixed(2):'—';
     if(copUpEl)copUpEl.textContent=ubStr;
     if(copLoEl)copLoEl.textContent=lbStr;
+  }
+  if(pivotStratOn){
+    const n=parseInt(g('PIVOT_SUSTAIN_CANDLES')||2);
+    const allC=state.candles_5m||[];
+    const ld=allC.length?new Date(allC[allC.length-1].t).toDateString():'';
+    const today=allC.filter(c=>new Date(c.t).toDateString()===ld);
+    const ok=!!pl&&today.length>=n;
+    const w=ok?today.slice(-n):[],bf=ok&&today.length>n?today[today.length-n-1]:null;
+    const P=pl?pl.pivot:null,pStr=P!=null?P.toFixed(2):'—';
+    const cp=ok?[w.every(c=>c.c>P),bf===null||bf.c<=P,c0.c<pl.r1]:[null,null,null];
+    const pp=ok?[w.every(c=>c.c<P),bf===null||bf.c>=P,c0.c>pl.s1]:[null,null,null];
+    renderConds('ce-pivot-conds',cp,[`Last ${n} closes > Pivot (${pStr})`,'Fresh cross (prior close ≤ Pivot)',`Below R1 (${pl?pl.r1.toFixed(2):'—'}) — room`]);
+    renderConds('pe-pivot-conds',pp,[`Last ${n} closes < Pivot (${pStr})`,'Fresh cross (prior close ≥ Pivot)',`Above S1 (${pl?pl.s1.toFixed(2):'—'}) — room`]);
+    if(cp.every(v=>v===true))ceSig=true;
+    if(pp.every(v=>v===true))peSig=true;
   }
   const cePill=document.getElementById('signal-ce-pill'),pePill=document.getElementById('signal-pe-pill');
   const tkCe=document.getElementById('tk-ce'),tkPe=document.getElementById('tk-pe');
@@ -1725,10 +1893,29 @@ function renderTrades(trades){const tbody=document.getElementById('trades-tbody'
 function renderOrders(orders){const tbody=document.getElementById('orders-tbody');if(!orders||!orders.length){tbody.innerHTML='<tr><td colspan="5" class="muted">No orders yet.</td></tr>';return;}const ac={ENTRY:'p-green',EXIT:'p-red',SL_PLACE:'p-yellow',SL_MODIFY:'p-yellow',CANCEL:'p-muted'};tbody.innerHTML=orders.slice(0,150).map(o=>`<tr><td style="font-size:9px;color:var(--muted)">${o.trade_id||'—'}</td><td><span class="pill ${ac[o.action_type]||'p-muted'}">${o.action_type}</span></td><td style="font-size:9px">${o.broker_order_id||'—'}</td><td>${statusPill(o.status)}</td><td style="font-size:9px;color:var(--muted)">${fmtDate(o.created_at)}</td></tr>`).join('');}
 
 // ── LTP ─────────────────────────────────────────────────────
-let _prevLtp=null;
+let _prevLtp=null, _lastGoodLtp=null, _feedDisconnectTimer=null;
+
+function _showFeedBanner(show){
+  const b=document.getElementById('feed-banner');
+  if(b)b.style.display=show?'flex':'none';
+}
+
 function renderLtp(data){
   if(!data||data.ltp==null)return;
   const ltp=parseFloat(data.ltp);
+
+  // ── Feed-disconnect detection ────────────────────────────────────────────────
+  // ltp === 0 means the bot is running but receiving zero ticks (WebSocket down).
+  // Show the warning banner; keep last-known LTP on screen instead of showing ₹0.
+  if(ltp===0){
+    // Only show banner when bot is running — not on weekend/EOD idle
+    if(_botRunning)_showFeedBanner(true);
+    // Leave sidebar showing last-known value — do NOT update to 0
+    return;
+  }
+  _showFeedBanner(false);
+  _lastGoodLtp=ltp;
+
   document.getElementById('kpi-ltp').textContent=ltp.toLocaleString('en-IN');
   document.getElementById('chart-ltp').textContent=ltp.toLocaleString('en-IN');
   document.getElementById('tk-sensex').textContent=ltp.toLocaleString('en-IN');
@@ -1740,11 +1927,11 @@ function renderLtp(data){
   const chgEl=document.getElementById('sb-ltp-chg');
   if(data.change!=null){const ch=parseFloat(data.change),pct=parseFloat(data.change_pct||0);chgEl.textContent=`${ch>=0?'+':''}${ch.toFixed(2)} (${pct>=0?'+':''}${pct.toFixed(2)}%)`;chgEl.style.color=ch>=0?'var(--green)':'var(--red)';}
   _prevLtp=ltp;
-  // ATR in sidebar
-  if(data.atr!=null){const aEl=document.getElementById('sb-atr');if(aEl)aEl.textContent=parseFloat(data.atr).toFixed(1);}
-  // ORB range in sidebar
-  if(data.orb_high!=null){const oH=document.getElementById('sb-orb-high');if(oH)oH.textContent=parseFloat(data.orb_high).toFixed(1);}
-  if(data.orb_low!=null){const oL=document.getElementById('sb-orb-low');if(oL)oL.textContent=parseFloat(data.orb_low).toFixed(1);}
+  // ATR in sidebar — sticky: only update when a real value arrives
+  if(data.atr!=null&&parseFloat(data.atr)>0){const aEl=document.getElementById('sb-atr');if(aEl)aEl.textContent=parseFloat(data.atr).toFixed(1);}
+  // ORB range in sidebar — sticky
+  if(data.orb_high!=null&&parseFloat(data.orb_high)>0){const oH=document.getElementById('sb-orb-high');if(oH)oH.textContent=parseFloat(data.orb_high).toFixed(1);}
+  if(data.orb_low!=null&&parseFloat(data.orb_low)>0){const oL=document.getElementById('sb-orb-low');if(oL)oL.textContent=parseFloat(data.orb_low).toFixed(1);}
   const el=document.getElementById('kpi-ltp-time');
   if(data.updated_at){const age=Date.now()-new Date(data.updated_at).getTime();el.innerHTML='at '+fmtTime(data.updated_at)+(_botRunning&&age>300000?' <span class="red bold">STALE</span>':'');}
   else el.textContent='—';
@@ -1799,6 +1986,17 @@ const FIELDS=[
   {key:'ATR_COPILOT_BAND_MULT',label:'ATR Copilot Band Mult',type:'number'},
   {key:'ATR_COPILOT_MIN_RR',label:'ATR Copilot Min R:R (PE)',type:'number'},
   {key:'ATR_COPILOT_LONG_MIN_RR',label:'ATR Copilot Min R:R (CE)',type:'number'},
+  {key:'ENABLE_PIVOT_STRATEGY',label:'Pivot Sustain',type:'select',options:['false','true']},
+  {key:'PIVOT_SUSTAIN_CANDLES',label:'Pivot Sustain Candles',type:'number'},
+  {key:'PIVOT_SL_MODE',label:'Pivot SL Mode',type:'select',options:['SIGNAL_LOW','ATR']},
+  {key:'PIVOT_SL_BUFFER_ATR',label:'Pivot SL Buffer (×ATR)',type:'number'},
+  {key:'PIVOT_SL_ATR_MULT',label:'Pivot SL ATR Mult (ATR mode)',type:'number'},
+  {key:'PIVOT_MIN_ROOM_R',label:'Pivot Min Room to T1 (R)',type:'number'},
+  {key:'PIVOT_BE_TRIGGER_R',label:'Pivot BE Trigger (R)',type:'number'},
+  {key:'PIVOT_BE_BUFFER_PTS',label:'Pivot BE Buffer Pts',type:'number'},
+  {key:'PIVOT_T1_LOCK_PCT',label:'Pivot T1 Lock %',type:'number'},
+  {key:'PIVOT_TRAIL_ATR_MULT',label:'Pivot Trail ATR Mult',type:'number'},
+  {key:'PIVOT_MAX_TRADES_PER_DAY',label:'Pivot Max Trades/Day',type:'number'},
   {key:'SMART_ENTRY_MIN_BODY_ATR_RATIO',label:'Entry: Min Body/ATR',type:'number'},
   {key:'SMART_ENTRY_REQUIRE_EMA_SLOPE',label:'Entry: Req EMA Slope',type:'select',options:['false','true']},
   {key:'SMART_ENTRY_COOLDOWN_CANDLES',label:'Entry: Cooldown Candles',type:'number'},
@@ -1938,7 +2136,7 @@ pollOptLtp();setInterval(pollOptLtp,2000);
 poll();setInterval(poll,3000);
 
 // ── Strategies panel ─────────────────────────────────────────
-const ST_KEYS=['ENABLE_EMA_STRATEGY','ENABLE_ORB_STRATEGY','ENABLE_TRB_STRATEGY','ENABLE_OB_STRATEGY','ENABLE_MOMENTUM_PHASE','ENABLE_VWAP_STRATEGY','ENABLE_PDHL_STRATEGY','ENABLE_NATR_STRATEGY','ENABLE_ATR_COPILOT_STRATEGY'];
+const ST_KEYS=['ENABLE_EMA_STRATEGY','ENABLE_ORB_STRATEGY','ENABLE_TRB_STRATEGY','ENABLE_OB_STRATEGY','ENABLE_MOMENTUM_PHASE','ENABLE_VWAP_STRATEGY','ENABLE_PDHL_STRATEGY','ENABLE_NATR_STRATEGY','ENABLE_ATR_COPILOT_STRATEGY','ENABLE_PIVOT_STRATEGY'];
 let _stLoaded=false;
 async function loadStrategies(){if(_stLoaded)return;try{const env=await fetch('/api/env').then(r=>r.json());_envCache=env;ST_KEYS.forEach(k=>{const el=document.getElementById('st-'+k);if(el)el.checked=(env[k]==='true');});_stLoaded=true;}catch(e){console.error('loadStrategies:',e);}}
 function stToggle(key,val){/* state held in checkbox — no extra cache needed */}

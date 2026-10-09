@@ -285,3 +285,24 @@ def fetch_today_realised_pnl() -> float:
             (f"{today}%",),
         ).fetchone()
     return float(row[0]) if row else 0.0
+
+
+def fetch_today_pivot_trade_count(day: str) -> int:
+    """
+    Return the number of CE_PIVOT / PE_PIVOT trades that have been filled today.
+
+    Counts trades whose strategy_type ends with '_PIVOT', entry_order_id is not
+    'IMPORTED', and entry_time falls on the given IST date string (YYYY-MM-DD).
+    Used to seed the in-memory pivot trade counter after a bot restart so the
+    daily max-trades limit is not reset mid-day.
+    """
+    with _conn() as con:
+        row = con.execute(
+            "SELECT COUNT(*) FROM trades "
+            "WHERE strategy_type LIKE '%_PIVOT' "
+            "  AND entry_order_id != 'IMPORTED' "
+            "  AND (entry_time LIKE ? OR signal_timestamp LIKE ?) "
+            "  AND status IN ('OPEN', 'CLOSED')",
+            (f"{day}%", f"{day}%"),
+        ).fetchone()
+    return int(row[0]) if row else 0

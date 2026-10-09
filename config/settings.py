@@ -47,6 +47,10 @@ ENABLE_LIVE_TRADING: bool = _getbool("ENABLE_LIVE_TRADING", False)
 # ── Instrument ────────────────────────────────────────────────────────────────
 UNDERLYING: str = _get("UNDERLYING", "SENSEX")
 QUANTITY: int = _getint("QUANTITY", 20)
+# EMA-specific overrides — applied only when the signal is CE or PE (pure EMA strategy).
+# When set, these override the global value for EMA trades only.
+# 0 / empty = use the global value.
+EMA_QUANTITY: int           = _getint("EMA_QUANTITY", 0)        # 0 = use QUANTITY
 # Minimum option premium (LTP) required to place an entry order.
 # Entries are skipped when the option LTP is below this threshold.
 # Prevents buying near-expiry / deep-OTM options with no recovery room.
@@ -157,6 +161,16 @@ TIMEZONE: str = _get("TIMEZONE", "Asia/Kolkata")
 FORCE_EXIT_TIME: str = _get("FORCE_EXIT_TIME", "15:15")
 NO_NEW_ENTRY_AFTER: str = _get("NO_NEW_ENTRY_AFTER", "15:00")
 
+# EMA-specific time and RR overrides
+# EMA_NO_NEW_ENTRY_AFTER: stop taking new EMA CE/PE signals after this time.
+#   Empty = use global NO_NEW_ENTRY_AFTER.
+EMA_NO_NEW_ENTRY_AFTER: str = _get("EMA_NO_NEW_ENTRY_AFTER", "")
+# EMA_TARGET_RR: R:R ratio for EMA CE/PE target. 0 = use global SPOT_ATR_TARGET_RR.
+EMA_TARGET_RR: float        = _getfloat("EMA_TARGET_RR", 0.0)
+# EMA_COOLDOWN_CANDLES: cooldown after an EMA trade before the next EMA signal is allowed.
+#   0 = use global SMART_ENTRY_COOLDOWN_CANDLES.
+EMA_COOLDOWN_CANDLES: int   = _getint("EMA_COOLDOWN_CANDLES", 0)
+
 # ── Strategy Toggles ──────────────────────────────────────────────────────────
 ENABLE_EMA_STRATEGY: bool = _getbool("ENABLE_EMA_STRATEGY", True)
 ENABLE_ORB_STRATEGY: bool = _getbool("ENABLE_ORB_STRATEGY", True)
@@ -238,6 +252,20 @@ SMART_ENTRY_15M_MAX_GAP_PTS: float       = _getfloat("SMART_ENTRY_15M_MAX_GAP_PT
 # are needed to trigger the bypass. 0 = disabled. Recommended: 3.
 SMART_ENTRY_SQUEEZE_BYPASS: bool         = _getbool("SMART_ENTRY_SQUEEZE_BYPASS",         False)
 SMART_ENTRY_SQUEEZE_CANDLES: int         = _getint("SMART_ENTRY_SQUEEZE_CANDLES",          3)
+# Filter 7c — Squeeze-exempt strategies.
+# Comma-separated list of strategy suffixes that are NEVER subject to squeeze bypass,
+# even when SMART_ENTRY_SQUEEZE_BYPASS=true.
+# Rationale: bounce/retest strategies (VWAP, NATR) use a pullback candle sequence as
+# the retest setup itself — those same candles would incorrectly trigger squeeze bypass
+# and silence the 15m trend filter, allowing counter-trend entries on trending days.
+# Default: "VWAP,NATR" — these strategies always go through Filter 6 (15m trend).
+# "" = no exemptions (all strategies subject to squeeze bypass equally).
+_SQUEEZE_EXEMPT_RAW: str = _get("SMART_ENTRY_SQUEEZE_EXEMPT_STRATEGIES", "VWAP,NATR")
+SMART_ENTRY_SQUEEZE_EXEMPT_STRATEGIES: set[str] = (
+    {s.strip().upper() for s in _SQUEEZE_EXEMPT_RAW.split(",") if s.strip()}
+    if _SQUEEZE_EXEMPT_RAW.strip()
+    else set()
+)
 # Filter 7b — Relaxed body ratio during a squeeze move.
 # When squeeze bypass is active (N consecutive same-direction candles),
 # the body/ATR check uses this looser ratio instead of SMART_ENTRY_MIN_BODY_ATR_RATIO.
@@ -415,6 +443,78 @@ ENABLE_VWAP_STRATEGY: bool    = _getbool("ENABLE_VWAP_STRATEGY", False)
 VWAP_RETEST_LOOKBACK: int     = _getint("VWAP_RETEST_LOOKBACK", 3)
 # Minimum distance close must be above/below VWAP to confirm bounce (0 = disabled)
 VWAP_MIN_BOUNCE_PTS: float    = _getfloat("VWAP_MIN_BOUNCE_PTS", 0.0)
+
+# ── Pivot Levels (floor pivots) ──────────────────────────────────────────────
+# Standard floor-pivot levels computed from the previous day's H/L/C.
+#   P  = (H+L+C)/3
+#   R1 = 2P−L    R2 = P+(H−L)
+#   S1 = 2P−H    S2 = P−(H−L)
+#
+# ENABLE_PIVOT_LEVELS: fetch and store pivot levels at startup (for display + filter).
+#   false = no pivot computation, no filter, no display. Default.
+#   true  = levels fetched, shown on dashboard, and optionally filter EMA signals.
+#
+# PIVOT_ZONE_BUFFER: half-width (pts) of the no-trade zone around each pivot level.
+#   When price closes within this distance of P, R1, R2, S1, or S2 the EMA signal
+#   is suppressed — price is in a congestion/decision zone, not a clean breakout.
+#   0 = disabled (no zone filter).  Recommended: 20–30 pts for SENSEX.
+#
+# PIVOT_COUNTER_TREND_BLOCK: block EMA CE signals when close < Pivot (bearish bias)
+#   and EMA PE signals when close > Pivot (bullish bias).
+#   Only trade in the direction the pivot structure supports.
+#   false = disabled (recommended to start — can kill valid trend trades).
+#
+# PIVOT_BREAKOUT_CONFIRM: require price to be ABOVE R1 for CE (momentum above resistance)
+#   and BELOW S1 for PE (breakdown below support) before allowing EMA signal.
+#   false = disabled.  Use only on strongly trending days.
+ENABLE_PIVOT_LEVELS: bool       = _getbool("ENABLE_PIVOT_LEVELS", False)
+PIVOT_ZONE_BUFFER: float        = _getfloat("PIVOT_ZONE_BUFFER", 25.0)
+PIVOT_COUNTER_TREND_BLOCK: bool = _getbool("PIVOT_COUNTER_TREND_BLOCK", False)
+PIVOT_BREAKOUT_CONFIRM: bool    = _getbool("PIVOT_BREAKOUT_CONFIRM", False)
+
+# ── Pivot strategy (CE_PIVOT / PE_PIVOT) ──────────────────────────────────────
+# Two entry modes:
+#   OPEN_DIRECTION : open is already on one side of Pivot; first candles sustain.
+#                    Only fires in the 09:15–09:30 window.
+#   REJECTION      : open on wrong side, price travels to Pivot, gets rejected;
+#                    fires any time of day.
+#   BOTH           : Mode A checked first, then Mode B (default).
+#
+# Targets: CE → R1 (T1), R2 (T2), R3 (T3)  |  PE → S1 (T1), S2 (T2), S3 (T3)
+# Has its OWN SL/BE/TSL/target engine (execution/pivot_trade_manager.py) —
+# the generic TSL/target/smart-exit logic is bypassed.
+# Requires ENABLE_PIVOT_LEVELS=true.
+ENABLE_PIVOT_STRATEGY: bool     = _getbool("ENABLE_PIVOT_STRATEGY", False)
+# Entry mode: "OPEN_DIRECTION" | "REJECTION" | "BOTH"
+PIVOT_MODE: str                 = _get("PIVOT_MODE", "BOTH").upper()
+PIVOT_SUSTAIN_CANDLES: int      = _getint("PIVOT_SUSTAIN_CANDLES", 2)
+PIVOT_ATR_PERIOD: int           = _getint("PIVOT_ATR_PERIOD", 14)
+PIVOT_SL_MODE: str              = _get("PIVOT_SL_MODE", "SIGNAL_LOW").upper()   # SIGNAL_LOW | ATR
+PIVOT_SL_ATR_MULT: float        = _getfloat("PIVOT_SL_ATR_MULT", 1.0)          # ATR mode only
+PIVOT_SL_BUFFER_ATR: float      = _getfloat("PIVOT_SL_BUFFER_ATR", 0.05)       # SIGNAL_LOW padding
+PIVOT_MIN_ROOM_R: float         = _getfloat("PIVOT_MIN_ROOM_R", 1.0)           # T1 distance >= this × risk
+# Minimum today-candles before pivot signal is allowed.
+# For REJECTION mode: must be > PIVOT_SUSTAIN_CANDLES (at least 1 pre-window candle needed).
+# 3 = allow REJECTION from the 4th candle onward (09:30).  0 = disabled.
+PIVOT_MIN_TODAY_CANDLES: int    = _getint("PIVOT_MIN_TODAY_CANDLES", 3)
+# Open-Direction window: only fires when last sustain candle is within [start, end].
+# Default 09:15–09:30 = first three 5-minute bars of the session.
+PIVOT_OD_WINDOW_START: str      = _get("PIVOT_OD_WINDOW_START", "09:15")
+PIVOT_OD_WINDOW_END: str        = _get("PIVOT_OD_WINDOW_END", "09:30")
+# Rejection zone: how close the pre-window high/low must come to the Pivot to
+# count as a genuine probe.  Expressed as a multiple of ATR.
+# 0.3 = within 0.3×ATR of the Pivot (e.g. ATR=150 → within 45 pts).
+PIVOT_REJECTION_ZONE_ATR: float = _getfloat("PIVOT_REJECTION_ZONE_ATR", 0.3)
+PIVOT_BE_TRIGGER_R: float       = _getfloat("PIVOT_BE_TRIGGER_R", 1.0)         # move to BE after +1R
+PIVOT_BE_BUFFER_PTS: float      = _getfloat("PIVOT_BE_BUFFER_PTS", 5.0)        # index pts above entry at BE
+PIVOT_T1_LOCK_PCT: float        = _getfloat("PIVOT_T1_LOCK_PCT", 0.5)          # lock 50% of T1 gain at T1
+PIVOT_T2_LOCK_PCT: float        = _getfloat("PIVOT_T2_LOCK_PCT", 0.5)          # lock 50% of T1→T2 range at T2
+PIVOT_TRAIL_ATR_MULT: float     = _getfloat("PIVOT_TRAIL_ATR_MULT", 1.0)       # chandelier after T1
+PIVOT_T2_TRAIL_ATR_MULT: float  = _getfloat("PIVOT_T2_TRAIL_ATR_MULT", 0.75)   # tighter trail after T2 (0=same)
+PIVOT_HARD_SL_CUSHION: float    = _getfloat("PIVOT_HARD_SL_CUSHION", 1.25)     # broker SL backstop width
+PIVOT_OPTION_DELTA: float       = _getfloat("PIVOT_OPTION_DELTA", 0.4)
+PIVOT_MAX_TRADES_PER_DAY: int   = _getint("PIVOT_MAX_TRADES_PER_DAY", 3)
+
 
 # ── PDHL (Previous Day High/Low) Breakout strategy ───────────────────────────
 # Fires CE_PDHL/PE_PDHL when price breaks convincingly above PDH or below PDL.

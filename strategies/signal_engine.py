@@ -26,12 +26,14 @@ Smart Entry Filter (optional):
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Sequence
 from datetime import datetime, time
 from typing import Literal
 
 from config import settings
 from market.candle_builder import Candle
+from market.historical_data import PivotLevels
 from persistence.trade_store import has_processed_signal, record_processed_signal
 from strategies.ce_strategy import is_ce_signal
 from strategies.pe_strategy import is_pe_signal
@@ -46,7 +48,61 @@ _session_qualifier = SessionQualifier(
     unblock_time=getattr(settings, "ORB_QUALIFIER_UNBLOCK_TIME", None) or "13:30"
 )
 
-SignalType = Literal["CE", "PE", "CE_ORB", "PE_ORB", "CE_OB", "PE_OB", "CE_MOM", "PE_MOM", "CE_TRB", "PE_TRB", "CE_VWAP", "PE_VWAP", "CE_PDHL", "PE_PDHL", "CE_NATR", "PE_NATR", "CE_ATR", "PE_ATR", None]
+# ── EMA-specific cooldown counter ─────────────────────────────────────────────
+# Independent of the global SmartEntry cooldown — only applies to CE/PE signals.
+# Counts down on every candle evaluation. Reset on date change.
+_ema_cooldown_left: int = 0
+_ema_cooldown_date: str = ""
+
+SignalType = Literal["CE", "PE", "CE_ORB", "PE_ORB", "CE_OB", "PE_OB", "CE_MOM", "PE_MOM", "CE_TRB", "PE_TRB", "CE_VWAP", "PE_VWAP", "CE_PDHL", "PE_PDHL", "CE_NATR", "PE_NATR", "CE_ATR", "PE_ATR", "CE_PIVOT", "PE_PIVOT", None]
+
+# FIX (Flaw 15): protect last_pivot_setup with a lock.
+# The setup is written by evaluate_signals (candle-close thread) and read by
+# execute_entry (same thread under _tick_lock), but consume_pivot_setup() makes
+# the read-and-clear atomic so there is no window where a second evaluation can
+# overwrite the setup between the read and the entry construction.
+_pivot_setup_lock = threading.Lock()
+_last_pivot_setup = None   # internal — access only via consume_pivot_setup()
+
+
+def consume_pivot_setup():
+    """Atomically read and clear the pending pivot setup.
+
+    Returns the PivotSetup that triggered the most recent CE_PIVOT/PE_PIVOT
+    signal, then resets the stored value to None.  Thread-safe: a concurrent
+    evaluate_signals call that writes a new setup will not race with this read
+    because both operations hold _pivot_setup_lock.
+    """
+    global _last_pivot_setup
+    with _pivot_setup_lock:
+        setup = _last_pivot_setup
+        _last_pivot_setup = None
+        return setup
+
+
+# FIX (Flaw 17): _pivot_trades_today is seeded from the DB on first access
+# so a bot restart mid-day does not reset the counter to 0.
+_pivot_trades_today: dict[str, int] = {}
+_pivot_counter_seeded: set[str] = set()  # days whose DB count has been loaded
+
+
+def _seed_pivot_count(day: str) -> None:
+    """Load today's filled pivot trade count from the DB (once per day)."""
+    if day in _pivot_counter_seeded:
+        return
+    try:
+        from persistence.trade_store import fetch_today_pivot_trade_count
+        db_count = fetch_today_pivot_trade_count(day)
+        if db_count > _pivot_trades_today.get(day, 0):
+            _pivot_trades_today[day] = db_count
+    except Exception as exc:
+        logger.warning("Could not seed pivot trade counter from DB: %s", exc)
+    _pivot_counter_seeded.add(day)
+
+
+def note_pivot_trade(day: str) -> None:
+    """Count a filled Pivot trade toward PIVOT_MAX_TRADES_PER_DAY."""
+    _pivot_trades_today[day] = _pivot_trades_today.get(day, 0) + 1
 
 
 def _signal_id(strategy: str, candle_ts: datetime) -> str:
@@ -78,6 +134,7 @@ def evaluate_signals(
     vwap: float | None = None,
     prev_day_high: float | None = None,
     prev_day_low:  float | None = None,
+    pivot_levels: "PivotLevels | None" = None,
     ema9: float | None = None,
     ema21: float | None = None,
     atr: float | None = None,
@@ -256,6 +313,52 @@ def evaluate_signals(
             if (sig := _gate("PE_ORB")) is not None:
                 return sig
 
+    # ── Pivot Sustain strategy ─────────────────────────────────────────────────
+    # Own risk engine — deliberately bypasses SmartEntry (the sustain + room
+    # filters are its quality gate; validated in _pivot_research.py).
+    # FIX (Flaw 6): pivot is evaluated independently of _candle_already_attempted()
+    # because it has its own DB-backed dedup (has_processed_signal).  Sharing the
+    # candle guard with EMA/VWAP/ORB would silently skip valid pivot setups whenever
+    # another strategy fired first on the same candle.  Pivot DOES set
+    # _candle_attempted=True after firing so it blocks other strategies.
+    if settings.ENABLE_PIVOT_STRATEGY and pivot_levels is not None:
+        global _last_pivot_setup
+        from strategies.pivot_strategy import find_pivot_setup
+        _day = str(latest_5m_ts.date())
+        # FIX (Flaw 17): seed counter from DB on first candle of the day so a
+        # mid-day restart does not reset the max-trades guard to 0.
+        _seed_pivot_count(_day)
+        if _pivot_trades_today.get(_day, 0) < settings.PIVOT_MAX_TRADES_PER_DAY:
+            setup = find_pivot_setup(
+                candles_5m, pivot_levels,
+                sustain_candles=settings.PIVOT_SUSTAIN_CANDLES,
+                atr_period=settings.PIVOT_ATR_PERIOD,
+                sl_mode=settings.PIVOT_SL_MODE,
+                sl_atr_mult=settings.PIVOT_SL_ATR_MULT,
+                sl_buffer_atr=settings.PIVOT_SL_BUFFER_ATR,
+                min_room_r=settings.PIVOT_MIN_ROOM_R,
+                min_today_candles=settings.PIVOT_MIN_TODAY_CANDLES,
+                pivot_mode=settings.PIVOT_MODE,
+                od_window_start=_parse_time(settings.PIVOT_OD_WINDOW_START),
+                od_window_end=_parse_time(settings.PIVOT_OD_WINDOW_END),
+                rejection_zone_atr=settings.PIVOT_REJECTION_ZONE_ATR,
+            )
+            if setup is not None:
+                sig_name = f"{setup.side}_PIVOT"
+                log_event(logger, f"{sig_name}_SIGNAL", candle=latest_5m_ts,
+                          mode=setup.mode, entry=setup.entry,
+                          stop=setup.stop, risk=setup.risk,
+                          t1=setup.t1, t2=setup.t2, t3=setup.t3, atr=setup.atr)
+                sig_id = _signal_id(sig_name, latest_5m_ts)
+                if not has_processed_signal(sig_id):
+                    _candle_attempted = True
+                    record_processed_signal(sig_id, sig_name, latest_5m_ts.isoformat())
+                    # FIX (Flaw 15): write setup under the lock so consume_pivot_setup()
+                    # in execute_entry always sees a consistent value.
+                    with _pivot_setup_lock:
+                        _last_pivot_setup = setup
+                    return sig_name  # type: ignore[return-value]
+
     # ── VWAP Retest strategy ───────────────────────────────────────────────────
     if settings.ENABLE_VWAP_STRATEGY and not _sq_blocked and not _candle_already_attempted():
         from strategies.vwap_strategy import is_vwap_ce_signal, is_vwap_pe_signal
@@ -353,15 +456,80 @@ def evaluate_signals(
                 return sig
 
     # ── Phase 1: Standard EMA strategy ─────────────────────────────────────────
+    global _ema_cooldown_left, _ema_cooldown_date
+    _today_str = str(latest_5m_ts.date())
+    if _ema_cooldown_date != _today_str:
+        _ema_cooldown_date  = _today_str
+        _ema_cooldown_left  = 0
+
+    # Tick down EMA cooldown on every candle
+    if _ema_cooldown_left > 0:
+        _ema_cooldown_left -= 1
+
     if settings.ENABLE_EMA_STRATEGY and not _sq_blocked and not _candle_already_attempted():
-        if is_ce_signal(candles_5m, candles_15m):
+        _close = candles_5m[-1].close
+
+        # ── Pivot zone / trend filter (opt-in) ─────────────────────────────────
+        # Applied only to EMA CE/PE — other strategies are unaffected.
+        _pivot_ce_ok = True
+        _pivot_pe_ok = True
+        if pivot_levels is not None:
+            _all_levels = [pivot_levels.pivot, pivot_levels.r1, pivot_levels.r2,
+                           pivot_levels.s1, pivot_levels.s2]
+
+            # Zone filter: block if close is within PIVOT_ZONE_BUFFER of any level
+            if settings.PIVOT_ZONE_BUFFER > 0:
+                for lvl in _all_levels:
+                    if abs(_close - lvl) <= settings.PIVOT_ZONE_BUFFER:
+                        log_event(logger, "EMA_BLOCKED_PIVOT_ZONE",
+                                  candle=latest_5m_ts, close=round(_close, 2),
+                                  level=round(lvl, 2), buffer=settings.PIVOT_ZONE_BUFFER)
+                        _pivot_ce_ok = False
+                        _pivot_pe_ok = False
+                        break
+
+            # Counter-trend filter: CE below Pivot = bearish bias; PE above Pivot = bullish bias
+            if settings.PIVOT_COUNTER_TREND_BLOCK and _pivot_ce_ok:
+                if _close < pivot_levels.pivot:
+                    log_event(logger, "CE_BLOCKED_PIVOT_COUNTER_TREND",
+                              candle=latest_5m_ts, close=round(_close, 2),
+                              pivot=pivot_levels.pivot)
+                    _pivot_ce_ok = False
+                if _close > pivot_levels.pivot:
+                    log_event(logger, "PE_BLOCKED_PIVOT_COUNTER_TREND",
+                              candle=latest_5m_ts, close=round(_close, 2),
+                              pivot=pivot_levels.pivot)
+                    _pivot_pe_ok = False
+
+            # Breakout-confirm filter: CE requires close > R1; PE requires close < S1
+            if settings.PIVOT_BREAKOUT_CONFIRM and _pivot_ce_ok:
+                if _close <= pivot_levels.r1:
+                    log_event(logger, "CE_BLOCKED_PIVOT_BREAKOUT",
+                              candle=latest_5m_ts, close=round(_close, 2),
+                              r1=pivot_levels.r1)
+                    _pivot_ce_ok = False
+            if settings.PIVOT_BREAKOUT_CONFIRM and _pivot_pe_ok:
+                if _close >= pivot_levels.s1:
+                    log_event(logger, "PE_BLOCKED_PIVOT_BREAKOUT",
+                              candle=latest_5m_ts, close=round(_close, 2),
+                              s1=pivot_levels.s1)
+                    _pivot_pe_ok = False
+
+        # EMA-specific cooldown check (separate from global SmartEntry cooldown)
+        _ema_cd = settings.EMA_COOLDOWN_CANDLES if settings.EMA_COOLDOWN_CANDLES > 0 else 0
+        if _ema_cd > 0 and _ema_cooldown_left > 0:
+            log_event(logger, "EMA_BLOCKED_COOLDOWN",
+                      candle=latest_5m_ts, candles_remaining=_ema_cooldown_left)
+        elif _pivot_ce_ok and is_ce_signal(candles_5m, candles_15m):
             log_event(logger, "CE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
             if (sig := _gate("CE")) is not None:
+                _ema_cooldown_left = _ema_cd   # start cooldown after EMA trade
                 return sig
 
-        if not _candle_already_attempted() and is_pe_signal(candles_5m, candles_15m):
+        if not _candle_already_attempted() and (_ema_cd == 0 or _ema_cooldown_left == 0) and _pivot_pe_ok and is_pe_signal(candles_5m, candles_15m):
             log_event(logger, "PE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
             if (sig := _gate("PE")) is not None:
+                _ema_cooldown_left = _ema_cd   # start cooldown after EMA trade
                 return sig
 
     # ── Phase 2: Momentum strategy (opt-in) ────────────────────────────────────

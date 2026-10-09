@@ -1,0 +1,4 @@
+n,signal,symbol,entry_time,sensex,entry,qty,sl_mode,sl_pts,be_pts,trail_pts,tgt_pts,init_stop,init_target,peak,mfe_pts,be_hit,trail_steps,final_stop,exit_time,exit_px,exit_reason,pnl_pts,pnl_rs
+1,PE_VWAP,SENSEX26O0872400PE,09:20,72409.61,205.5,20,spot_atr,102.75,51.4,30.8,154.1,102.75,359.6,282.0,76.5,Y,1,250.9,09:29,250.9,TSL_HIT (profit locked),45.4,908.0
+2,PE_VWAP,SENSEX26O0872400PE,09:30,72354.39,244.15,20,spot_atr,122.1,61.05,36.65,183.15,122.05,427.3,323.0,78.85,Y,3,288.8,09:49,288.8,TSL_HIT (profit locked),44.65,893.0
+3,PE_VWAP,SENSEX26O0872200PE,10:25,72217.62,157.45,20,spot_atr,78.7,39.35,23.6,118.05,78.75,275.5,198.5,41.05,Y,1,166.25,10:35,166.25,TSL_HIT (profit locked),8.8,176.0

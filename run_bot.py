@@ -18,6 +18,7 @@ import sys
 import time
 import signal
 import os
+import atexit
 from datetime import datetime, time as dtime
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -25,6 +26,41 @@ RESTART_DELAY_SECS   = 10    # wait before restarting after unexpected exit
 MARKET_OPEN_H        = 9     # don't restart before this hour (IST)
 MARKET_CLOSE_H       = 15    # don't restart after this hour (IST)
 MARKET_CLOSE_M       = 30    # don't restart after 15:30 IST
+
+_LAUNCHER_PID_FILE = ".launcher.pid"
+
+# ── Single-instance guard ─────────────────────────────────────────────────────
+def _acquire_launcher_lock() -> None:
+    """Exit immediately if another launcher is already running."""
+    if os.path.exists(_LAUNCHER_PID_FILE):
+        try:
+            with open(_LAUNCHER_PID_FILE) as f:
+                existing_pid = int(f.read().strip())
+            # Check if that PID is still alive
+            try:
+                os.kill(existing_pid, 0)   # signal 0 = existence check only
+                print(
+                    f"[Launcher] Another launcher is already running (PID {existing_pid}). "
+                    "Exiting to prevent duplicate bot instances.",
+                    flush=True,
+                )
+                sys.exit(0)
+            except (ProcessLookupError, PermissionError):
+                pass  # PID is gone — stale file, continue
+        except (ValueError, OSError):
+            pass  # Unreadable file — overwrite it
+
+    with open(_LAUNCHER_PID_FILE, "w") as f:
+        f.write(str(os.getpid()))
+    atexit.register(_release_launcher_lock)
+
+
+def _release_launcher_lock() -> None:
+    try:
+        os.remove(_LAUNCHER_PID_FILE)
+    except OSError:
+        pass
+
 
 # ── State ─────────────────────────────────────────────────────────────────────
 _stop_launcher = False
@@ -57,6 +93,8 @@ def _ts() -> str:
 
 def main():
     global _stop_launcher
+
+    _acquire_launcher_lock()
 
     print("=" * 60)
     print("  SENSEX Auto-Trader — Persistent Launcher")

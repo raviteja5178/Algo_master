@@ -91,12 +91,12 @@ def fetch_historical_candles(
     return candles
 
 
-def fetch_previous_day_hl(instrument_token: int) -> tuple[float | None, float | None]:
+def fetch_previous_day_hl(instrument_token: int) -> tuple[float | None, float | None, float | None]:
     """
-    Return (prev_day_high, prev_day_low) for the most recent completed trading day.
+    Return (prev_day_high, prev_day_low, prev_day_close) for the most recent completed trading day.
 
-    Fetches the last 5 daily candles and returns the HIGH and LOW of the
-    most recent day that is strictly before today.  Returns (None, None)
+    Fetches the last 7 calendar days of daily candles and returns the HIGH, LOW and CLOSE of the
+    most recent day that is strictly before today.  Returns (None, None, None)
     on any error or if no prior-day data is available.
     """
     from datetime import date as _date
@@ -112,7 +112,7 @@ def fetch_previous_day_hl(instrument_token: int) -> tuple[float | None, float | 
         )
     except Exception as exc:
         logger.error("fetch_previous_day_hl failed: %s", exc)
-        return None, None
+        return None, None, None
 
     today = _date.today()
     # records are chronological oldest-first; find the last day before today
@@ -123,9 +123,98 @@ def fetch_previous_day_hl(instrument_token: int) -> tuple[float | None, float | 
             prev = r
     if prev is None:
         logger.warning("fetch_previous_day_hl: no prior-day candle found.")
-        return None, None
+        return None, None, None
 
     pdh = float(prev["high"])
     pdl = float(prev["low"])
-    log_event(logger, "PREV_DAY_HL_LOADED", pdh=pdh, pdl=pdl, date=str(prev["date"])[:10])
-    return pdh, pdl
+    pdc = float(prev["close"])
+    log_event(logger, "PREV_DAY_HL_LOADED", pdh=pdh, pdl=pdl, pdc=pdc, date=str(prev["date"])[:10])
+    return pdh, pdl, pdc
+
+
+# ── Pivot-level dataclass ─────────────────────────────────────────────────────
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class PivotLevels:
+    """Standard floor-pivot levels computed from the previous day's OHLC.
+
+    R3 = High + 2(PP - Low)
+    S3 = Low  - 2(High - PP)
+    """
+    pivot: float
+    r1: float
+    r2: float
+    r3: float
+    s1: float
+    s2: float
+    s3: float
+    prev_high: float
+    prev_low:  float
+    prev_close: float
+
+
+def fetch_pivot_levels(instrument_token: int) -> PivotLevels | None:
+    """
+    Compute standard floor-pivot levels from the previous completed trading day.
+
+    Formula:
+        P  = (H + L + C) / 3
+        R1 = 2P − L
+        R2 = P + (H − L)
+        S1 = 2P − H
+        S2 = P − (H − L)
+
+    Returns None on any error or if no prior-day data is available.
+    """
+    from datetime import date as _date
+    kite      = get_kite()
+    to_date   = datetime.now(IST).replace(tzinfo=None)
+    from_date = to_date - timedelta(days=7)
+    try:
+        records = kite.historical_data(
+            instrument_token=instrument_token,
+            from_date=from_date.strftime("%Y-%m-%d %H:%M:%S"),
+            to_date=to_date.strftime("%Y-%m-%d %H:%M:%S"),
+            interval="day",
+        )
+    except Exception as exc:
+        logger.error("fetch_pivot_levels failed: %s", exc)
+        return None
+
+    today = _date.today()
+    prev  = None
+    for r in records:
+        ts = IST.localize(r["date"]) if r["date"].tzinfo is None else r["date"]
+        if ts.date() < today:
+            prev = r
+    if prev is None:
+        logger.warning("fetch_pivot_levels: no prior-day candle found.")
+        return None
+
+    H = float(prev["high"])
+    L = float(prev["low"])
+    C = float(prev["close"])
+    P  = (H + L + C) / 3.0
+
+    levels = PivotLevels(
+        pivot      = round(P, 2),
+        r1         = round(2 * P - L, 2),
+        r2         = round(P + (H - L), 2),
+        r3         = round(H + 2 * (P - L), 2),
+        s1         = round(2 * P - H, 2),
+        s2         = round(P - (H - L), 2),
+        s3         = round(L - 2 * (H - P), 2),
+        prev_high  = H,
+        prev_low   = L,
+        prev_close = C,
+    )
+    log_event(
+        logger, "PIVOT_LEVELS_LOADED",
+        date=str(prev["date"])[:10],
+        P=levels.pivot, R1=levels.r1, R2=levels.r2, R3=levels.r3,
+        S1=levels.s1,  S2=levels.s2,  S3=levels.s3,
+    )
+    return levels
