@@ -112,6 +112,37 @@ def atr_at(candles: Sequence[Candle], period: int = 14, index: int = -1) -> floa
     val = result[index]
     return float(val) if val is not None else None
 
+def rsi(values: Sequence[Union[Candle, float]], period: int = 14) -> list[float | None]:
+    """
+    Wilder RSI, list parallel to *values* (oldest first).
+    Items before the first full `period` of price changes are None.
+    """
+    closes = _closes(values)
+    n = len(closes)
+    result: list[float | None] = [None] * n
+    if n <= period:
+        return result
+
+    gains = [max(closes[i] - closes[i - 1], 0.0) for i in range(1, n)]
+    losses = [max(closes[i - 1] - closes[i], 0.0) for i in range(1, n)]
+
+    avg_gain = sum(gains[:period]) / period
+    avg_loss = sum(losses[:period]) / period
+
+    def _val(g: float, l: float) -> float:
+        if l == 0:
+            return 100.0 if g > 0 else 50.0
+        return 100.0 - 100.0 / (1.0 + g / l)
+
+    result[period] = _val(avg_gain, avg_loss)
+    for i in range(period + 1, n):
+        avg_gain = (avg_gain * (period - 1) + gains[i - 1]) / period
+        avg_loss = (avg_loss * (period - 1) + losses[i - 1]) / period
+        result[i] = _val(avg_gain, avg_loss)
+    return result
+
+
+
 def swing_levels(
     candles: Sequence[Candle],
     length: int = 10,

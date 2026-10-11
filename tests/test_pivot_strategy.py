@@ -258,6 +258,188 @@ class TestBothMode:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Mode C — Cross-and-Acceptance
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Oct-9 shape: open below P, two closes below P (with wicks above), a cross
+# candle that closes above P but wicks back below, then clean candles above.
+_OCT9_PRE = [
+    (990, 1004, 988, 995),    # opens below P, wick above, closes below
+    (995, 1002, 990, 996),    # closes below P
+    (996, 1010, 994, 1008),   # CROSS: closes above P, low 994 < P (dirty)
+]
+
+
+class TestModeC:
+    def test_oct9_shape_fires_on_first_clean_window(self):
+        candles = _series_rejection(_OCT9_PRE, [1012, 1015])
+        s = find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="BOTH",
+                             min_today_candles=0, enable_acceptance=True)
+        assert s is not None and s.side == "CE" and s.mode == "ACCEPTANCE"
+        assert s.entry == 1015 and s.t1 == 1100
+        assert s.stop < 1009   # below lowest low of clean window (1012-3=1009)
+
+    def test_modes_a_and_b_miss_oct9_shape(self):
+        """Regression: without Mode C the Oct-9 shape produces no signal."""
+        candles = _series_rejection(_OCT9_PRE, [1012, 1015])
+        assert find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="BOTH",
+                                min_today_candles=0) is None
+
+    def test_window_with_dirty_cross_candle_does_not_fire(self):
+        """Window = [cross candle, 1012] → cross candle wick below P → not clean."""
+        candles = _series_rejection(_OCT9_PRE, [1012])
+        assert find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="BOTH",
+                                min_today_candles=0, enable_acceptance=True) is None
+
+    def test_fires_only_once_per_cross(self):
+        candles = _series_rejection(_OCT9_PRE, [1012, 1015, 1018])
+        assert find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="BOTH",
+                                min_today_candles=0, enable_acceptance=True) is None
+
+    def test_new_cross_fires_again(self):
+        """Close back below P, then a fresh clean acceptance → new signal."""
+        candles = _series_rejection(
+            _OCT9_PRE + [(1012, 1015, 1009, 1012), (1012, 1013, 990, 995)],
+            [1006, 1010],
+        )
+        # pivot_mode="NONE" isolates Mode C (B would also legitimately fire here)
+        s = find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="NONE",
+                             min_today_candles=0, enable_acceptance=True)
+        assert s is not None and s.side == "CE" and s.mode == "ACCEPTANCE"
+
+    def test_open_below_cross_on_first_candle(self):
+        """No candle ever closed below P, but the day OPENED below P → reference = open."""
+        candles = _series_rejection([(990, 1008, 988, 1005)], [1010, 1015])
+        s = find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="BOTH",
+                             min_today_candles=0, enable_acceptance=True)
+        assert s is not None and s.side == "CE" and s.mode == "ACCEPTANCE"
+
+    def test_open_above_never_below_does_not_fire_acceptance(self):
+        """Gap-up day that never crossed: no wrong side → Mode C silent (A handles opens)."""
+        candles = _series_rejection([(1010, 1014, 1004, 1008)], [1012, 1015, 1018])
+        assert find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="REJECTION",
+                                min_today_candles=0, enable_acceptance=True) is None
+
+    def test_pe_mirror(self):
+        pre = [
+            (1010, 1012, 996, 1005),
+            (1005, 1010, 998, 1004),
+            (1004, 1006, 990, 992),    # cross down, high 1006 > P (dirty)
+        ]
+        candles = _series_rejection(pre, [988, 985])
+        s = find_pivot_setup(candles, PV_PE, sustain_candles=2, pivot_mode="BOTH",
+                             min_today_candles=0, enable_acceptance=True)
+        assert s is not None and s.side == "PE" and s.mode == "ACCEPTANCE"
+        assert s.t1 == 900
+
+    def test_room_filter_applies(self):
+        candles = _series_rejection(_OCT9_PRE, [1012, 1015])
+        assert find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="BOTH",
+                                min_today_candles=0, enable_acceptance=True,
+                                min_room_r=50.0) is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Level Bounce / Rejection (S/R)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestBounce:
+    # ATR from yesterday's 6-pt-range candles ≈ 6 → zone 0.5×ATR ≈ 3 pts.
+
+    def test_ce_support_bounce_at_pivot(self):
+        """Above P, pull back, wick into P, bullish close back above → CE BOUNCE."""
+        candles = _series_rejection(
+            [(1020, 1022, 1012, 1015), (1015, 1016, 1008, 1010),
+             (1010, 1018, 999, 1016)],   # wick to 999, bullish close 1016
+            [],
+        )
+        s = find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="NONE",
+                             min_today_candles=0, bounce_zone_atr=0.5)
+        assert s is not None and s.side == "CE" and s.mode == "BOUNCE"
+        assert (s.t1, s.t2, s.t3) == (1100, 1200, 1300)
+        assert s.stop < 999
+
+    def test_pe_resistance_rejection_at_r1(self):
+        """Below R1, rally, wick into R1, bearish close back below → PE BOUNCE."""
+        candles = _series_rejection(
+            [(1080, 1088, 1078, 1085), (1085, 1092, 1083, 1090),
+             (1090, 1102, 1082, 1084)],  # wick to 1102, bearish close 1084
+            [],
+        )
+        s = find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="NONE",
+                             min_today_candles=0, bounce_zone_atr=0.5)
+        assert s is not None and s.side == "PE" and s.mode == "BOUNCE"
+        assert (s.t1, s.t2, s.t3) == (1000, 900, 800)
+        assert s.stop > 1102
+
+    def test_no_bounce_without_confirming_body(self):
+        """Wick into P but bearish close (still above P) → no signal."""
+        candles = _series_rejection(
+            [(1020, 1022, 1012, 1015), (1015, 1016, 1008, 1012),
+             (1012, 1013, 999, 1003)],
+            [],
+        )
+        assert find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="NONE",
+                                min_today_candles=0, bounce_zone_atr=0.5) is None
+
+    def test_close_through_level_is_not_bounce(self):
+        """Candle closes below P → breakdown, not a support bounce."""
+        candles = _series_rejection(
+            [(1020, 1022, 1012, 1015), (1015, 1016, 1008, 1010),
+             (1004, 1006, 990, 998)],
+            [],
+        )
+        s = find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="NONE",
+                             min_today_candles=0, bounce_zone_atr=0.5)
+        assert s is None or s.side != "CE"
+
+    # ── quality filters ──────────────────────────────────────────────────
+    _CE_BOUNCE = [(1020, 1022, 1012, 1015), (1015, 1016, 1008, 1010),
+                  (1010, 1018, 999, 1016)]   # signal: range 19, lower wick 11
+
+    def _run(self, pre, **kw):
+        return find_pivot_setup(_series_rejection(pre, []), PV, sustain_candles=2,
+                                pivot_mode="NONE", min_today_candles=0,
+                                bounce_zone_atr=0.5, **kw)
+
+    def test_range_filter(self):
+        assert self._run(self._CE_BOUNCE, bounce_min_range_atr=1.0) is not None
+        assert self._run(self._CE_BOUNCE, bounce_min_range_atr=50.0) is None
+
+    def test_wick_filter(self):
+        assert self._run(self._CE_BOUNCE, bounce_min_wick_pct=0.5) is not None   # 11/19=0.58
+        assert self._run(self._CE_BOUNCE, bounce_min_wick_pct=0.7) is None
+
+    def test_trend_filter_blocks_ce_below_ema(self):
+        # yesterday's EMA ~990 → CE entry 1016 is above → allowed
+        assert self._run(self._CE_BOUNCE, bounce_trend_ema=21) is not None
+        # strong prior trend from 1100 keeps EMA above entry → blocked
+        high_pre = [(1100, 1102, 1098, 1100)] * 20 + self._CE_BOUNCE
+        assert self._run(high_pre, bounce_trend_ema=21) is None
+
+    def test_confirm_next(self):
+        # signal candle alone → no entry yet
+        assert self._run(self._CE_BOUNCE, bounce_confirm_next=True) is None
+        # next candle closes above signal high (1018) → CE at 1020
+        s = self._run(self._CE_BOUNCE + [(1016, 1022, 1014, 1020)], bounce_confirm_next=True)
+        assert s is not None and s.side == "CE" and s.mode == "BOUNCE" and s.entry == 1020
+        # next candle fails to break the high → no entry
+        assert self._run(self._CE_BOUNCE + [(1016, 1017, 1012, 1014)],
+                         bounce_confirm_next=True) is None
+
+    def test_disabled_by_default(self):
+        candles = _series_rejection(
+            [(1020, 1022, 1012, 1015), (1015, 1016, 1008, 1010),
+             (1010, 1018, 999, 1016)],
+            [],
+        )
+        assert find_pivot_setup(candles, PV, sustain_candles=2, pivot_mode="NONE",
+                                min_today_candles=0) is None
+
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PivotLevels R3/S3 computation sanity check
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -461,3 +643,248 @@ class TestPivotTradeManager:
         r = PivotTradeManager.load("T1")
         assert r is not None and r.stop_index == m.stop_index and r.stage == "BE"
         assert PivotTradeManager.load("OTHER") is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mode A — Open-Direction quality filters (Oct 9 regression)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestModeAQualityFilters:
+    """
+    Regression tests for the three OD quality filters added to fix the
+    Oct 9 PE_PIVOT false signal.
+
+    Oct 9 facts (scaled to the test pivot=1000):
+      Pivot  = 1000
+      ATR    = 114  → scaled ATR = 100
+      Open   = 990  → gap = 10 pts = 0.10×ATR  (very close to Pivot)
+      First candle: open=990, high=1000 (touches Pivot), close=990
+        upper wick = 1000 − 990 = 10 pts = 0.10×ATR
+        body: 990 == 990 → doji (no bearish body)
+
+    With legacy defaults all filters are OFF → PE fires.
+    Enabling each filter independently must block the trade.
+    """
+
+    # Scaled test pivot  (Pivot=1000, ATR≈100)
+    _PV = PivotLevels(
+        pivot=1000.0, r1=1100.0, r2=1200.0, r3=1300.0,
+        s1=900.0, s2=800.0, s3=700.0,
+        prev_high=1100, prev_low=900, prev_close=1001,
+    )
+
+    def _oct9_candles(self) -> list[Candle]:
+        """
+        Reproduce Oct 9 candle structure at test scale.
+
+        Oct 9 actual data (scaled):
+          First candle (09:15): open=990, high=999.9 (just below Pivot), close=990  (doji)
+            upper wick = 999.9 − 990 = 9.9 pts ≈ 0.10×ATR
+          Second candle (09:20, sustain[0]): close=992, high=998 (below Pivot)
+          Third candle (09:25, sustain[1]): close=990, high=997 (below Pivot)
+
+        NOTE: high must be STRICTLY < Pivot (1000) for the sustained check to pass.
+        On Oct 9 the real first candle's high was 71871.28, Pivot was 71871.65 — a
+        difference of only 0.37 pts (strictly below).  We mirror that: high=999.9.
+        The key signals are:
+          - open within the noise band of Pivot (gap=10 pts = 0.10×ATR) → gap filter
+          - doji body (open==close) → first_candle_confirm filter
+          - large upper wick reaching near Pivot → wick filter
+        """
+        from datetime import date, timedelta
+        y = date.today() - timedelta(days=1)
+        t = date.today()
+        # 20 yesterday candles with range=200 so ATR(14)≈100
+        out = [
+            Candle(
+                datetime(y.year, y.month, y.day, 9, 15) + timedelta(minutes=5 * i),
+                980, 1080, 880, 980,  # range=200 → ATR≈100
+            )
+            for i in range(20)
+        ]
+        # First today candle: open=990, high=999.9 (just below Pivot), close=990 (doji)
+        # Upper wick = 999.9 − 990 = 9.9 pts ≈ 0.10×ATR — models the Pivot probe
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 15), 990, 999.9, 985, 990))
+        # Second today candle (sustain[0]): below Pivot, high<1000
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 20), 990, 998, 985, 992))
+        return out
+
+    def test_legacy_defaults_fire(self):
+        """With all filters OFF (defaults), PE fires — baseline must hold."""
+        candles = self._oct9_candles()
+        s = find_pivot_setup(candles, self._PV, sustain_candles=2,
+                             pivot_mode="OPEN_DIRECTION", min_today_candles=0)
+        assert s is not None and s.side == "PE", (
+            "Baseline broken: expected PE to fire with all OD filters OFF"
+        )
+
+    def test_min_od_gap_atr_blocks_near_pivot_open(self):
+        """
+        Open=990 is 10 pts from Pivot=1000.
+        With ATR≈100, gap=0.10×ATR.
+        Setting min_od_gap_atr=0.4 requires gap >= 40 pts → blocked.
+        """
+        candles = self._oct9_candles()
+        s = find_pivot_setup(candles, self._PV, sustain_candles=2,
+                             pivot_mode="OPEN_DIRECTION", min_today_candles=0,
+                             min_od_gap_atr=0.4)
+        assert s is None, "PE should be blocked: open is within 0.4×ATR of Pivot"
+
+    def test_min_od_gap_atr_allows_far_open(self):
+        """
+        Open=950 is 50 pts from Pivot=1000.
+        The 20 yesterday candles (range=200) produce ATR≈176.
+        Using min_od_gap_atr=0.2 → required gap = 0.2×176 ≈ 35 pts.
+        gap=50 pts > 35 pts → allowed.
+        Also uses min_today_candles=0 so the room filter passes
+        (entry=952, S1=900, room=52 > risk≈17 → valid setup).
+        """
+        from datetime import date, timedelta
+        y = date.today() - timedelta(days=1)
+        t = date.today()
+        out = [
+            Candle(
+                datetime(y.year, y.month, y.day, 9, 15) + timedelta(minutes=5 * i),
+                980, 1080, 880, 980,
+            )
+            for i in range(20)
+        ]
+        # open=950, between S1(900) and Pivot(1000), tiny upper wick, bearish body
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 15), 950, 952, 940, 948))
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 20), 948, 953, 937, 945))
+        s = find_pivot_setup(out, self._PV, sustain_candles=2,
+                             pivot_mode="OPEN_DIRECTION", min_today_candles=0,
+                             min_od_gap_atr=0.2)
+        assert s is not None and s.side == "PE", (
+            "PE should fire: open is 50 pts (>0.2×ATR) from Pivot"
+        )
+
+    def test_first_candle_confirm_blocks_doji(self):
+        """
+        First candle is a doji (open==close=990).
+        first_candle_confirm=True requires close < open for PE → blocked.
+        """
+        candles = self._oct9_candles()
+        s = find_pivot_setup(candles, self._PV, sustain_candles=2,
+                             pivot_mode="OPEN_DIRECTION", min_today_candles=0,
+                             first_candle_confirm=True)
+        assert s is None, "PE should be blocked: first candle is a doji, not bearish"
+
+    def test_first_candle_confirm_allows_bearish_first_candle(self):
+        """
+        First candle is bearish (close=985 < open=990).
+        first_candle_confirm=True should allow the PE.
+        """
+        from datetime import date, timedelta
+        y = date.today() - timedelta(days=1)
+        t = date.today()
+        out = [
+            Candle(
+                datetime(y.year, y.month, y.day, 9, 15) + timedelta(minutes=5 * i),
+                980, 1080, 880, 980,
+            )
+            for i in range(20)
+        ]
+        # First candle: clearly bearish (close < open), no upper wick near Pivot
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 15), 990, 991, 980, 985))
+        # Sustain candle: below Pivot
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 20), 985, 990, 978, 983))
+        # Open = 990 < Pivot=1000, gap=10 (no gap filter applied here)
+        s = find_pivot_setup(out, self._PV, sustain_candles=2,
+                             pivot_mode="OPEN_DIRECTION", min_today_candles=0,
+                             first_candle_confirm=True)
+        assert s is not None and s.side == "PE", (
+            "PE should fire: first candle is bearish and confirms the direction"
+        )
+
+    def test_max_first_wick_atr_blocks_bullish_probe(self):
+        """
+        First candle: open=990, high=999.9, close=990.
+        Upper wick = 999.9 − 990 = 9.9 pts.  ATR≈174.
+        wick/ATR = 9.9/174 ≈ 0.057.
+        Setting max_first_wick_atr=0.05 → max_wick=0.05×174≈8.7 pts < 9.9 → blocked.
+        """
+        candles = self._oct9_candles()
+        s = find_pivot_setup(candles, self._PV, sustain_candles=2,
+                             pivot_mode="OPEN_DIRECTION", min_today_candles=0,
+                             max_first_wick_atr=0.05)
+        assert s is None, (
+            "PE should be blocked: first candle upper wick reaches Pivot (bullish probe)"
+        )
+
+    def test_max_first_wick_atr_allows_small_wick(self):
+        """
+        First candle has a tiny upper wick (high=992, close=990 → wick=2 pts ≈ 0.02×ATR).
+        max_first_wick_atr=0.08 allows this (2 < 8 pts) → PE should fire.
+        """
+        from datetime import date, timedelta
+        y = date.today() - timedelta(days=1)
+        t = date.today()
+        out = [
+            Candle(
+                datetime(y.year, y.month, y.day, 9, 15) + timedelta(minutes=5 * i),
+                980, 1080, 880, 980,
+            )
+            for i in range(20)
+        ]
+        # First candle: tiny upper wick (high=992), bearish body
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 15), 990, 992, 982, 988))
+        # Sustain candle: below Pivot
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 20), 988, 993, 981, 985))
+        s = find_pivot_setup(out, self._PV, sustain_candles=2,
+                             pivot_mode="OPEN_DIRECTION", min_today_candles=0,
+                             max_first_wick_atr=0.08)
+        assert s is not None and s.side == "PE", (
+            "PE should fire: first candle upper wick is tiny (0.02×ATR), below threshold"
+        )
+
+    def test_all_three_filters_together_block_oct9(self):
+        """
+        All three filters combined must block the Oct 9 scenario.
+        Uses the same thresholds as the individual block tests:
+          min_od_gap_atr=0.4  → gap=10 pts < 0.4×174≈70 pts → blocked
+          first_candle_confirm=True → doji body → blocked
+          max_first_wick_atr=0.05 → wick=9.9 pts > 0.05×174≈8.7 pts → blocked
+        Any one of the three is sufficient to block; all three together is belt-and-braces.
+        """
+        candles = self._oct9_candles()
+        s = find_pivot_setup(candles, self._PV, sustain_candles=2,
+                             pivot_mode="OPEN_DIRECTION", min_today_candles=0,
+                             min_od_gap_atr=0.4,
+                             first_candle_confirm=True,
+                             max_first_wick_atr=0.05)
+        assert s is None, "PE should be blocked by combined OD quality filters"
+
+    def test_filters_do_not_affect_mode_b(self):
+        """
+        OD filters must not affect Mode B (REJECTION).
+        A valid rejection setup must still fire even when all OD filters are set
+        to their strictest values.
+        """
+        from datetime import date, timedelta
+        y = date.today() - timedelta(days=1)
+        t = date.today()
+        out = [
+            Candle(
+                datetime(y.year, y.month, y.day, 9, 15) + timedelta(minutes=5 * i),
+                980, 1080, 880, 980,
+            )
+            for i in range(20)
+        ]
+        # Today candles: price came from above, probed Pivot zone, now rejecting down
+        # pre_candle: starts above Pivot (1010), low dips into zone (1002 ≤ 1000 + 0.3×ATR)
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 15), 1010, 1015, 1002, 1008))  # above Pivot
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 20), 1008, 1010, 990, 1005))   # probe: low=990, before=1008>1000
+        # sustain candles: now clearly below Pivot (rejection confirmed)
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 25), 995, 998, 989, 992))
+        out.append(Candle(datetime(t.year, t.month, t.day, 9, 30), 992, 996, 986, 990))
+        s = find_pivot_setup(out, self._PV, sustain_candles=2,
+                             pivot_mode="REJECTION", min_today_candles=0,
+                             rejection_zone_atr=0.3,
+                             # All OD filters at strictest — must have no effect on Mode B
+                             min_od_gap_atr=1.0,
+                             first_candle_confirm=True,
+                             max_first_wick_atr=0.01)
+        assert s is not None and s.side == "PE" and s.mode == "REJECTION", (
+            "Mode B REJECTION must be unaffected by OD quality filter settings"
+        )

@@ -28,6 +28,36 @@ MODE A — Open-Direction Sustain  (PIVOT_MODE = "OPEN_DIRECTION" | "BOTH")
   previous day's close is still checked as a sanity gate when no intraday
   candle precedes the sustain window.
 
+  Additional quality filters (all opt-in, default OFF to preserve existing
+  behaviour; enable via .env):
+
+  min_od_gap_atr  (PIVOT_OD_MIN_GAP_ATR, default 0.0):
+      Require the day's open to be at least this many ATR multiples away
+      from Pivot before the OD mode is allowed to fire.  When the open is
+      within the noise band around Pivot the market has not committed to a
+      direction — it is hovering in the pivot zone.
+      Example: atr=114, gap_atr=0.5 → open must be ≥57 pts from Pivot.
+      Root-cause Oct 9: open was only 33 pts (0.29×ATR) below Pivot — too
+      close to be considered a genuine below-Pivot open.  A value of 0.4
+      would have blocked the PE_PIVOT that day.
+
+  first_candle_confirm  (PIVOT_OD_FIRST_CANDLE_CONFIRM, default False):
+      Require the first today-candle's body to confirm the OD direction.
+      CE: first candle must close ABOVE its open (bullish body).
+      PE: first candle must close BELOW its open (bearish body).
+      Prevents entering a PE when the first candle was a doji or a candle
+      that probed Pivot from below (bullish signal, not bearish).
+
+  max_first_wick_atr  (PIVOT_OD_MAX_FIRST_WICK_ATR, default 0.0):
+      For PE: block if the first candle's UPPER wick ≥ this × ATR.
+      For CE: block if the first candle's LOWER wick ≥ this × ATR.
+      A long upper wick on the first candle reaching into / near Pivot
+      (as happened on Oct 9) signals a bullish probe — not a clean
+      below-Pivot open.  0.0 = disabled.
+      Root-cause Oct 9: first candle high=71871.28 touched Pivot exactly;
+      upper wick = high − close = 71871.28 − 71838.83 = 32.45 pts ≈ 0.28×ATR.
+      Setting max_first_wick_atr=0.25 would have blocked that trade.
+
 ═══════════════════════════════════════════════════════════════════════
 MODE B — Pivot-Rejection Retest  (PIVOT_MODE = "REJECTION" | "BOTH")
 ═══════════════════════════════════════════════════════════════════════
@@ -53,6 +83,55 @@ MODE B — Pivot-Rejection Retest  (PIVOT_MODE = "REJECTION" | "BOTH")
   min_today_candles (default 6) still applies.
 
 ═══════════════════════════════════════════════════════════════════════
+MODE C — Cross-and-Acceptance  (opt-in: enable_acceptance=True)
+═══════════════════════════════════════════════════════════════════════
+  Premise: price was on the wrong side of the Pivot (a candle CLOSED on
+  that side, or the day OPENED there), crossed it, and is now ACCEPTED on
+  the new side.  This catches the classic trend day that opens below the
+  Pivot, reclaims it and never looks back (Oct 9 2026: open 95 pts below
+  P, crossed at 09:25, every candle from 09:30 held above P, day high
+  72669 ≈ 800 pts above P).
+
+  Modes A / B miss this when the cross candle itself wicks back through
+  the Pivot: B then never sees "closed-below candle directly followed by
+  N clean candles", and A needs the open on the trade side.
+
+  CE_PIVOT:
+    • Reference = last today-candle that CLOSED below Pivot (or the day
+      open, if it was below Pivot and no later candle closed below).
+    • Every candle after the reference closes above Pivot.
+    • The latest N candles are CLEAN: close AND low strictly above Pivot.
+    • This is the FIRST clean N-window after the reference → one signal
+      per cross, no repeated entries on every later candle.
+  PE_PIVOT mirrors with highs below Pivot.
+
+  No time restriction; room filter + min_today_candles still apply.
+
+═══════════════════════════════════════════════════════════════════════
+BOUNCE — S/R Level Bounce / Rejection  (opt-in: bounce_zone_atr > 0)
+═══════════════════════════════════════════════════════════════════════
+  Premise: price approaches a pivot level (S3..S1, P, R1..R3) from one
+  side, wicks into its zone (level ± bounce_zone_atr × ATR) and the SAME
+  candle closes back on the original side with a confirming body.
+
+  CE_PIVOT (support bounce): previous candle closed above the level,
+    signal candle low ≤ level + zone, close > level, bullish body, close
+    in the upper half of the range.
+  PE_PIVOT (resistance rejection): mirror image.
+
+  Stop   : below / above the zone or signal-candle extreme, padded by
+           PIVOT_SL_BUFFER_ATR × ATR.
+  Targets: the next three levels in the trade direction.
+  Checked last, so Modes A / B / C keep priority.  One signal per touch.
+
+  Optional quality filters (default OFF):
+    PIVOT_BOUNCE_MIN_RANGE_ATR  signal candle range >= N × ATR
+    PIVOT_BOUNCE_MIN_WICK_PCT   rejection wick >= N × candle range
+    PIVOT_BOUNCE_TREND_EMA      CE only above EMA(N), PE only below
+    PIVOT_BOUNCE_CONFIRM_NEXT   next candle must close beyond the signal
+                                candle's high (CE) / low (PE) → entry there
+
+═══════════════════════════════════════════════════════════════════════
 Targets
 ═══════════════════════════════════════════════════════════════════════
   CE_PIVOT : T1 = R1,  T2 = R2,  T3 = R3
@@ -76,7 +155,7 @@ from dataclasses import dataclass
 from datetime import time as dtime
 
 from market.candle_builder import Candle
-from market.indicators import atr_at
+from market.indicators import atr_at, ema
 
 # Minimum today-candles before ATR is computed from today only;
 # below this threshold the full multi-day series is used.
@@ -90,7 +169,7 @@ _OD_WINDOW_END   = dtime(9, 30)
 @dataclass(frozen=True)
 class PivotSetup:
     side:  str           # "CE" | "PE"
-    mode:  str           # "OPEN_DIRECTION" | "REJECTION"
+    mode:  str           # "OPEN_DIRECTION" | "REJECTION" | "ACCEPTANCE" | "BOUNCE"
     entry: float         # SENSEX close of the confirming candle
     stop:  float         # SENSEX stop level
     risk:  float         # |entry - stop| in index points
@@ -121,24 +200,32 @@ def _make_setup(
     sl_atr_mult: float,
     sl_buffer_atr: float,
     min_room_r: float,
+    targets: tuple[float, float, float] | None = None,
+    stop: float | None = None,
 ) -> PivotSetup | None:
-    """Build a PivotSetup for one direction, applying SL + room filter."""
+    """Build a PivotSetup for one direction, applying SL + room filter.
+
+    ``targets`` / ``stop`` override the default R1-R3 / S1-S3 targets and the
+    sl_mode-derived stop (used by the level-bounce setup).
+    """
     if side == "CE":
-        t1, t2, t3 = pivot_levels.r1, pivot_levels.r2, pivot_levels.r3
-        stop = (
-            min(c.low for c in window) - sl_buffer_atr * atr
-            if sl_mode == "SIGNAL_LOW"
-            else entry - sl_atr_mult * atr
-        )
+        t1, t2, t3 = targets or (pivot_levels.r1, pivot_levels.r2, pivot_levels.r3)
+        if stop is None:
+            stop = (
+                min(c.low for c in window) - sl_buffer_atr * atr
+                if sl_mode == "SIGNAL_LOW"
+                else entry - sl_atr_mult * atr
+            )
         risk = entry - stop
         room = t1 - entry
     else:
-        t1, t2, t3 = pivot_levels.s1, pivot_levels.s2, pivot_levels.s3
-        stop = (
-            max(c.high for c in window) + sl_buffer_atr * atr
-            if sl_mode == "SIGNAL_LOW"
-            else entry + sl_atr_mult * atr
-        )
+        t1, t2, t3 = targets or (pivot_levels.s1, pivot_levels.s2, pivot_levels.s3)
+        if stop is None:
+            stop = (
+                max(c.high for c in window) + sl_buffer_atr * atr
+                if sl_mode == "SIGNAL_LOW"
+                else entry + sl_atr_mult * atr
+            )
         risk = stop - entry
         room = entry - t1
 
@@ -171,10 +258,19 @@ def _check_open_direction(
     min_room_r: float,
     window_start: dtime,
     window_end: dtime,
+    min_od_gap_atr: float = 0.0,
+    first_candle_confirm: bool = False,
+    max_first_wick_atr: float = 0.0,
 ) -> PivotSetup | None:
     """
     Open-Direction mode: fire when the open committed to one side and the
     first N candles sustain that commitment within the time window.
+
+    Optional quality filters (all default-OFF):
+      min_od_gap_atr      — open must be >= this × ATR away from Pivot.
+      first_candle_confirm — first candle body must confirm the direction.
+      max_first_wick_atr  — first candle counter-direction wick must be
+                            < this × ATR (0 = disabled).
     """
     n = sustain_candles
     if len(today) < n:
@@ -190,6 +286,7 @@ def _check_open_direction(
     P = pivot_levels.pivot
     # Day's open = first today-candle's open
     day_open = today[0].open
+    first_candle = today[0]
 
     atr = atr_at(_atr_series(today, all_candles), period=atr_period)
     if not atr or atr <= 0:
@@ -209,6 +306,69 @@ def _check_open_direction(
 
         if not sustained:
             continue
+
+        # ── Filter 1: open must be far enough from Pivot ───────────────────
+        # Prevents OD trades when the open is inside the Pivot noise band.
+        if min_od_gap_atr > 0:
+            gap = abs(day_open - P)
+            if gap < min_od_gap_atr * atr:
+                import logging as _log
+                _log.getLogger(__name__).info(
+                    "[OD_BLOCKED_GAP] side=%s day_open=%.2f pivot=%.2f "
+                    "gap=%.2f min_gap=%.2f (%.2f×ATR)",
+                    side, day_open, P, gap, min_od_gap_atr * atr, min_od_gap_atr,
+                )
+                continue
+
+        # ── Filter 2: first candle body must confirm direction ─────────────
+        # Prevents OD trades when the opening candle is a doji or moves
+        # against the expected direction (e.g. bullish first candle on PE).
+        if first_candle_confirm:
+            if side == "CE" and first_candle.close <= first_candle.open:
+                import logging as _log
+                _log.getLogger(__name__).info(
+                    "[OD_BLOCKED_FIRST_CANDLE] side=CE first_candle: "
+                    "open=%.2f close=%.2f — bearish/doji body, CE blocked",
+                    first_candle.open, first_candle.close,
+                )
+                continue
+            if side == "PE" and first_candle.close >= first_candle.open:
+                import logging as _log
+                _log.getLogger(__name__).info(
+                    "[OD_BLOCKED_FIRST_CANDLE] side=PE first_candle: "
+                    "open=%.2f close=%.2f — bullish/doji body, PE blocked",
+                    first_candle.open, first_candle.close,
+                )
+                continue
+
+        # ── Filter 3: first candle counter-wick must not probe Pivot ──────
+        # A long upper wick on the first candle toward Pivot on a PE setup
+        # (or long lower wick on CE) signals that buyers (sellers) tested
+        # Pivot and were not fully rejected — the direction is uncertain.
+        if max_first_wick_atr > 0:
+            max_wick = max_first_wick_atr * atr
+            if side == "PE":
+                # upper wick = high - max(open, close)
+                upper_wick = first_candle.high - max(first_candle.open, first_candle.close)
+                if upper_wick >= max_wick:
+                    import logging as _log
+                    _log.getLogger(__name__).info(
+                        "[OD_BLOCKED_FIRST_WICK] side=PE upper_wick=%.2f "
+                        "max_wick=%.2f (%.2f×ATR=%.2f) — bullish probe on first candle",
+                        upper_wick, max_wick, max_first_wick_atr, atr,
+                    )
+                    continue
+            else:  # CE
+                # lower wick = min(open, close) - low
+                lower_wick = min(first_candle.open, first_candle.close) - first_candle.low
+                if lower_wick >= max_wick:
+                    import logging as _log
+                    _log.getLogger(__name__).info(
+                        "[OD_BLOCKED_FIRST_WICK] side=CE lower_wick=%.2f "
+                        "max_wick=%.2f (%.2f×ATR=%.2f) — bearish probe on first candle",
+                        lower_wick, max_wick, max_first_wick_atr, atr,
+                    )
+                    continue
 
         setup = _make_setup(
             side, "OPEN_DIRECTION", entry, window,
@@ -292,6 +452,207 @@ def _check_rejection(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Level Bounce / Rejection (support bounce → CE, resistance rejection → PE)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _is_bounce(c: Candle, prev: Candle, level: float, zone_half: float, side: str) -> bool:
+    """True when ``c`` is a confirmed rejection of ``level``.
+
+    CE (support): prev closed above the level (approach from above), ``c``
+    wicked into the zone (low <= level + zone), closed back above the level
+    with a bullish body and its close in the upper half of the range.
+    PE (resistance) mirrors.
+    """
+    rng = c.high - c.low
+    if rng <= 0:
+        return False
+    if side == "CE":
+        return (prev.close > level and c.low <= level + zone_half
+                and c.close > level and c.close > c.open
+                and (c.close - c.low) >= 0.5 * rng)
+    return (prev.close < level and c.high >= level - zone_half
+            and c.close < level and c.close < c.open
+            and (c.high - c.close) >= 0.5 * rng)
+
+
+def _check_bounce(
+    today: list[Candle],
+    all_candles: Sequence[Candle],
+    pivot_levels,
+    atr_period: int,
+    sl_buffer_atr: float,
+    min_room_r: float,
+    zone_atr: float,
+    min_range_atr: float = 0.0,
+    min_wick_pct: float = 0.0,
+    trend_ema: int = 0,
+    confirm_next: bool = False,
+) -> PivotSetup | None:
+    """Bounce off a support level (CE) or rejection at a resistance (PE).
+
+    Levels: S3..S1, Pivot, R1..R3.  The nearest level to price is tested first.
+    Stop  : beyond the zone / signal-candle extreme, padded by sl_buffer_atr×ATR.
+    Target: the next three levels in the trade direction.
+    Fires once per touch: skipped when the candle before the signal candle was
+    itself a bounce of the same level.
+
+    Optional quality filters (all default OFF):
+      min_range_atr — signal candle range must be >= this × ATR.
+      min_wick_pct  — rejection wick (CE lower / PE upper) must be >= this
+                      fraction of the signal candle range.
+      trend_ema     — CE only when entry close > EMA(trend_ema); PE only
+                      when below.  0 = disabled.
+      confirm_next  — the signal candle is the PREVIOUS candle; the latest
+                      candle must close above its high (CE) / below its
+                      low (PE).  Entry = confirmation candle close.
+    """
+    need = 3 if confirm_next else 2
+    if len(today) < need:
+        return None
+
+    atr = atr_at(_atr_series(today, all_candles), period=atr_period)
+    if not atr or atr <= 0:
+        return None
+
+    zone_half = zone_atr * atr
+    levels = sorted({pivot_levels.s3, pivot_levels.s2, pivot_levels.s1, pivot_levels.pivot,
+                     pivot_levels.r1, pivot_levels.r2, pivot_levels.r3})
+    k = -2 if confirm_next else -1           # index of the signal candle
+    c, prev = today[k], today[k - 1]
+    prev2 = today[k - 2] if len(today) >= -k + 2 else None
+    last = today[-1]
+    entry = last.close
+
+    trend = None
+    if trend_ema > 0:
+        series = ema([x.close for x in all_candles], trend_ema)
+        trend = series[-1] if series else None
+        if trend is None:
+            return None
+
+    rng = c.high - c.low
+    if min_range_atr > 0 and rng < min_range_atr * atr:
+        return None
+
+    for side in ("CE", "PE"):
+        if trend is not None and (entry <= trend if side == "CE" else entry >= trend):
+            continue
+        if min_wick_pct > 0:
+            wick = (min(c.open, c.close) - c.low) if side == "CE" else (c.high - max(c.open, c.close))
+            if wick < min_wick_pct * rng:
+                continue
+        if confirm_next and not (last.close > c.high if side == "CE" else last.close < c.low):
+            continue
+
+        if side == "CE":
+            candidates = sorted((lv for lv in levels if lv < c.close), reverse=True)
+        else:
+            candidates = sorted(lv for lv in levels if lv > c.close)
+
+        for level in candidates:
+            if not _is_bounce(c, prev, level, zone_half, side):
+                continue
+            if prev2 is not None and _is_bounce(prev, prev2, level, zone_half, side):
+                continue   # already signalled on this touch
+
+            if side == "CE":
+                stop = min(c.low, level - zone_half) - sl_buffer_atr * atr
+                ahead = [lv for lv in levels if lv > entry]
+            else:
+                stop = max(c.high, level + zone_half) + sl_buffer_atr * atr
+                ahead = sorted((lv for lv in levels if lv < entry), reverse=True)
+            if not ahead:
+                continue
+            t1, t2, t3 = (ahead + [ahead[-1]] * 2)[:3]
+
+            setup = _make_setup(
+                side, "BOUNCE", entry, [c], atr, pivot_levels,
+                "SIGNAL_LOW", 0.0, sl_buffer_atr, min_room_r,
+                targets=(t1, t2, t3), stop=stop,
+            )
+            if setup is not None:
+                return setup
+
+    return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mode C — Cross-and-Acceptance
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _check_acceptance(
+    today: list[Candle],
+    all_candles: Sequence[Candle],
+    pivot_levels,
+    sustain_candles: int,
+    atr_period: int,
+    sl_mode: str,
+    sl_atr_mult: float,
+    sl_buffer_atr: float,
+    min_room_r: float,
+) -> PivotSetup | None:
+    """
+    Acceptance mode: price closed (or opened) on the wrong side of the Pivot,
+    crossed it, and the latest N candles are the FIRST clean N-window on the
+    new side since that cross.
+    """
+    n = sustain_candles
+    if len(today) < n:
+        return None
+
+    P = pivot_levels.pivot
+    last = len(today) - 1
+
+    for side in ("CE", "PE"):
+        if side == "CE":
+            wrong = lambda c: c.close < P                       # noqa: E731
+            clean = lambda c: c.close > P and c.low > P         # noqa: E731
+            opened_wrong = today[0].open < P
+        else:
+            wrong = lambda c: c.close > P                       # noqa: E731
+            clean = lambda c: c.close < P and c.high < P        # noqa: E731
+            opened_wrong = today[0].open > P
+
+        # Reference: index of the last wrong-side close; -1 = the day open.
+        ref = next((i for i in range(last, -1, -1) if wrong(today[i])), None)
+        if ref is None:
+            if not opened_wrong:
+                continue
+            ref = -1
+        if ref >= last - n + 1:          # window would include the wrong-side candle
+            continue
+
+        # All candles after the reference must have closed on the new side
+        # (guaranteed for the close test by ref being the LAST wrong close,
+        # but a close exactly AT Pivot is neither side → reject).
+        after = today[ref + 1:]
+        if not all(c.close > P if side == "CE" else c.close < P for c in after):
+            continue
+
+        # First clean N-window after the reference must end at the latest candle.
+        first_end = next(
+            (k for k in range(ref + n, last + 1)
+             if all(clean(c) for c in today[k - n + 1:k + 1])),
+            None,
+        )
+        if first_end != last:
+            continue
+
+        atr = atr_at(_atr_series(today, all_candles), period=atr_period)
+        if not atr or atr <= 0:
+            return None
+
+        setup = _make_setup(
+            side, "ACCEPTANCE", today[-1].close, today[-n:],
+            atr, pivot_levels, sl_mode, sl_atr_mult, sl_buffer_atr, min_room_r,
+        )
+        if setup is not None:
+            return setup
+
+    return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -313,6 +674,22 @@ def find_pivot_setup(
     od_window_end:   dtime = _OD_WINDOW_END,
     # Rejection zone half-width in ATR multiples
     rejection_zone_atr: float = 0.3,
+    # ── Open-Direction quality filters (default OFF) ─────────────────────
+    # min_od_gap_atr: open must be >= N×ATR away from Pivot (0 = disabled).
+    min_od_gap_atr: float = 0.0,
+    # first_candle_confirm: first candle body must confirm OD direction.
+    first_candle_confirm: bool = False,
+    # max_first_wick_atr: first candle counter-wick cap (0 = disabled).
+    max_first_wick_atr: float = 0.0,
+    # enable_acceptance: also run Mode C (cross-and-acceptance).
+    enable_acceptance: bool = False,
+    # bounce_zone_atr: S/R bounce-rejection zone half-width (0 = disabled).
+    bounce_zone_atr: float = 0.0,
+    # ── Bounce quality filters (default OFF) ─────────────────────────────
+    bounce_min_range_atr: float = 0.0,
+    bounce_min_wick_pct: float = 0.0,
+    bounce_trend_ema: int = 0,
+    bounce_confirm_next: bool = False,
 ) -> PivotSetup | None:
     """Return a PivotSetup when the latest completed candle confirms a setup,
     else None.
@@ -340,6 +717,25 @@ def find_pivot_setup(
     min_today_candles
         Require at least this many completed today-candles before any signal
         is allowed.  0 = disabled.
+    min_od_gap_atr
+        Open-Direction only. Open must be >= this × ATR from Pivot. Blocks
+        OD trades when the open is hovering in the Pivot noise band.
+        Recommended: 0.4 for SENSEX (blocks opens within ~46 pts of Pivot).
+    first_candle_confirm
+        Open-Direction only. Require the first 5m candle's body to confirm
+        the direction (CE: bullish body; PE: bearish body).
+    max_first_wick_atr
+        Open-Direction only. Block if the first candle's counter-direction
+        wick is >= this × ATR — signals a probe toward Pivot. 0 = disabled.
+        Recommended: 0.25 for SENSEX (blocks a wick >= 0.25×ATR toward Pivot).
+    enable_acceptance
+        Also evaluate Mode C (cross-and-acceptance) after Modes A / B.
+    bounce_zone_atr
+        When > 0, also evaluate support-bounce (CE) / resistance-rejection
+        (PE) at every pivot level (S3..R3).  Zone = level ± this × ATR.
+    bounce_min_range_atr / bounce_min_wick_pct / bounce_trend_ema /
+    bounce_confirm_next
+        Bounce-only quality filters — see ``_check_bounce``.
     """
     if pivot_levels is None or not candles_5m or sustain_candles < 1:
         return None
@@ -360,6 +756,9 @@ def find_pivot_setup(
             sustain_candles, atr_period,
             sl_mode, sl_atr_mult, sl_buffer_atr, min_room_r,
             od_window_start, od_window_end,
+            min_od_gap_atr=min_od_gap_atr,
+            first_candle_confirm=first_candle_confirm,
+            max_first_wick_atr=max_first_wick_atr,
         )
         if setup is not None:
             return setup
@@ -371,6 +770,29 @@ def find_pivot_setup(
             sustain_candles, atr_period,
             sl_mode, sl_atr_mult, sl_buffer_atr, min_room_r,
             rejection_zone_atr,
+        )
+        if setup is not None:
+            return setup
+
+    # ── Mode C ──────────────────────────────────────────────────────────────
+    if enable_acceptance:
+        setup = _check_acceptance(
+            today, candles_5m, pivot_levels,
+            sustain_candles, atr_period,
+            sl_mode, sl_atr_mult, sl_buffer_atr, min_room_r,
+        )
+        if setup is not None:
+            return setup
+
+    # ── Level bounce / rejection ────────────────────────────────────────────
+    if bounce_zone_atr > 0:
+        setup = _check_bounce(
+            today, candles_5m, pivot_levels,
+            atr_period, sl_buffer_atr, min_room_r, bounce_zone_atr,
+            min_range_atr=bounce_min_range_atr,
+            min_wick_pct=bounce_min_wick_pct,
+            trend_ema=bounce_trend_ema,
+            confirm_next=bounce_confirm_next,
         )
         if setup is not None:
             return setup

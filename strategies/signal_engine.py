@@ -4,9 +4,9 @@ enforces de-duplication, and emits signals to callers.
 
 Two evaluation phases run in order:
 
-  Phase 1 — Standard strategy (ce_strategy / pe_strategy)
-      4-rule EMA crossover with prev-high/low breakout confirmation.
-      Active all day (09:15–15:00).
+  Phase 1 — EMA strategy (ce_strategy / pe_strategy)
+      15m EMA9/21 trend + 5m EMA9 crossover / EMA21 pullback + RSI.
+      Active EMA_SCAN_START → EMA_NO_NEW_ENTRY_AFTER (default 09:20–15:00).
 
   Phase 2 — Momentum strategy (ce_momentum / pe_momentum)
       3-rule acceleration filter: strong candle body + EMA alignment + 5mins trend.
@@ -50,9 +50,52 @@ _session_qualifier = SessionQualifier(
 
 # ── EMA-specific cooldown counter ─────────────────────────────────────────────
 # Independent of the global SmartEntry cooldown — only applies to CE/PE signals.
-# Counts down on every candle evaluation. Reset on date change.
+# Started by note_ema_trade() when an EMA entry FILLS; ticked down on every
+# completed 5m candle by tick_ema_cooldown(). Reset on date change.
 _ema_cooldown_left: int = 0
 _ema_cooldown_date: str = ""
+_ema_trades_today: int = 0
+_ema_consec_losses: int = 0
+
+
+def _reset_ema_cooldown_if_new_day(day: str) -> None:
+    global _ema_cooldown_left, _ema_cooldown_date, _ema_trades_today, _ema_consec_losses
+    if _ema_cooldown_date != day:
+        _ema_cooldown_date = day
+        _ema_cooldown_left = 0
+        _ema_trades_today = 0
+        _ema_consec_losses = 0
+
+
+def note_ema_trade(day: str) -> None:
+    """Start the EMA cooldown and count the trade after an EMA CE/PE entry has filled."""
+    global _ema_cooldown_left, _ema_trades_today
+    _reset_ema_cooldown_if_new_day(day)
+    _ema_cooldown_left = max(0, settings.EMA_COOLDOWN_CANDLES)
+    _ema_trades_today += 1
+
+
+def note_ema_result(day: str, pnl: float) -> None:
+    """Record a closed EMA trade's P&L for the consecutive-loss lockout."""
+    global _ema_consec_losses
+    _reset_ema_cooldown_if_new_day(day)
+    _ema_consec_losses = _ema_consec_losses + 1 if pnl < 0 else 0
+
+
+def ema_day_block_reason() -> str | None:
+    """Return why EMA is locked for the rest of the day, or None."""
+    if settings.EMA_MAX_TRADES_PER_DAY > 0 and _ema_trades_today >= settings.EMA_MAX_TRADES_PER_DAY:
+        return f"max EMA trades/day reached ({_ema_trades_today})"
+    if settings.EMA_MAX_CONSEC_LOSSES > 0 and _ema_consec_losses >= settings.EMA_MAX_CONSEC_LOSSES:
+        return f"{_ema_consec_losses} consecutive EMA losses"
+    return None
+
+
+def tick_ema_cooldown() -> None:
+    """Count the EMA cooldown down by one candle (call on every closed 5m candle)."""
+    global _ema_cooldown_left
+    if _ema_cooldown_left > 0:
+        _ema_cooldown_left -= 1
 
 SignalType = Literal["CE", "PE", "CE_ORB", "PE_ORB", "CE_OB", "PE_OB", "CE_MOM", "PE_MOM", "CE_TRB", "PE_TRB", "CE_VWAP", "PE_VWAP", "CE_PDHL", "PE_PDHL", "CE_NATR", "PE_NATR", "CE_ATR", "PE_ATR", "CE_PIVOT", "PE_PIVOT", None]
 
@@ -103,6 +146,58 @@ def _seed_pivot_count(day: str) -> None:
 def note_pivot_trade(day: str) -> None:
     """Count a filled Pivot trade toward PIVOT_MAX_TRADES_PER_DAY."""
     _pivot_trades_today[day] = _pivot_trades_today.get(day, 0) + 1
+
+
+# ── Momentum guards: per-day trade cap + same-direction re-entry cooldown ─────
+# Trade count is seeded from the DB once per day (restart-safe).  The re-entry
+# cooldown is in-memory only (a restart clears it — fails open).
+_mom_trades_today: dict[str, int] = {}
+_mom_counter_seeded: set[str] = set()
+_mom_cooldown_left: int = 0
+_mom_cooldown_side: str | None = None
+
+
+def _seed_mom_count(day: str) -> None:
+    if day in _mom_counter_seeded:
+        return
+    try:
+        from persistence.trade_store import fetch_today_mom_trade_count
+        db_count = fetch_today_mom_trade_count(day)
+        if db_count > _mom_trades_today.get(day, 0):
+            _mom_trades_today[day] = db_count
+    except Exception as exc:
+        logger.warning("Could not seed MOM trade counter from DB: %s", exc)
+    _mom_counter_seeded.add(day)
+
+
+def note_mom_trade(day: str) -> None:
+    """Count a filled CE_MOM / PE_MOM trade toward MOMENTUM_MAX_TRADES_PER_DAY."""
+    _mom_trades_today[day] = _mom_trades_today.get(day, 0) + 1
+
+
+def note_mom_exit(side: str) -> None:
+    """Start the same-direction re-entry cooldown after a MOM trade closes."""
+    global _mom_cooldown_left, _mom_cooldown_side
+    _mom_cooldown_left = max(0, settings.MOMENTUM_REENTRY_COOLDOWN_CANDLES)
+    _mom_cooldown_side = side
+
+
+def tick_mom_cooldown() -> None:
+    """Count the MOM re-entry cooldown down by one candle (call per closed 5m candle)."""
+    global _mom_cooldown_left
+    if _mom_cooldown_left > 0:
+        _mom_cooldown_left -= 1
+
+
+def mom_block_reason(side: str, day: str) -> str | None:
+    """Return why a MOM signal on *side* must be skipped, or None."""
+    _seed_mom_count(day)
+    cap = settings.MOMENTUM_MAX_TRADES_PER_DAY
+    if cap > 0 and _mom_trades_today.get(day, 0) >= cap:
+        return f"max MOM trades/day reached ({_mom_trades_today.get(day, 0)})"
+    if _mom_cooldown_left > 0 and _mom_cooldown_side == side:
+        return f"same-direction re-entry cooldown ({_mom_cooldown_left} candles left)"
+    return None
 
 
 def _signal_id(strategy: str, candle_ts: datetime) -> str:
@@ -218,9 +313,17 @@ def evaluate_signals(
         # Mark that this candle has been attempted regardless of Smart Entry outcome.
         # Subsequent strategies on the same candle are blocked even if this one fails.
         _candle_attempted = True
-        # Rule-based quality gate
-        if smart_entry is not None and not smart_entry.allow(sig, candles_5m, candles_15m=candles_15m):
-            return None
+        # Rule-based quality gate.
+        # EMA CE/PE with EMA_SKIP_SMART_FILTERS: skip the candle filters (the
+        # rule-set has its own 15m trend + RSI) but keep the post-loss cooldown.
+        if smart_entry is not None:
+            if sig in ("CE", "PE") and settings.EMA_SKIP_SMART_FILTERS:
+                if smart_entry.cooldown_active:
+                    log_event(logger, "SMART_ENTRY_BLOCKED_COOLDOWN",
+                              direction=sig, candles_remaining=smart_entry.cooldown_remaining)
+                    return None
+            elif not smart_entry.allow(sig, candles_5m, candles_15m=candles_15m):
+                return None
         # AI confirmation gate (optional — fails safely to ALLOW)
         if ai_confirmation is not None:
             verdict = ai_confirmation.confirm(
@@ -342,6 +445,15 @@ def evaluate_signals(
                 od_window_start=_parse_time(settings.PIVOT_OD_WINDOW_START),
                 od_window_end=_parse_time(settings.PIVOT_OD_WINDOW_END),
                 rejection_zone_atr=settings.PIVOT_REJECTION_ZONE_ATR,
+                min_od_gap_atr=settings.PIVOT_OD_MIN_GAP_ATR,
+                first_candle_confirm=settings.PIVOT_OD_FIRST_CANDLE_CONFIRM,
+                max_first_wick_atr=settings.PIVOT_OD_MAX_FIRST_WICK_ATR,
+                enable_acceptance=settings.PIVOT_ACCEPTANCE,
+                bounce_zone_atr=settings.PIVOT_BOUNCE_ZONE_ATR,
+                bounce_min_range_atr=settings.PIVOT_BOUNCE_MIN_RANGE_ATR,
+                bounce_min_wick_pct=settings.PIVOT_BOUNCE_MIN_WICK_PCT,
+                bounce_trend_ema=settings.PIVOT_BOUNCE_TREND_EMA,
+                bounce_confirm_next=settings.PIVOT_BOUNCE_CONFIRM_NEXT,
             )
             if setup is not None:
                 sig_name = f"{setup.side}_PIVOT"
@@ -455,82 +567,45 @@ def evaluate_signals(
             if (sig := _gate("PE_TRB")) is not None:
                 return sig
 
-    # ── Phase 1: Standard EMA strategy ─────────────────────────────────────────
-    global _ema_cooldown_left, _ema_cooldown_date
+    # ── Phase 1: EMA 9/21 + RSI strategy ───────────────────────────────────────
+    # Pivot filters are intentionally NOT applied to EMA (rule-set has its own
+    # 15m trend + RSI logic).  Cooldown is started by note_ema_trade() only when
+    # an EMA entry actually fills, and ticks down on every closed 5m candle via
+    # tick_ema_cooldown() — not here.
     _today_str = str(latest_5m_ts.date())
-    if _ema_cooldown_date != _today_str:
-        _ema_cooldown_date  = _today_str
-        _ema_cooldown_left  = 0
+    _reset_ema_cooldown_if_new_day(_today_str)
 
-    # Tick down EMA cooldown on every candle
-    if _ema_cooldown_left > 0:
-        _ema_cooldown_left -= 1
+    _ema_window_ok = True
+    try:
+        _ema_window_ok = latest_5m_ts.time() >= _parse_time(settings.EMA_SCAN_START)
+        if settings.EMA_NO_NEW_ENTRY_AFTER:
+            _ema_window_ok = _ema_window_ok and latest_5m_ts.time() < _parse_time(settings.EMA_NO_NEW_ENTRY_AFTER)
+    except (ValueError, AttributeError, TypeError):
+        pass   # bad config — fail open
 
-    if settings.ENABLE_EMA_STRATEGY and not _sq_blocked and not _candle_already_attempted():
-        _close = candles_5m[-1].close
-
-        # ── Pivot zone / trend filter (opt-in) ─────────────────────────────────
-        # Applied only to EMA CE/PE — other strategies are unaffected.
-        _pivot_ce_ok = True
-        _pivot_pe_ok = True
-        if pivot_levels is not None:
-            _all_levels = [pivot_levels.pivot, pivot_levels.r1, pivot_levels.r2,
-                           pivot_levels.s1, pivot_levels.s2]
-
-            # Zone filter: block if close is within PIVOT_ZONE_BUFFER of any level
-            if settings.PIVOT_ZONE_BUFFER > 0:
-                for lvl in _all_levels:
-                    if abs(_close - lvl) <= settings.PIVOT_ZONE_BUFFER:
-                        log_event(logger, "EMA_BLOCKED_PIVOT_ZONE",
-                                  candle=latest_5m_ts, close=round(_close, 2),
-                                  level=round(lvl, 2), buffer=settings.PIVOT_ZONE_BUFFER)
-                        _pivot_ce_ok = False
-                        _pivot_pe_ok = False
-                        break
-
-            # Counter-trend filter: CE below Pivot = bearish bias; PE above Pivot = bullish bias
-            if settings.PIVOT_COUNTER_TREND_BLOCK and _pivot_ce_ok:
-                if _close < pivot_levels.pivot:
-                    log_event(logger, "CE_BLOCKED_PIVOT_COUNTER_TREND",
-                              candle=latest_5m_ts, close=round(_close, 2),
-                              pivot=pivot_levels.pivot)
-                    _pivot_ce_ok = False
-                if _close > pivot_levels.pivot:
-                    log_event(logger, "PE_BLOCKED_PIVOT_COUNTER_TREND",
-                              candle=latest_5m_ts, close=round(_close, 2),
-                              pivot=pivot_levels.pivot)
-                    _pivot_pe_ok = False
-
-            # Breakout-confirm filter: CE requires close > R1; PE requires close < S1
-            if settings.PIVOT_BREAKOUT_CONFIRM and _pivot_ce_ok:
-                if _close <= pivot_levels.r1:
-                    log_event(logger, "CE_BLOCKED_PIVOT_BREAKOUT",
-                              candle=latest_5m_ts, close=round(_close, 2),
-                              r1=pivot_levels.r1)
-                    _pivot_ce_ok = False
-            if settings.PIVOT_BREAKOUT_CONFIRM and _pivot_pe_ok:
-                if _close >= pivot_levels.s1:
-                    log_event(logger, "PE_BLOCKED_PIVOT_BREAKOUT",
-                              candle=latest_5m_ts, close=round(_close, 2),
-                              s1=pivot_levels.s1)
-                    _pivot_pe_ok = False
-
-        # EMA-specific cooldown check (separate from global SmartEntry cooldown)
-        _ema_cd = settings.EMA_COOLDOWN_CANDLES if settings.EMA_COOLDOWN_CANDLES > 0 else 0
-        if _ema_cd > 0 and _ema_cooldown_left > 0:
+    if settings.ENABLE_EMA_STRATEGY and _ema_window_ok and not _sq_blocked and not _candle_already_attempted():
+        _ema_kwargs = dict(
+            rsi_period=settings.EMA_RSI_PERIOD,
+            pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS,
+        )
+        _day_block = ema_day_block_reason()
+        if _day_block:
+            log_event(logger, "EMA_BLOCKED_DAY_LOCK", candle=latest_5m_ts, reason=_day_block)
+        elif settings.EMA_COOLDOWN_CANDLES > 0 and _ema_cooldown_left > 0:
             log_event(logger, "EMA_BLOCKED_COOLDOWN",
                       candle=latest_5m_ts, candles_remaining=_ema_cooldown_left)
-        elif _pivot_ce_ok and is_ce_signal(candles_5m, candles_15m):
-            log_event(logger, "CE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("CE")) is not None:
-                _ema_cooldown_left = _ema_cd   # start cooldown after EMA trade
-                return sig
+        else:
+            if is_ce_signal(candles_5m, candles_15m, rsi_min=settings.EMA_RSI_CE_MIN, **_ema_kwargs):
+                log_event(logger, "CE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
+                if (sig := _gate("CE")) is not None:
+                    return sig
 
-        if not _candle_already_attempted() and (_ema_cd == 0 or _ema_cooldown_left == 0) and _pivot_pe_ok and is_pe_signal(candles_5m, candles_15m):
-            log_event(logger, "PE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("PE")) is not None:
-                _ema_cooldown_left = _ema_cd   # start cooldown after EMA trade
-                return sig
+            if not _candle_already_attempted() and is_pe_signal(
+                candles_5m, candles_15m, rsi_max=settings.EMA_RSI_PE_MAX, **_ema_kwargs
+            ):
+                log_event(logger, "PE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
+                if (sig := _gate("PE")) is not None:
+                    return sig
 
     # ── Phase 2: Momentum strategy (opt-in) ────────────────────────────────────
     if not settings.ENABLE_MOMENTUM_PHASE or _skip_on_monday or _candle_already_attempted():
@@ -548,6 +623,8 @@ def evaluate_signals(
 
     min_body = float(settings.MOMENTUM_MIN_BODY_PTS)
 
+    _mom_day = str(latest_5m_ts.date())
+
     if is_ce_momentum_signal(candles_5m, candles_15m,
                               min_body_pts=min_body,
                               window_start=win_start,
@@ -555,7 +632,9 @@ def evaluate_signals(
         log_event(logger, "CE_MOMENTUM_SIGNAL",
                   candle=latest_5m_ts, close=candles_5m[-1].close,
                   body=round(candles_5m[-1].close - candles_5m[-1].open, 2))
-        if (sig := _gate("CE_MOM")) is not None:
+        if (_blk := mom_block_reason("CE", _mom_day)):
+            log_event(logger, "MOM_BLOCKED", signal="CE_MOM", candle=latest_5m_ts, reason=_blk)
+        elif (sig := _gate("CE_MOM")) is not None:
             return sig
 
     if not _candle_already_attempted() and is_pe_momentum_signal(candles_5m, candles_15m,
@@ -565,7 +644,9 @@ def evaluate_signals(
         log_event(logger, "PE_MOMENTUM_SIGNAL",
                   candle=latest_5m_ts, close=candles_5m[-1].close,
                   body=round(candles_5m[-1].open - candles_5m[-1].close, 2))
-        if (sig := _gate("PE_MOM")) is not None:
+        if (_blk := mom_block_reason("PE", _mom_day)):
+            log_event(logger, "MOM_BLOCKED", signal="PE_MOM", candle=latest_5m_ts, reason=_blk)
+        elif (sig := _gate("PE_MOM")) is not None:
             return sig
 
     return None

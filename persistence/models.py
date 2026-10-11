@@ -306,3 +306,17 @@ def fetch_today_pivot_trade_count(day: str) -> int:
             (f"{day}%", f"{day}%"),
         ).fetchone()
     return int(row[0]) if row else 0
+
+
+def fetch_today_mom_trade_count(day: str) -> int:
+    """Return the number of CE_MOM / PE_MOM trades filled on *day* (YYYY-MM-DD)."""
+    with _conn() as con:
+        row = con.execute(
+            "SELECT COUNT(*) FROM trades "
+            "WHERE strategy_type LIKE '%_MOM' "
+            "  AND entry_order_id != 'IMPORTED' "
+            "  AND (entry_time LIKE ? OR signal_timestamp LIKE ?) "
+            "  AND status IN ('OPEN', 'CLOSED')",
+            (f"{day}%", f"{day}%"),
+        ).fetchone()
+    return int(row[0]) if row else 0
