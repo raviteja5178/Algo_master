@@ -236,6 +236,13 @@ EMA_EXPIRY_NO_ENTRY_AFTER: str = _get("EMA_EXPIRY_NO_ENTRY_AFTER", "13:30")
 # Only applies to EXPIRY_MODE=AUTO.
 EXPIRY_DAY_ROLLOVER_TIME: str = _get("EXPIRY_DAY_ROLLOVER_TIME", "12:30")
 
+# ── Global per-side daily trade cap ───────────────────────────────────────────
+# MAX_TRADES_PER_SIDE: maximum filled trades per side (CE or PE) per day, across
+# ALL strategies combined.  0 = unlimited.  Default 3 means the bot takes at
+# most 3 CE trades and 3 PE trades in a single session regardless of which
+# strategy triggered them.
+MAX_TRADES_PER_SIDE: int = _getint("MAX_TRADES_PER_SIDE", 3)
+
 # ── Strategy Toggles ──────────────────────────────────────────────────────────
 ENABLE_EMA_STRATEGY: bool = _getbool("ENABLE_EMA_STRATEGY", True)
 ENABLE_ORB_STRATEGY: bool = _getbool("ENABLE_ORB_STRATEGY", True)
@@ -625,12 +632,16 @@ PIVOT_ACCEPTANCE: bool          = _getbool("PIVOT_ACCEPTANCE", False)
 #   must wick into the zone and close back on its approach side with a
 #   confirming body.  Targets = next levels.  0.0 = disabled (legacy behaviour).
 PIVOT_BOUNCE_ZONE_ATR: float    = _getfloat("PIVOT_BOUNCE_ZONE_ATR", 0.0)
-# Bounce quality filters (only used when PIVOT_BOUNCE_ZONE_ATR > 0; all default OFF):
-#   PIVOT_BOUNCE_MIN_RANGE_ATR : signal candle range >= this × ATR (e.g. 0.6).
+# Bounce quality filters (only used when PIVOT_BOUNCE_ZONE_ATR > 0):
+#   PIVOT_BOUNCE_MIN_RANGE_ATR : signal candle range >= this × ATR.
+#                                Rejects tiny doji wicks at the level.  Recommended: 0.5.
 #   PIVOT_BOUNCE_MIN_WICK_PCT  : rejection wick >= this × candle range (e.g. 0.5).
-#   PIVOT_BOUNCE_TREND_EMA     : CE only above EMA(N), PE only below (e.g. 21). 0 = off.
+#   PIVOT_BOUNCE_TREND_EMA     : CE only above EMA(N), PE only below.  Recommended: 21.
 #   PIVOT_BOUNCE_CONFIRM_NEXT  : next candle must close above signal high (CE) /
 #                                below signal low (PE); entry on that candle.
+#                                STRONGLY RECOMMENDED = true.  Without it the bot enters
+#                                on the wick-touch candle alone — no follow-through
+#                                evidence that the S/R level is actually holding.
 PIVOT_BOUNCE_MIN_RANGE_ATR: float = _getfloat("PIVOT_BOUNCE_MIN_RANGE_ATR", 0.0)
 PIVOT_BOUNCE_MIN_WICK_PCT: float  = _getfloat("PIVOT_BOUNCE_MIN_WICK_PCT", 0.0)
 PIVOT_BOUNCE_TREND_EMA: int       = _getint("PIVOT_BOUNCE_TREND_EMA", 0)

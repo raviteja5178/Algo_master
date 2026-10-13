@@ -32,34 +32,14 @@ _LAUNCHER_PID_FILE = ".launcher.pid"
 # ── Single-instance guard ─────────────────────────────────────────────────────
 def _acquire_launcher_lock() -> None:
     """Exit immediately if another launcher is already running."""
-    if os.path.exists(_LAUNCHER_PID_FILE):
-        try:
-            with open(_LAUNCHER_PID_FILE) as f:
-                existing_pid = int(f.read().strip())
-            # Check if that PID is still alive
-            try:
-                os.kill(existing_pid, 0)   # signal 0 = existence check only
-                print(
-                    f"[Launcher] Another launcher is already running (PID {existing_pid}). "
-                    "Exiting to prevent duplicate bot instances.",
-                    flush=True,
-                )
-                sys.exit(0)
-            except (ProcessLookupError, PermissionError):
-                pass  # PID is gone — stale file, continue
-        except (ValueError, OSError):
-            pass  # Unreadable file — overwrite it
-
-    with open(_LAUNCHER_PID_FILE, "w") as f:
-        f.write(str(os.getpid()))
-    atexit.register(_release_launcher_lock)
-
-
-def _release_launcher_lock() -> None:
-    try:
-        os.remove(_LAUNCHER_PID_FILE)
-    except OSError:
-        pass
+    from utils.process_lock import acquire_process_lock
+    if not acquire_process_lock("launcher"):
+        print(
+            "[Launcher] Another launcher is already running. "
+            "Exiting to prevent duplicate bot instances.",
+            flush=True,
+        )
+        sys.exit(0)
 
 
 # ── State ─────────────────────────────────────────────────────────────────────

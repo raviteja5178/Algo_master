@@ -34,7 +34,7 @@ from typing import Literal
 from config import settings
 from market.candle_builder import Candle
 from market.historical_data import PivotLevels
-from persistence.trade_store import has_processed_signal, record_processed_signal
+from persistence.trade_store import claim_signal_atomic, has_processed_signal, record_processed_signal
 from strategies.ce_strategy import is_ce_signal
 from strategies.pe_strategy import is_pe_signal
 from strategies.session_qualifier import SessionQualifier
@@ -200,6 +200,52 @@ def mom_block_reason(side: str, day: str) -> str | None:
     return None
 
 
+# ── Global per-side daily trade cap (applies to ALL strategies) ───────────────
+# Counts filled trades per direction (CE / PE) regardless of strategy.
+# Seeded from DB once per day on first access so a restart mid-day doesn't
+# reset the counter to 0.
+_side_trades_today: dict[str, dict[str, int]] = {}   # {day: {"CE": n, "PE": n}}
+_side_counter_seeded: set[str] = set()
+
+
+def _seed_side_count(day: str) -> None:
+    """Load today's per-side filled trade counts from the DB (once per day)."""
+    if day in _side_counter_seeded:
+        return
+    try:
+        from persistence.trade_store import fetch_today_side_trade_count
+        for _s in ("CE", "PE"):
+            db_count = fetch_today_side_trade_count(_s, day)
+            _side_trades_today.setdefault(day, {})
+            if db_count > _side_trades_today[day].get(_s, 0):
+                _side_trades_today[day][_s] = db_count
+    except Exception as exc:
+        logger.warning("Could not seed side trade counter from DB: %s", exc)
+    _side_counter_seeded.add(day)
+
+
+def note_side_trade(side: str, day: str) -> None:
+    """Increment the per-side daily counter after a trade entry fills.
+
+    *side* must be 'CE' or 'PE'.  Call this once per filled trade from
+    main.py's execute_entry regardless of which strategy triggered the fill.
+    """
+    _side_trades_today.setdefault(day, {})
+    _side_trades_today[day][side] = _side_trades_today[day].get(side, 0) + 1
+
+
+def side_block_reason(side: str, day: str) -> str | None:
+    """Return why a signal on *side* must be blocked by the global cap, or None."""
+    _seed_side_count(day)
+    cap = settings.MAX_TRADES_PER_SIDE
+    if cap <= 0:
+        return None
+    count = _side_trades_today.get(day, {}).get(side, 0)
+    if count >= cap:
+        return f"global {side} cap reached ({count}/{cap} trades today)"
+    return None
+
+
 def _signal_id(strategy: str, candle_ts: datetime) -> str:
     """
     Generate a per-candle deduplication key.
@@ -313,6 +359,14 @@ def evaluate_signals(
         # Mark that this candle has been attempted regardless of Smart Entry outcome.
         # Subsequent strategies on the same candle are blocked even if this one fails.
         _candle_attempted = True
+        # ── Global per-side daily cap ──────────────────────────────────────────
+        # Derive side from the signal name prefix ("CE" or "PE").
+        _sig_side = "CE" if sig.startswith("CE") else "PE"
+        _gate_day = str(latest_5m_ts.date())
+        if (_side_blk := side_block_reason(_sig_side, _gate_day)):
+            log_event(logger, "GLOBAL_SIDE_CAP_BLOCKED",
+                      signal=sig, side=_sig_side, reason=_side_blk)
+            return None
         # Rule-based quality gate.
         # EMA CE/PE with EMA_SKIP_SMART_FILTERS: skip the candle filters (the
         # rule-set has its own 15m trend + RSI) but keep the post-loss cooldown.
@@ -342,8 +396,13 @@ def evaluate_signals(
                 log_event(logger, "AI_CONFIRMATION_BLOCKED",
                           signal=sig, score=verdict.score, reason=verdict.reason)
                 return None
-        # Atomically claim this signal before returning it to the caller.
-        record_processed_signal(sig_id, sig, latest_5m_ts.isoformat())
+        # Atomically claim this signal — INSERT OR IGNORE returns rowcount=1 only
+        # for the first writer.  A concurrent bot process that races here will get
+        # rowcount=0 and the signal will be silently dropped, preventing a duplicate
+        # order even if two processes receive the same candle close simultaneously.
+        if not claim_signal_atomic(sig_id, sig, latest_5m_ts.isoformat()):
+            log_event(logger, "SIGNAL_CLAIM_LOST_RACE", signal=sig, sig_id=sig_id)
+            return None
         return sig  # type: ignore[return-value]
 
     def _candle_already_attempted() -> bool:
@@ -461,15 +520,22 @@ def evaluate_signals(
                           mode=setup.mode, entry=setup.entry,
                           stop=setup.stop, risk=setup.risk,
                           t1=setup.t1, t2=setup.t2, t3=setup.t3, atr=setup.atr)
-                sig_id = _signal_id(sig_name, latest_5m_ts)
-                if not has_processed_signal(sig_id):
-                    _candle_attempted = True
-                    record_processed_signal(sig_id, sig_name, latest_5m_ts.isoformat())
-                    # FIX (Flaw 15): write setup under the lock so consume_pivot_setup()
-                    # in execute_entry always sees a consistent value.
-                    with _pivot_setup_lock:
-                        _last_pivot_setup = setup
-                    return sig_name  # type: ignore[return-value]
+                # Global per-side cap also applies to pivot signals.
+                if (_side_blk := side_block_reason(setup.side, _day)):
+                    log_event(logger, "GLOBAL_SIDE_CAP_BLOCKED",
+                              signal=sig_name, side=setup.side, reason=_side_blk)
+                else:
+                    sig_id = _signal_id(sig_name, latest_5m_ts)
+                    # Atomically claim the pivot signal — same race-condition guard as
+                    # _gate().  claim_signal_atomic returns True only for the first
+                    # writer, so a concurrent bot process that races here is blocked.
+                    if claim_signal_atomic(sig_id, sig_name, latest_5m_ts.isoformat()):
+                        _candle_attempted = True
+                        # FIX (Flaw 15): write setup under the lock so consume_pivot_setup()
+                        # in execute_entry always sees a consistent value.
+                        with _pivot_setup_lock:
+                            _last_pivot_setup = setup
+                        return sig_name  # type: ignore[return-value]
 
     # ── VWAP Retest strategy ───────────────────────────────────────────────────
     if settings.ENABLE_VWAP_STRATEGY and not _sq_blocked and not _candle_already_attempted():

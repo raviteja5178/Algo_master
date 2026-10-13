@@ -835,6 +835,12 @@ def api_shadow_active():
                     trade["highest_ltp"]    = at["highest_ltp"]
                 if at.get("target") is not None:
                     trade["target_reference"] = at["target"]
+                if at.get("break_even_activated") is not None:
+                    trade["break_even_activated"] = at["break_even_activated"]
+                if at.get("trail_steps_completed") is not None:
+                    trade["trail_steps_completed"] = at["trail_steps_completed"]
+                if at.get("be_points") is not None:
+                    trade["be_points"] = at["be_points"]
         except Exception:
             pass
 

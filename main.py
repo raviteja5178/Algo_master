@@ -54,6 +54,7 @@ from market.paper_feed import PaperFeed
 from market.websocket_client import WebSocketClient
 from notifications.notifier import notify
 from persistence.trade_store import (
+    claim_entry_slot_atomic,
     fetch_active_trade,
     fetch_today_realised_pnl,
     has_action,
@@ -61,12 +62,14 @@ from persistence.trade_store import (
     mark_trade_closed,
     mark_trade_closed_with_reason,
     record_action,
+    release_entry_slot,
     upsert_trade,
 )
 from risk.safety_manager import SafetyManager
 from strategies.signal_engine import (
     evaluate_signals, note_ema_result, note_ema_trade, tick_ema_cooldown,
     note_mom_exit, note_mom_trade, tick_mom_cooldown,
+    note_side_trade,
 )
 from market.indicators import atr_at, ema as calc_ema, swing_levels
 from utils.latency import LatencyTracker
@@ -470,6 +473,17 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         logger.info("Entry action %s already recorded — skipping duplicate.", action_id)
         return
 
+    # Second-line defence against duplicate orders from concurrent bot processes:
+    # the state machine above is in-memory and cannot protect across processes.
+    # A DB check here catches the case where another process already opened a
+    # trade (wrote it to DB) since the state-machine check above passed.
+    if fetch_active_trade() is not None:
+        logger.warning(
+            "Entry blocked [%s]: an OPEN trade already exists in DB "
+            "(concurrent process guard).", signal_type,
+        )
+        return
+
     option_type = "CE" if signal_type.startswith("CE") else "PE"
 
     # ── Latency tracker — one per trade entry attempt ─────────────────────────
@@ -662,6 +676,26 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     ctx.tradingsymbol = instrument["tradingsymbol"]
     ctx.instrument_token = instrument["instrument_token"]
 
+    # ── Atomic entry-slot claim ───────────────────────────────────────────────
+    # Generate trade_id NOW (before the order) and INSERT a PENDING row so any
+    # concurrent bot process racing here will see status IN ('OPEN','PENDING')
+    # in fetch_active_trade() and block itself — closing the race window between
+    # the fetch_active_trade() check above and the upsert_trade(OPEN) after fill.
+    ctx.trade_id = (
+        f"TRADE_{signal_type}_{now_ist().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+    )
+    ctx.strategy_type = signal_type
+    if not claim_entry_slot_atomic(
+        ctx.trade_id, signal_type, ctx.tradingsymbol,
+        ctx.instrument_token, ctx.quantity, now_ist().isoformat(),
+    ):
+        logger.warning(
+            "Entry blocked [%s]: concurrent process claimed the entry slot first.",
+            signal_type,
+        )
+        ctx.sm.transition(State.IDLE, reason="entry slot claimed by concurrent process")
+        return
+
     if settings.TRADING_MODE != "PAPER":
         # Subscribe to option LTP on WebSocket
         ctx.ws.add_token(ctx.instrument_token)
@@ -684,12 +718,14 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     except Exception as exc:
         logger.error("Entry order placement raised an exception: %s", exc, exc_info=True)
         notify("ENTRY_REJECTED", symbol=ctx.tradingsymbol, reason=str(exc))
+        release_entry_slot(ctx.trade_id)
         ctx.sm.transition(State.IDLE, reason="broker exception on entry")
         return
 
     if fill["status"] != "COMPLETE" or fill["filled_qty"] == 0:
         logger.error("Entry fill failed: %s", fill)
         notify("ENTRY_REJECTED", symbol=ctx.tradingsymbol, reason=fill.get("status"))
+        release_entry_slot(ctx.trade_id)
         ctx.sm.transition(State.IDLE, reason="entry rejected/timeout")
         return
 
@@ -742,6 +778,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
                     "fallbacks failed. Skipping entry — bot returns to IDLE.",
                     settings.TRADING_MODE, ctx.tradingsymbol,
                 )
+                release_entry_slot(ctx.trade_id)
                 ctx.sm.transition(State.IDLE, reason="shadow/paper zero fill — no LTP available")
                 return
         else:
@@ -767,14 +804,16 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
 
     ctx.entry_price = fill["average_price"]
     ctx.quantity = fill["filled_qty"]
-    ctx.trade_id = f"TRADE_{signal_type}_{now_ist().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
-    ctx.strategy_type = signal_type
+    # trade_id and strategy_type were already set before the order (atomic slot claim)
     if ctx.latency:
         ctx.latency.trade_id = ctx.trade_id   # backfill real trade_id now that we have it
+    _fill_day = str(now_ist().date())
+    _fill_side = "CE" if signal_type.startswith("CE") else "PE"
+    note_side_trade(_fill_side, _fill_day)     # global per-side daily cap counter
     if signal_type in ("CE", "PE"):
-        note_ema_trade(str(now_ist().date()))   # EMA cooldown starts only on a real fill
+        note_ema_trade(_fill_day)              # EMA cooldown starts only on a real fill
     elif signal_type in ("CE_MOM", "PE_MOM"):
-        note_mom_trade(str(now_ist().date()))
+        note_mom_trade(_fill_day)
 
     notify("ENTRY_FILLED", symbol=ctx.tradingsymbol, fill=ctx.entry_price, qty=ctx.quantity)
 
@@ -1096,7 +1135,12 @@ def on_pivot_index_price(ctx: BotContext, sensex_ltp: float) -> None:
             notify("BOT_HALTED", reason="pivot_stop_modification_failed")
             return
         ctx.trailing.current_stop = new_opt_stop
+        was_be = ctx.trailing.break_even_activated
         ctx.trailing.break_even_activated = mgr.stage != "INITIAL"
+        # Count each stop-raise after BE as a trail step so the UI TSL-steps
+        # counter works correctly for CE_PIVOT / PE_PIVOT trades.
+        if was_be:
+            ctx.trailing.trail_steps_completed += 1
     mgr.save(ctx.trade_id or "")
     upsert_trade({
         "trade_id": ctx.trade_id,
@@ -1504,6 +1548,17 @@ def recover_from_restart(ctx: BotContext) -> None:
     )
     ctx.target.target_reference = active["target_reference"] or ctx.target.target_reference
 
+    # Restore in-memory paper SL order so trailing stop modifications succeed
+    if settings.TRADING_MODE in ("PAPER", "SHADOW") and ctx.stop_order_id:
+        if hasattr(ctx.broker, "_open_orders"):
+            ctx.broker._open_orders[ctx.stop_order_id] = {
+                "type": "SL",
+                "tradingsymbol": symbol,
+                "quantity": expected_qty,
+                "trigger_price": ctx.trailing.current_stop,
+                "status": "TRIGGER PENDING",
+            }
+
     # EMA trades: restore the index-based engine (falls back to generic TSL if missing)
     if ctx.strategy_type in ("CE", "PE"):
         ctx.pivot_mgr = EmaTradeManager.load(ctx.trade_id)
@@ -1773,6 +1828,9 @@ def _write_state(ctx: BotContext) -> None:
                 "current_stop": ctx.trailing.current_stop if ctx.trailing else None,
                 "highest_ltp":  ctx.trailing.highest_ltp if ctx.trailing else None,
                 "target":       ctx.target.target_reference if ctx.target else None,
+                "break_even_activated": ctx.trailing.break_even_activated if ctx.trailing else False,
+                "trail_steps_completed": ctx.trailing.trail_steps_completed if ctx.trailing else 0,
+                "be_points":    ctx.trailing.break_even_trigger_points if ctx.trailing else None,
             } if ctx.trade_id else None,
             "updated_at": now_ist().isoformat(),
         }
@@ -2080,6 +2138,12 @@ def _make_candle_handler_5m(ctx: BotContext):
 
 def main() -> None:
     configure_logging()
+
+    from utils.process_lock import acquire_process_lock
+    if not acquire_process_lock("bot"):
+        print("[FATAL] Another bot instance is already running. Exiting.", flush=True)
+        sys.exit(1)
+
     settings.validate()
     print_startup_summary()
 

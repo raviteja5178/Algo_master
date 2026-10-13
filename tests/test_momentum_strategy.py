@@ -381,6 +381,7 @@ class TestSignalEngineWithMomentum:
 
         with patch("strategies.signal_engine.settings") as mock_settings, \
              patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
              patch("strategies.signal_engine.record_processed_signal"):
 
             mock_settings.ENABLE_OB_STRATEGY    = False
@@ -401,6 +402,7 @@ class TestSignalEngineWithMomentum:
 
         with patch("strategies.signal_engine.settings") as mock_settings, \
              patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
              patch("strategies.signal_engine.record_processed_signal"), \
              patch("strategies.signal_engine.is_ce_signal", return_value=False), \
              patch("strategies.signal_engine.is_pe_signal", return_value=False):
@@ -423,6 +425,8 @@ class TestSignalEngineWithMomentum:
             mock_settings.ENABLE_PIVOT_STRATEGY        = False
             mock_settings.MOMENTUM_MAX_TRADES_PER_DAY  = 0
             mock_settings.MOMENTUM_REENTRY_COOLDOWN_CANDLES = 0
+            mock_settings.ORB_MOMENTUM_SKIP_MONDAY     = False   # don't suppress on actual Mondays
+            mock_settings.MAX_TRADES_PER_SIDE          = 0       # unlimited for this test
 
             result = evaluate_signals(c5, c15)
             assert result == "CE_MOM"
@@ -437,6 +441,7 @@ class TestSignalEngineWithMomentum:
         record_calls = []
         with patch("strategies.signal_engine.settings") as mock_settings, \
              patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
              patch("strategies.signal_engine.record_processed_signal",
                    side_effect=lambda *a, **kw: record_calls.append(a[0])), \
              patch("strategies.signal_engine.is_ce_signal", return_value=True), \
@@ -459,6 +464,7 @@ class TestSignalEngineWithMomentum:
             mock_settings.EMA_MAX_TRADES_PER_DAY       = 0
             mock_settings.EMA_MAX_CONSEC_LOSSES        = 0
             mock_settings.ENABLE_PIVOT_STRATEGY        = False
+            mock_settings.MAX_TRADES_PER_SIDE          = 0       # unlimited for this test
 
             result = evaluate_signals(c5, c15)
             assert result == "CE"
@@ -561,6 +567,12 @@ class TestMomentumMondayFilter:
         ms.MOMENTUM_WINDOW_START        = "13:30"
         ms.MOMENTUM_WINDOW_END          = "14:30"
         ms.ORB_MOMENTUM_SKIP_MONDAY     = skip
+        ms.EMA_MAX_TRADES_PER_DAY       = 0
+        ms.EMA_MAX_CONSEC_LOSSES        = 0
+        ms.EMA_COOLDOWN_CANDLES         = 0
+        ms.MOMENTUM_MAX_TRADES_PER_DAY  = 0
+        ms.MOMENTUM_REENTRY_COOLDOWN_CANDLES = 0
+        ms.MAX_TRADES_PER_SIDE          = 0       # unlimited for this test
 
     def test_momentum_suppressed_on_monday(self) -> None:
         from unittest.mock import patch
@@ -572,6 +584,7 @@ class TestMomentumMondayFilter:
 
         with patch("strategies.signal_engine.settings") as ms, \
              patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
              patch("strategies.signal_engine.record_processed_signal"), \
              patch("strategies.signal_engine.is_ce_signal", return_value=False), \
              patch("strategies.signal_engine.is_pe_signal", return_value=False):

@@ -330,6 +330,10 @@
           <div class="ml">ATR @ Entry</div>
           <div class="mv muted" id="mATR">—</div>
         </div>
+        <div class="metric-card">
+          <div class="ml">TSL Step</div>
+          <div class="mv muted" id="mTSL">—</div>
+        </div>
       </div>
 
       <!-- Progress bar: SL ←—→ Entry ←—→ Target -->
@@ -524,11 +528,15 @@ async function pollActiveTrade() {
         logEvent(data, 'TARGET SET', data.entry_price + data.target_points, 'green');
       }
     } else {
-      // Detect trailing stop updates
-      const prevStop = _liveOrder.current_stop;
-      const newStop  = data.current_stop;
+      // Detect trailing stop updates — only log when stop genuinely moved above entry
+      // (prevents a false "TSL RAISED" when the initial SL value is first written to
+      //  current_stop, or when a floating-point rounding difference between the DB
+      //  value and the bot_state.json value causes a spurious micro-change).
+      const prevStop  = _liveOrder.current_stop;
+      const newStop   = data.current_stop;
+      const entryPx   = parseFloat(data.entry_price || 0);
       if (prevStop && newStop && Math.abs(newStop - prevStop) > 0.01) {
-        if (newStop > prevStop) {
+        if (newStop > prevStop && newStop > entryPx) {
           logEvent(data, 'TSL RAISED', newStop, 'amber');
         }
       }
@@ -588,7 +596,7 @@ function renderLiveTracker(t) {
 
   // These CAN change during a trade (TSL raises SL, highest_ltp ratchets up):
   const slPrice    = parseFloat(t.current_stop    || (entry - slPts));
-  const highestLtp = parseFloat(t.highest_ltp     || entry);
+  const highestLtp = Math.max(parseFloat(t.highest_ltp || entry), ltp);
 
   const isNewTrade = (_lastTradeId !== t.trade_id);
   if (isNewTrade) _lastTradeId = t.trade_id;
@@ -612,6 +620,7 @@ function renderLiveTracker(t) {
     // Static fields — set once and never touched again by the poll loop
     document.getElementById('mEntry').textContent  = entry > 0 ? '₹'+entry.toFixed(2) : '—';
     document.getElementById('mATR').textContent    = atr   > 0 ? atr.toFixed(1)        : '—';
+    document.getElementById('mTSL').textContent    = tslPts > 0 ? tslPts.toFixed(1) + ' pts' : '—';
     document.getElementById('lp-entry').textContent  = entry    > 0 ? '₹'+entry.toFixed(2)    : '—';
     document.getElementById('lp-target').textContent = tgtPrice > 0 ? '₹'+tgtPrice.toFixed(2) : '—';
     document.getElementById('pbTgtLabel').textContent = 'Target ₹' + tgtPrice.toFixed(0);
@@ -623,8 +632,11 @@ function renderLiveTracker(t) {
 
   // ── Timer (updates every poll, cheap text change) ────────────
   if (t.entry_time) {
-    const start = new Date(t.entry_time.endsWith('Z') ? t.entry_time : t.entry_time+'Z');
-    const mins  = Math.round((Date.now() - start.getTime()) / 60000);
+    const tsStr = (t.entry_time.includes('+') || (t.entry_time.includes('-') && t.entry_time.lastIndexOf('-') > 10) || t.entry_time.endsWith('Z'))
+      ? t.entry_time
+      : t.entry_time + 'Z';
+    const start = new Date(tsStr);
+    const mins  = isNaN(start.getTime()) ? 0 : Math.max(0, Math.round((Date.now() - start.getTime()) / 60000));
     document.getElementById('tTimer').textContent =
       mins < 60 ? `⏱ ${mins}m` : `⏱ ${Math.floor(mins/60)}h ${mins%60}m`;
   }
@@ -681,22 +693,34 @@ function renderLiveTracker(t) {
 
   if (slRange > 0 && tgtRange > 0 && barLtp > 0) {
     const ltpDist   = barLtp - entry;
-    const profitPct = Math.min(ltpDist  / tgtRange, 1) * 100;
-    const lossPct   = Math.min(-ltpDist / slRange,  1) * 100;
-    document.getElementById('progressFillProfit').style.width = Math.max(profitPct, 0) + '%';
-    document.getElementById('progressFillLoss').style.width   = Math.max(lossPct,   0) + '%';
+    const profitPct = Math.min(Math.max(ltpDist  / tgtRange, 0), 1) * 100;
+    const lossPct   = Math.min(Math.max(-ltpDist / slRange,  0), 1) * 100;
+    // Each half of the track is 50% width
+    document.getElementById('progressFillProfit').style.width = (profitPct * 0.5) + '%';
+    document.getElementById('progressFillLoss').style.width   = (lossPct   * 0.5) + '%';
     const markerPct = ltpDist >= 0
-      ? 50 + Math.min(ltpDist  / tgtRange, 1) * 50
-      : 50 - Math.min(-ltpDist / slRange,  1) * 50;
+      ? 50 + (profitPct * 0.5)
+      : 50 - (lossPct   * 0.5);
     document.getElementById('ltpMarker').style.left = Math.max(2, Math.min(98, markerPct)) + '%';
   }
 
   // ── TSL steps (only rebuild DOM when step count or BE state changes) ──
-  const beThreshold  = entry + (bePts > 0 ? bePts : slPts);
-  const beTriggered  = highestLtp >= beThreshold;
-  const trailSteps   = (tslPts > 0 && beTriggered)
-      ? Math.floor((highestLtp - beThreshold) / tslPts)
-      : 0;
+  const beTriggered = Boolean(
+    t.break_even_activated || (slPrice >= entry - 0.01 && slPrice > (entry - slPts + 0.1))
+  );
+  const effectiveBePts = bePts > 0 ? bePts : (slPts * 0.5);
+  const beThreshold    = entry + effectiveBePts;
+
+  // Use actual trail steps from bot if available, or compute from stop rise / peak
+  const trailSteps = (t.trail_steps_completed != null && t.trail_steps_completed > 0)
+    ? t.trail_steps_completed
+    : (slPrice > entry && tslPts > 0)
+      ? Math.max(1, Math.round((slPrice - entry) / tslPts))
+      : (tslPts > 0 && beTriggered && highestLtp >= beThreshold)
+        ? Math.floor((highestLtp - beThreshold) / tslPts)
+        : (beTriggered ? 1 : 0);
+
+  const slRaisedPts = slPrice > entry ? (slPrice - entry) : (trailSteps * tslPts);
 
   if (trailSteps !== _lastTslSteps || beTriggered !== _lastBeTriggered) {
     _lastTslSteps   = trailSteps;
@@ -704,7 +728,7 @@ function renderLiveTracker(t) {
     const MAX_DOTS = 8;
     let stepsHtml = '<span class="tsl-label">TSL Steps:</span>';
     stepsHtml += `<div class="step-dot ${beTriggered ? 'be' : ''}" title="${beTriggered
-      ? 'Break-even activated @ '+beThreshold.toFixed(2)
+      ? 'Break-even activated'
       : 'Break-even not yet reached (need LTP >= '+beThreshold.toFixed(2)+')'}"></div>`;
     for (let i = 0; i < MAX_DOTS - 1; i++) {
       const done = i < trailSteps;
@@ -713,8 +737,9 @@ function renderLiveTracker(t) {
     }
     if (trailSteps >= MAX_DOTS)
       stepsHtml += `<span style="font-size:11px;color:var(--amber)">+${trailSteps-MAX_DOTS+1} more</span>`;
+    const tslStepLabel = tslPts > 0 ? ` @ ${tslPts.toFixed(1)} pts/step` : '';
     stepsHtml += `<span style="font-size:11px;color:var(--muted);margin-left:4px;">`
-      + `(${trailSteps} × ${tslPts.toFixed(0)} pts = +${(trailSteps*tslPts).toFixed(0)} pts SL raise)</span>`;
+      + `(${trailSteps} step${trailSteps === 1 ? '' : 's'}${tslStepLabel} = +${slRaisedPts.toFixed(1)} pts SL raise)</span>`;
     document.getElementById('tslSteps').innerHTML = stepsHtml;
   }
 

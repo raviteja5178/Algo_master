@@ -1,0 +1,548 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Today's Signals — Oct 12 2026</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-size: 13px; background: #f7f8fa; color: #1f2328; line-height: 1.5; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 19px; font-weight: 700; margin-bottom: 3px; }
+  .subtitle { color: #57606a; font-size: 12px; margin-bottom: 22px; }
+  h2 { font-size: 13px; font-weight: 700; margin: 26px 0 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
+
+  /* Summary strip */
+  .strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+  .pill { background:#fff; border:1px solid #e5e7eb; border-radius:20px; padding:5px 14px; font-size:12px; }
+  .pill strong { font-weight:700; }
+  .g { color:#16a34a; } .r { color:#dc2626; } .b { color:#3b82d4; } .o { color:#d97706; }
+
+  /* Main table */
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid #e5e7eb; border-radius:6px; overflow:hidden; font-size:12px; }
+  th { background:#f7f8fa; color:#57606a; font-weight:600; text-align:left; padding:7px 9px; border-bottom:1px solid #e5e7eb; white-space:nowrap; font-size:11px; }
+  td { padding:7px 9px; border-bottom:1px solid #f2f2f2; vertical-align:middle; }
+  tr:last-child td { border-bottom:none; }
+
+  /* Row colouring */
+  tr.filled td { background:#f0fdf4; }
+  tr.blocked td { background:#fff7f7; }
+  tr.smart-blocked td { background:#fffbeb; }
+  tr.time-blocked td { background:#f8f8ff; }
+  tr.filled:hover td { background:#dcfce7; }
+  tr.blocked:hover td { background:#fee2e2; }
+  tr.smart-blocked:hover td { background:#fef9c3; }
+
+  .tag { display:inline-block; padding:1px 6px; border-radius:3px; font-size:10px; font-weight:700; white-space:nowrap; }
+  .tag-ce   { background:#dbeafe; color:#1d4ed8; }
+  .tag-pe   { background:#fce7f3; color:#9d174d; }
+  .tag-fill { background:#dcfce7; color:#15803d; }
+  .tag-blk  { background:#fee2e2; color:#b91c1c; }
+  .tag-smrt { background:#fef9c3; color:#854d0e; }
+  .tag-time { background:#ede9fe; color:#6d28d9; }
+  .tag-dup  { background:#f3f4f6; color:#6b7280; }
+
+  .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .muted { color:#57606a; }
+  .mono { font-family: "Courier New", monospace; font-size:11px; }
+  .bold { font-weight:600; }
+  .win { color:#16a34a; font-weight:700; }
+  .loss { color:#dc2626; font-weight:700; }
+  .dash { color:#c9c9c9; }
+
+  .reason-cell { font-size:11px; color:#57606a; max-width:260px; }
+  .reason-cell b { color:#1f2328; }
+
+  /* P&L bar */
+  .pnl-pos { color:#16a34a; font-weight:700; }
+  .pnl-neg { color:#dc2626; font-weight:700; }
+  .pnl-zero { color:#57606a; }
+
+  footer { margin-top:36px; padding-top:12px; border-top:1px solid #e5e7eb; text-align:center; font-size:11px; color:#57606a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Today's Full Signal Log — Mon 12 Oct 2026</h1>
+  <div class="subtitle">SHADOW mode · SENSEX options · All strategies · 19 signal events (9 filled, 10 blocked)</div>
+
+  
+  <div class="strip">
+    <div class="pill">Signals fired: <strong>19</strong></div>
+    <div class="pill">Filled: <strong class="g">9</strong></div>
+    <div class="pill">Blocked: <strong class="r">10</strong></div>
+    <div class="pill">Gross P&amp;L: <strong class="g">+₹3,367</strong></div>
+    <div class="pill">CE trades: <strong>2</strong> (cap=3)</div>
+    <div class="pill">PE trades: <strong class="r">7</strong> (cap=3 ← hit by 11:05)</div>
+    <div class="pill">Avg SL pts: <strong>82.6</strong></div>
+    <div class="pill">Avg TSL pts: <strong class="b">29.5</strong></div>
+    <div class="pill">Avg Target pts: <strong>243.8</strong></div>
+  </div>
+
+  <h2>All Signal Events — Chronological</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Time</th>
+        <th>Side</th>
+        <th>Strategy</th>
+        <th>Status</th>
+        <th>Symbol</th>
+        <th class="num">Entry ₹</th>
+        <th class="num">SL pts</th>
+        <th class="num">TSL pts</th>
+        <th class="num">Target pts</th>
+        <th class="num">ATR</th>
+        <th class="num">Exit ₹</th>
+        <th class="num">P&amp;L ₹</th>
+        <th>Exit / Block Reason</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      
+      <tr class="filled">
+        <td class="muted">1</td>
+        <td class="bold">09:20</td>
+        <td><span class="tag tag-ce">CE</span></td>
+        <td class="bold">NATR</td>
+        <td><span class="tag tag-fill">FILLED</span></td>
+        <td class="mono muted">72600CE</td>
+        <td class="num">567.00</td>
+        <td class="num bold">45.65</td>
+        <td class="num bold b">13.7</td>
+        <td class="num bold">100.45</td>
+        <td class="num muted">115.6</td>
+        <td class="num">521.00</td>
+        <td class="num pnl-neg">−920</td>
+        <td class="reason-cell"><b>STOP_HIT</b> — price dropped immediately, SL hit 3 min after entry. No TSL activation (highest=584 &lt; entry+TSL trigger).</td>
+      </tr>
+
+      
+      <tr class="smart-blocked">
+        <td class="muted">2</td>
+        <td class="bold">09:20</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">VWAP</td>
+        <td><span class="tag tag-smrt">SMART BLOCKED</span></td>
+        <td class="mono muted">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="reason-cell"><b>SMART_ENTRY_BLOCKED_SLOPE</b> — EMA9 not falling for PE (EMA9 rising: 72588→72600). SmartEntry rejected before DB claim.</td>
+      </tr>
+
+      
+      <tr class="smart-blocked">
+        <td class="muted">3</td>
+        <td class="bold">09:25</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">NATR</td>
+        <td><span class="tag tag-smrt">SMART BLOCKED</span></td>
+        <td class="mono muted">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="reason-cell"><b>SMART_ENTRY_BLOCKED_15M_TREND</b> — 15m close 72772 is 324 pts above EMA21 (72447). Too far above EMA21 for PE entry.</td>
+      </tr>
+
+      
+      <tr class="filled">
+        <td class="muted">4</td>
+        <td class="bold">09:25</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">VWAP</td>
+        <td><span class="tag tag-fill">FILLED</span></td>
+        <td class="mono muted">72400PE</td>
+        <td class="num">418.10</td>
+        <td class="num bold">176.25</td>
+        <td class="num bold b">52.9</td>
+        <td class="num bold">387.75</td>
+        <td class="num muted">146.9</td>
+        <td class="num">514.00</td>
+        <td class="num pnl-pos">+1,918</td>
+        <td class="reason-cell"><b>STOP_HIT ✓TSL</b> — TSL raised stop from 241.85 → 514.4. Highest LTP 551.05 (+32.95 above entry). Profitable exit via trailing stop.</td>
+      </tr>
+
+      
+      <tr class="filled">
+        <td class="muted">5</td>
+        <td class="bold">10:30</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">VWAP</td>
+        <td><span class="tag tag-fill">FILLED</span></td>
+        <td class="mono muted">72200PE</td>
+        <td class="num">459.90</td>
+        <td class="num bold">105.05</td>
+        <td class="num bold b">31.5</td>
+        <td class="num bold">231.1</td>
+        <td class="num muted">87.5</td>
+        <td class="num">513.40</td>
+        <td class="num pnl-pos">+1,070</td>
+        <td class="reason-cell"><b>STOP_HIT ✓TSL</b> — TSL raised stop to 514.05. Highest LTP 546.85 (+86.95). Strong win.</td>
+      </tr>
+
+      
+      <tr class="filled">
+        <td class="muted">6</td>
+        <td class="bold">10:30</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">ATR</td>
+        <td><span class="tag tag-fill">FILLED</span></td>
+        <td class="mono muted">72200PE</td>
+        <td class="num">459.90</td>
+        <td class="num bold">105.05</td>
+        <td class="num bold b">31.5</td>
+        <td class="num bold">231.1</td>
+        <td class="num muted">79.5</td>
+        <td class="num">514.30</td>
+        <td class="num pnl-pos">+1,088</td>
+        <td class="reason-cell"><b>STOP_HIT ✓TSL</b> — TSL raised stop to 514.8. Same candle as PE_VWAP — both strategies fired simultaneously on same SENSEX level.</td>
+      </tr>
+
+      
+      <tr class="filled">
+        <td class="muted">7</td>
+        <td class="bold">11:05</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">VWAP</td>
+        <td><span class="tag tag-fill">FILLED</span></td>
+        <td class="mono muted">72000PE</td>
+        <td class="num">472.15</td>
+        <td class="num bold">128.1</td>
+        <td class="num bold b">38.45</td>
+        <td class="num bold">281.8</td>
+        <td class="num muted">72.4</td>
+        <td class="num">510.20</td>
+        <td class="num pnl-pos">+761</td>
+        <td class="reason-cell"><b>STOP_HIT ✓TSL</b> — TSL raised stop to 510.35. Highest LTP 543.1 (+70.95). <span style="color:#dc2626">⚠ This was the 3rd PE trade — PE cap (MAX_TRADES_PER_SIDE=3) now reached.</span></td>
+      </tr>
+
+      
+      <tr class="filled">
+        <td class="muted">8</td>
+        <td class="bold">11:20</td>
+        <td><span class="tag tag-ce">CE</span></td>
+        <td class="bold">PIVOT</td>
+        <td><span class="tag tag-fill">FILLED</span></td>
+        <td class="mono muted">72000CE</td>
+        <td class="num">466.45</td>
+        <td class="num bold">31.85</td>
+        <td class="num bold b">36.83</td>
+        <td class="num bold">506.35</td>
+        <td class="num muted">79.6</td>
+        <td class="num">449.60</td>
+        <td class="num pnl-neg">−337</td>
+        <td class="reason-cell"><b>PIVOT_SL_HIT</b> — BOUNCE off S1 failed. Index dropped below 71893.84 index stop. No TSL (highest=entry, price went straight down).</td>
+      </tr>
+
+      
+      <tr class="filled">
+        <td class="muted">9</td>
+        <td class="bold">11:20</td>
+        <td><span class="tag tag-ce">CE</span></td>
+        <td class="bold">PIVOT <span class="tag tag-dup">DUPLICATE</span></td>
+        <td><span class="tag tag-fill">FILLED</span></td>
+        <td class="mono muted">72000CE</td>
+        <td class="num">466.45</td>
+        <td class="num bold">31.80</td>
+        <td class="num bold b">36.31</td>
+        <td class="num bold">506.35</td>
+        <td class="num muted">78.7</td>
+        <td class="num">431.00</td>
+        <td class="num pnl-neg">−709</td>
+        <td class="reason-cell"><b>STOP_HIT</b> — Duplicate CE_PIVOT from second bot process (race condition on same candle). Worse exit (−₹709 vs −₹337) as it ran without PivotTradeManager state.</td>
+      </tr>
+
+      
+      <tr class="smart-blocked">
+        <td class="muted">10</td>
+        <td class="bold">12:10</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">VWAP</td>
+        <td><span class="tag tag-smrt">SMART BLOCKED</span></td>
+        <td class="mono muted">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="reason-cell"><b>SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING</b> — EMA gap not widening (gap_now −92.98 vs gap_prev −93.57). PE momentum not accelerating.</td>
+      </tr>
+
+      
+      <tr class="smart-blocked">
+        <td class="muted">11</td>
+        <td class="bold">12:20</td>
+        <td><span class="tag tag-ce">CE</span></td>
+        <td class="bold">VWAP</td>
+        <td><span class="tag tag-smrt">SMART BLOCKED</span></td>
+        <td class="mono muted">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="reason-cell"><b>SMART_ENTRY_BLOCKED_EMA_GAP</b> — EMA9 (71914) &lt; EMA21 (71989), gap −75 pts. CE needs EMA9 &gt; EMA21. Bearish alignment rejected CE.</td>
+      </tr>
+
+      
+      <tr class="blocked">
+        <td class="muted">12</td>
+        <td class="bold">12:55</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">EMA</td>
+        <td><span class="tag tag-blk">ENTRY BLOCKED</span></td>
+        <td class="mono muted">71900PE</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num muted">53.6</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="reason-cell"><b>EMA_ENTRY_BLOCKED — room too small</b>: nearest level only 67.3 pts away, needs ≥1.5× ATR (80.4 pts). Signal claimed in DB but entry refused at risk planning stage.</td>
+      </tr>
+
+      
+      <tr class="smart-blocked">
+        <td class="muted">13</td>
+        <td class="bold">13:10</td>
+        <td><span class="tag tag-ce">CE</span></td>
+        <td class="bold">VWAP</td>
+        <td><span class="tag tag-smrt">SMART BLOCKED</span></td>
+        <td class="mono muted">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="reason-cell"><b>SMART_ENTRY_BLOCKED_EMA_GAP</b> — EMA9 (71953) &lt; EMA21 (71969), gap only −16 pts. CE needs bullish EMA alignment. Bearish gap velocity too low.</td>
+      </tr>
+
+      
+      <tr class="filled">
+        <td class="muted">14</td>
+        <td class="bold">13:15</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">VWAP</td>
+        <td><span class="tag tag-fill">FILLED</span></td>
+        <td class="mono muted">71900PE</td>
+        <td class="num">459.85</td>
+        <td class="num bold">42.0</td>
+        <td class="num bold b">12.6</td>
+        <td class="num bold">92.4</td>
+        <td class="num muted">69.3</td>
+        <td class="num">417.00</td>
+        <td class="num pnl-neg">−857</td>
+        <td class="reason-cell"><b>STOP_HIT</b> — SL hit, no TSL (highest 476 was +16 pts above entry, &lt; 1×ATR needed for BE). Full stop loss taken. <span style="color:#dc2626">⚠ This was the 4th PE trade — exceeds the old no-cap, now blocked by MAX_TRADES_PER_SIDE=3.</span></td>
+      </tr>
+
+      
+      <tr class="smart-blocked">
+        <td class="muted">15</td>
+        <td class="bold">13:55</td>
+        <td><span class="tag tag-ce">CE</span></td>
+        <td class="bold">VWAP</td>
+        <td><span class="tag tag-smrt">SMART BLOCKED</span></td>
+        <td class="mono muted">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="reason-cell"><b>SMART_ENTRY_BLOCKED_EMA_GAP</b> — EMA9 (71903) &lt; EMA21 (71925), gap −21 pts, velocity 5.93 &lt; required 10.0. CE rejected again on bearish alignment.</td>
+      </tr>
+
+      
+      <tr class="blocked">
+        <td class="muted">16</td>
+        <td class="bold">14:00</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">EMA</td>
+        <td><span class="tag tag-blk">ENTRY BLOCKED</span></td>
+        <td class="mono muted">71900PE</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="reason-cell"><b>EMA_ENTRY_BLOCKED — option premium below EMA9</b>: premium 439.7 ≤ option 5m EMA9 440.27. Option not yet breaking above its own EMA (no bullish premium momentum for PE put).</td>
+      </tr>
+
+      
+      <tr class="filled">
+        <td class="muted">17</td>
+        <td class="bold">14:15</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">VWAP</td>
+        <td><span class="tag tag-fill">FILLED</span></td>
+        <td class="mono muted">71800PE</td>
+        <td class="num">429.05</td>
+        <td class="num bold">71.25</td>
+        <td class="num bold b">21.4</td>
+        <td class="num bold">156.75</td>
+        <td class="num muted">50.8</td>
+        <td class="num">446.70</td>
+        <td class="num pnl-pos">+353</td>
+        <td class="reason-cell"><b>STOP_HIT ✓TSL</b> — TSL raised stop to 446.7. Highest LTP 467.7 (+38.65). Small winner. <span style="color:#dc2626">⚠ This was the 5th PE trade — with MAX_TRADES_PER_SIDE=3 now live, this will be blocked in future sessions.</span></td>
+      </tr>
+
+      
+      <tr class="smart-blocked">
+        <td class="muted">18</td>
+        <td class="bold">14:45</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">PDHL</td>
+        <td><span class="tag tag-smrt">SMART BLOCKED</span></td>
+        <td class="mono muted">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="reason-cell"><b>SMART_ENTRY_BLOCKED_BODY</b> — candle body 14.61 pts &lt; required 18.72 (0.35× ATR 53.49). Candle too small/weak for PDHL breakout entry.</td>
+      </tr>
+
+      
+      <tr class="time-blocked">
+        <td class="muted">19</td>
+        <td class="bold">15:13</td>
+        <td><span class="tag tag-pe">PE</span></td>
+        <td class="bold">EMA</td>
+        <td><span class="tag tag-time">TIME BLOCKED</span></td>
+        <td class="mono muted">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="num dash">—</td>
+        <td class="reason-cell"><b>Past NO_NEW_ENTRY_AFTER 15:00</b> — EMA signal fired at 14:55 candle but bot processed it at 15:13 (after the no-new-entry cutoff). Hard time block.</td>
+      </tr>
+
+    </tbody>
+  </table>
+
+  
+  <h2>Legend &amp; Block Type Summary</h2>
+  <table>
+    <thead><tr><th>Colour</th><th>Type</th><th>Count</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr class="filled"><td>Green row</td><td><span class="tag tag-fill">FILLED</span></td><td class="num bold g">9</td><td>Signal passed all gates → trade executed → SL/TSL/Target set</td></tr>
+      <tr class="smart-blocked"><td>Yellow row</td><td><span class="tag tag-smrt">SMART BLOCKED</span></td><td class="num bold o">6</td><td>SmartEntry quality gate rejected before DB claim — no signal ID written, candle stays available</td></tr>
+      <tr class="blocked"><td>Red row</td><td><span class="tag tag-blk">ENTRY BLOCKED</span></td><td class="num bold r">2</td><td>Signal claimed in DB (dedup key written) but risk planner rejected entry — room too small or option EMA filter</td></tr>
+      <tr class="time-blocked"><td>Purple row</td><td><span class="tag tag-time">TIME BLOCKED</span></td><td class="num bold" style="color:#6d28d9">1</td><td>Signal valid but processed after NO_NEW_ENTRY_AFTER=15:00 cutoff</td></tr>
+    </tbody>
+  </table>
+
+  
+  <h2>Filled Trades Summary — SL / TSL / Target / P&amp;L</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th><th>Strategy</th><th>Symbol</th>
+        <th class="num">Entry ₹</th>
+        <th class="num">SL pts</th>
+        <th class="num">TSL pts</th>
+        <th class="num">Target pts</th>
+        <th class="num">Highest LTP</th>
+        <th class="num">Exit ₹</th>
+        <th>Exit Reason</th>
+        <th class="num">P&amp;L ₹</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>09:20</td><td>CE_NATR</td><td class="mono muted">72600CE</td>
+        <td class="num">567.00</td><td class="num">45.65</td><td class="num b">13.7</td><td class="num">100.45</td>
+        <td class="num muted">584.2</td><td class="num">521.00</td>
+        <td>STOP_HIT</td><td class="num pnl-neg">−920</td>
+      </tr>
+      <tr>
+        <td>09:25</td><td>PE_VWAP</td><td class="mono muted">72400PE</td>
+        <td class="num">418.10</td><td class="num">176.25</td><td class="num b">52.9</td><td class="num">387.75</td>
+        <td class="num muted">551.05</td><td class="num">514.00</td>
+        <td>STOP_HIT ✓TSL</td><td class="num pnl-pos">+1,918</td>
+      </tr>
+      <tr>
+        <td>10:30</td><td>PE_VWAP</td><td class="mono muted">72200PE</td>
+        <td class="num">459.90</td><td class="num">105.05</td><td class="num b">31.5</td><td class="num">231.1</td>
+        <td class="num muted">546.85</td><td class="num">513.40</td>
+        <td>STOP_HIT ✓TSL</td><td class="num pnl-pos">+1,070</td>
+      </tr>
+      <tr>
+        <td>10:30</td><td>PE_ATR</td><td class="mono muted">72200PE</td>
+        <td class="num">459.90</td><td class="num">105.05</td><td class="num b">31.5</td><td class="num">231.1</td>
+        <td class="num muted">546.85</td><td class="num">514.30</td>
+        <td>STOP_HIT ✓TSL</td><td class="num pnl-pos">+1,088</td>
+      </tr>
+      <tr>
+        <td>11:05</td><td>PE_VWAP</td><td class="mono muted">72000PE</td>
+        <td class="num">472.15</td><td class="num">128.1</td><td class="num b">38.45</td><td class="num">281.8</td>
+        <td class="num muted">543.10</td><td class="num">510.20</td>
+        <td>STOP_HIT ✓TSL</td><td class="num pnl-pos">+761</td>
+      </tr>
+      <tr>
+        <td>11:20</td><td>CE_PIVOT</td><td class="mono muted">72000CE</td>
+        <td class="num">466.45</td><td class="num">31.85</td><td class="num b">36.83</td><td class="num">506.35</td>
+        <td class="num muted">466.45</td><td class="num">449.60</td>
+        <td>PIVOT_SL_HIT</td><td class="num pnl-neg">−337</td>
+      </tr>
+      <tr>
+        <td>11:20</td><td>CE_PIVOT <span class="tag tag-dup" style="font-size:9px">DUP</span></td><td class="mono muted">72000CE</td>
+        <td class="num">466.45</td><td class="num">31.80</td><td class="num b">36.31</td><td class="num">506.35</td>
+        <td class="num muted">466.45</td><td class="num">431.00</td>
+        <td>STOP_HIT</td><td class="num pnl-neg">−709</td>
+      </tr>
+      <tr>
+        <td>13:15</td><td>PE_VWAP</td><td class="mono muted">71900PE</td>
+        <td class="num">459.85</td><td class="num">42.0</td><td class="num b">12.6</td><td class="num">92.4</td>
+        <td class="num muted">476.00</td><td class="num">417.00</td>
+        <td>STOP_HIT</td><td class="num pnl-neg">−857</td>
+      </tr>
+      <tr style="background:#f0fdf4">
+        <td>14:15</td><td>PE_VWAP</td><td class="mono muted">71800PE</td>
+        <td class="num">429.05</td><td class="num">71.25</td><td class="num b">21.4</td><td class="num">156.75</td>
+        <td class="num muted">467.70</td><td class="num">446.70</td>
+        <td>STOP_HIT ✓TSL</td><td class="num pnl-pos">+353</td>
+      </tr>
+      <tr style="background:#f7f8fa;font-weight:700">
+        <td colspan="4" style="text-align:right;color:#57606a;font-size:11px">TOTALS / AVERAGES</td>
+        <td class="num">82.6 avg</td>
+        <td class="num b">29.5 avg</td>
+        <td class="num">243.8 avg</td>
+        <td class="num muted"></td>
+        <td class="num"></td>
+        <td></td>
+        <td class="num pnl-pos">+3,367</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer>Made with IBM Bob</footer>
+</div>
+</body>
+</html>

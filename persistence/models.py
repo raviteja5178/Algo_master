@@ -126,11 +126,56 @@ def upsert_trade(row: dict) -> None:
 
 
 def fetch_active_trade() -> dict | None:
+    """Return the most recent OPEN or PENDING trade, or None.
+
+    PENDING rows are written atomically by claim_entry_slot_atomic() before
+    the order is placed, so a concurrent process that races through the
+    fetch_active_trade() check will see the row and block itself even if
+    the first process hasn't received a fill yet.
+    """
     with _conn() as con:
         row = con.execute(
-            "SELECT * FROM trades WHERE status='OPEN' ORDER BY created_at DESC LIMIT 1"
+            "SELECT * FROM trades WHERE status IN ('OPEN','PENDING') "
+            "ORDER BY created_at DESC LIMIT 1"
         ).fetchone()
     return dict(row) if row else None
+
+
+def claim_entry_slot_atomic(trade_id: str, signal_type: str,
+                             option_symbol: str, instrument_token: int,
+                             quantity: int, signal_timestamp: str) -> bool:
+    """Atomically reserve an entry slot by inserting a PENDING trade row.
+
+    Uses INSERT OR IGNORE so only the first writer succeeds.  Returns True
+    if this process claimed the slot, False if another process beat it.
+    Call this BEFORE placing the broker order; on success the row is already
+    visible to any concurrent fetch_active_trade() call so the second process
+    will block itself before it can place a duplicate order.
+
+    The caller must call upsert_trade(...status='OPEN') after fill to promote
+    the row, or delete it on failure so the slot is released.
+    """
+    with _conn() as con:
+        cur = con.execute(
+            "INSERT OR IGNORE INTO trades "
+            "(trade_id, strategy_type, signal_timestamp, option_symbol, "
+            " instrument_token, quantity, status, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, 'PENDING', "
+            " strftime('%Y-%m-%dT%H:%M:%SZ','now'), "
+            " strftime('%Y-%m-%dT%H:%M:%SZ','now'))",
+            (trade_id, signal_type, signal_timestamp,
+             option_symbol, instrument_token, quantity),
+        )
+        return cur.rowcount == 1
+
+
+def release_entry_slot(trade_id: str) -> None:
+    """Delete the PENDING row if entry failed, so the slot is freed."""
+    with _conn() as con:
+        con.execute(
+            "DELETE FROM trades WHERE trade_id=? AND status='PENDING'",
+            (trade_id,),
+        )
 
 
 def fetch_trade(trade_id: str) -> dict | None:
@@ -234,6 +279,29 @@ def record_processed_signal(signal_id: str, strategy_type: str, candle_timestamp
         )
 
 
+def claim_signal_atomic(signal_id: str, strategy_type: str, candle_timestamp: str) -> bool:
+    """
+    Atomically claim a signal for processing.
+
+    Attempts to INSERT the signal_id into processed_signals.  Returns True if
+    this call was the first to insert it (i.e. this process owns the signal),
+    False if the row already existed (another process or a prior call already
+    claimed it).
+
+    Unlike the separate has_processed_signal() + record_processed_signal()
+    pair, this is a single INSERT that wins on conflict — eliminating the
+    SELECT-then-INSERT race condition that can cause duplicate orders when two
+    bot processes start within milliseconds of each other.
+    """
+    with _conn() as con:
+        cur = con.execute(
+            "INSERT OR IGNORE INTO processed_signals (signal_id, strategy_type, candle_timestamp) "
+            "VALUES (?,?,?)",
+            (signal_id, strategy_type, candle_timestamp),
+        )
+        return cur.rowcount == 1
+
+
 # ── Order idempotency ──────────────────────────────────────────────────────────
 
 def has_action(action_id: str) -> bool:
@@ -318,5 +386,25 @@ def fetch_today_mom_trade_count(day: str) -> int:
             "  AND (entry_time LIKE ? OR signal_timestamp LIKE ?) "
             "  AND status IN ('OPEN', 'CLOSED')",
             (f"{day}%", f"{day}%"),
+        ).fetchone()
+    return int(row[0]) if row else 0
+
+
+def fetch_today_side_trade_count(side: str, day: str) -> int:
+    """Return the number of trades on a given side (CE or PE) filled on *day*.
+
+    Counts every filled trade (any strategy) that starts with *side* ('CE' or
+    'PE'), excluding IMPORTED entries.  Used to seed the global per-side daily
+    cap after a bot restart.
+    """
+    prefix = f"{side}%"
+    with _conn() as con:
+        row = con.execute(
+            "SELECT COUNT(*) FROM trades "
+            "WHERE strategy_type LIKE ? "
+            "  AND entry_order_id != 'IMPORTED' "
+            "  AND (entry_time LIKE ? OR signal_timestamp LIKE ?) "
+            "  AND status IN ('OPEN', 'CLOSED')",
+            (prefix, f"{day}%", f"{day}%"),
         ).fetchone()
     return int(row[0]) if row else 0
