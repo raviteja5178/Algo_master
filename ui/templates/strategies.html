@@ -295,6 +295,28 @@
     </ul>
   </div>
 
+  <!-- Pivot Sustain Card -->
+  <div class="card">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="card-title">&#x1F3AF; Pivot Sustain</span>
+        <span class="pill" style="background:rgba(245,166,35,0.12);color:#c47a00;border:1px solid rgba(245,166,35,0.3);">Level Acceptance</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="chk-ENABLE_PIVOT_STRATEGY" onchange="toggleStrategy('ENABLE_PIVOT_STRATEGY', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-desc">Fires CE_PIVOT / PE_PIVOT when <span id="pv-sustain">2</span> consecutive completed 5-minute candles close above (CE) or below (PE) the daily floor Pivot after a fresh cross. Own risk engine — bypasses SmartEntry, MIN_RR and the generic TSL/target.</div>
+    <ul class="feature-list">
+      <li>Targets: CE T1 = R1, T2 = R2 &nbsp;|&nbsp; PE T1 = S1, T2 = S2</li>
+      <li>SL (<span id="pv-sl-mode">SIGNAL_LOW</span>): lowest low / highest high of the sustain candles &plusmn; <span id="pv-sl-buf">0.05</span> &times; ATR(14)</li>
+      <li>Room filter: distance to T1 must be &ge; <span id="pv-room">1.0</span> &times; risk</li>
+      <li>Break-even at +<span id="pv-be">1.0</span>R &rarr; at T1 lock <span id="pv-lock">50</span>% of gain + chandelier trail <span id="pv-trail">1.0</span> &times; ATR &rarr; exit at T2</li>
+      <li>Max <span id="pv-max">3</span> Pivot trades per day; all decisions on SENSEX index ticks</li>
+    </ul>
+  </div>
+
   <div style="text-align:right;">
     <button class="btn btn-save" onclick="saveAll()">Save Configurations</button>
   </div>
@@ -321,6 +343,18 @@
       document.getElementById('chk-ENABLE_PDHL_STRATEGY').checked   = (_config.ENABLE_PDHL_STRATEGY   === 'true');
       document.getElementById('chk-ENABLE_NATR_STRATEGY').checked          = (_config.ENABLE_NATR_STRATEGY          === 'true');
       document.getElementById('chk-ENABLE_ATR_COPILOT_STRATEGY').checked   = (_config.ENABLE_ATR_COPILOT_STRATEGY   === 'true');
+      document.getElementById('chk-ENABLE_PIVOT_STRATEGY').checked         = (_config.ENABLE_PIVOT_STRATEGY         === 'true');
+
+      // Populate Pivot Sustain parameter display values
+      const _pv = (k, id, f) => { if (_config[k]) document.getElementById(id).textContent = f ? f(_config[k]) : _config[k]; };
+      _pv('PIVOT_SUSTAIN_CANDLES', 'pv-sustain');
+      _pv('PIVOT_SL_MODE', 'pv-sl-mode');
+      _pv('PIVOT_SL_BUFFER_ATR', 'pv-sl-buf');
+      _pv('PIVOT_MIN_ROOM_R', 'pv-room');
+      _pv('PIVOT_BE_TRIGGER_R', 'pv-be');
+      _pv('PIVOT_T1_LOCK_PCT', 'pv-lock', v => Math.round(parseFloat(v) * 100));
+      _pv('PIVOT_TRAIL_ATR_MULT', 'pv-trail');
+      _pv('PIVOT_MAX_TRADES_PER_DAY', 'pv-max');
 
       // Populate OB parameter display values
       if (_config.OB_SWING_LENGTH)  document.getElementById('ob-swing-len').textContent    = _config.OB_SWING_LENGTH;
@@ -379,6 +413,7 @@
       ENABLE_PDHL_STRATEGY:  document.getElementById('chk-ENABLE_PDHL_STRATEGY').checked  ? 'true' : 'false',
       ENABLE_NATR_STRATEGY:         document.getElementById('chk-ENABLE_NATR_STRATEGY').checked         ? 'true' : 'false',
       ENABLE_ATR_COPILOT_STRATEGY:  document.getElementById('chk-ENABLE_ATR_COPILOT_STRATEGY').checked  ? 'true' : 'false',
+      ENABLE_PIVOT_STRATEGY:        document.getElementById('chk-ENABLE_PIVOT_STRATEGY').checked        ? 'true' : 'false',
     };
     try {
       const res = await fetch('/api/env', {

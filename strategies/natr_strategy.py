@@ -109,13 +109,19 @@ def is_natr_ce_signal(
 
     Conditions:
       1. Latest candle is from today.
-      2. Previous candle close was AT OR BELOW the stop (price was below stop).
-      3. Current candle close is ABOVE the stop (price crossed above).
+      2. Candle is bullish: close > open (green candle).
+      3. Previous candle close was AT OR BELOW the stop (price was below stop).
+      4. Current candle close is ABOVE the stop (price crossed above).
     """
     if len(candles_5m) < max(_MIN_CANDLES, natr_period + 3):
         return False
 
-    if candles_5m[-1].timestamp.date() != date.today():
+    latest = candles_5m[-1]
+    if latest.timestamp.date() != date.today():
+        return False
+
+    # Candle color check: CE entry requires a bullish (green) candle
+    if latest.close <= latest.open:
         return False
 
     stops = _compute_natr_stop(candles_5m, natr_period, natr_mult)
@@ -152,13 +158,19 @@ def is_natr_pe_signal(
 
     Conditions:
       1. Latest candle is from today.
-      2. Previous candle close was AT OR ABOVE the stop (price was above stop).
-      3. Current candle close is BELOW the stop (price crossed below).
+      2. Candle is bearish: close < open (red candle).
+      3. Previous candle close was AT OR ABOVE the stop (price was above stop).
+      4. Current candle close is BELOW the stop (price crossed below).
     """
     if len(candles_5m) < max(_MIN_CANDLES, natr_period + 3):
         return False
 
-    if candles_5m[-1].timestamp.date() != date.today():
+    latest = candles_5m[-1]
+    if latest.timestamp.date() != date.today():
+        return False
+
+    # Candle color check: PE entry requires a bearish (red) candle
+    if latest.close >= latest.open:
         return False
 
     stops = _compute_natr_stop(candles_5m, natr_period, natr_mult)

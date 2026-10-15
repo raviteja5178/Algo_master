@@ -57,7 +57,12 @@ class SmartExitEngine:
         enable_profit_lock: bool = True,
         enable_time_decay: bool = True,
         enable_daily_loss_limit: bool = True,
+        ema_collapse_closes: int = 1,
+        ema_profit_lock: bool = True,
     ) -> None:
+        self._ema_collapse_closes = max(1, ema_collapse_closes)
+        # False = EMA CE/PE skip the profit lock (their own index engine manages exits)
+        self._ema_profit_lock = ema_profit_lock
         self._profit_lock_mult     = profit_lock_multiplier
         self._profit_lock_atr_mult = profit_lock_atr_mult   # 0 = use fixed mult
         self._profit_lock_min_pct  = profit_lock_min_pct    # 0 = disabled
@@ -114,7 +119,8 @@ class SmartExitEngine:
         # Using max() means:
         #   • On low-premium entries (≈₹225): ATR-based usually wins → tight lock
         #   • On high-premium entries (≈₹520): %-based wins → lets winners run
-        if self._en_profit_lock and not self._profit_locked:
+        _skip_lock = strategy_type in ("CE", "PE") and not self._ema_profit_lock
+        if self._en_profit_lock and not self._profit_locked and not _skip_lock:
             candidates: list[tuple[float, str]] = []
 
             if self._profit_lock_atr_mult > 0 and entry_atr and entry_atr > 0:
@@ -180,31 +186,28 @@ class SmartExitEngine:
         """
 
         # ── Trigger 2: EMA collapse ────────────────────────────────────────────
-        if self._en_ema_collapse and len(candles_5m) >= 21:
+        # Fires only when the last `ema_collapse_closes` candles ALL show collapse.
+        n = self._ema_collapse_closes
+        if self._en_ema_collapse and len(candles_5m) >= 20 + n and strategy_type in ("CE", "PE"):
             ema9_vals  = ema(candles_5m, 9)
             ema21_vals = ema(candles_5m, 21)
-            e9  = ema9_vals[-1]
-            e21 = ema21_vals[-1]
-            if e9 is None or e21 is None:
+            if any(v is None for v in ema9_vals[-n:] + ema21_vals[-n:]):
                 return None
 
-            close = candles_5m[-1].close
+            def _collapsed(i: int) -> bool:
+                e9, e21, close = ema9_vals[i], ema21_vals[i], candles_5m[i].close
+                if strategy_type == "CE":
+                    # Entry required EMA9 > EMA21. Collapse if EMA9 ≤ EMA21 or close < EMA21.
+                    return e9 <= e21 or close < e21
+                # PE: entry required EMA9 < EMA21. Collapse if EMA9 ≥ EMA21 or close > EMA21.
+                return e9 >= e21 or close > e21
 
-            if strategy_type == "CE":
-                # Entry required EMA9 > EMA21. Exit if EMA9 ≤ EMA21 or close < EMA21.
-                if e9 <= e21 or close < e21:
-                    log_event(logger, "SMART_EXIT_EMA_COLLAPSE",
-                              side="CE", ema9=round(e9, 2), ema21=round(e21, 2),
-                              close=round(close, 2))
-                    return "EMA_COLLAPSE"
-
-            elif strategy_type == "PE":
-                # Entry required EMA9 < EMA21. Exit if EMA9 ≥ EMA21 or close > EMA21.
-                if e9 >= e21 or close > e21:
-                    log_event(logger, "SMART_EXIT_EMA_COLLAPSE",
-                              side="PE", ema9=round(e9, 2), ema21=round(e21, 2),
-                              close=round(close, 2))
-                    return "EMA_COLLAPSE"
+            if all(_collapsed(i) for i in range(-n, 0)):
+                log_event(logger, "SMART_EXIT_EMA_COLLAPSE",
+                          side=strategy_type, ema9=round(ema9_vals[-1], 2),
+                          ema21=round(ema21_vals[-1], 2),
+                          close=round(candles_5m[-1].close, 2), closes=n)
+                return "EMA_COLLAPSE"
 
         return None
 

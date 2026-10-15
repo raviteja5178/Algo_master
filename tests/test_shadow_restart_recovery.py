@@ -93,6 +93,9 @@ class TestShadowRestartRecovery:
 
             # PaperBroker should now hold the restored qty
             assert ctx.broker.get_position_qty(symbol) == qty
+            # PaperBroker should also restore the pending SL order
+            assert "PAPER_SL_ABCDEF" in ctx.broker._open_orders
+            assert ctx.broker._open_orders["PAPER_SL_ABCDEF"]["status"] == "TRIGGER PENDING"
 
     @pytest.mark.parametrize("mode", ["PAPER", "SHADOW"])
     def test_paper_shadow_sets_position_open_state(self, mode: str) -> None:

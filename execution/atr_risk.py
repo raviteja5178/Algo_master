@@ -16,6 +16,14 @@ Two active modes, evaluated in priority order:
   Falls back to Mode C (spot ATR) automatically when no swing level is found.
   Caller must pass swing_high / swing_low (index prices) and sensex_ltp.
 
+  Mode D adequacy guard  (swing_sl_min_atr_mult > 0):
+    If the swing level is so close to entry that the index-point distance is
+    less than  ATR(spot_atr_period) × swing_sl_min_atr_mult, Mode D is
+    rejected and the bot falls through to Mode C.
+    Rationale: a swing only 44 index pts away on an ATR-90 day is inside one
+    normal candle's range — not a structural level, just nearby noise.
+    Recommended: 0.6  (swing must be at least 60% of one ATR away).
+
   MODE C — SENSEX spot ATR × multiplier  (use_spot_atr=True)
   ────────────────────────────────────────────────────────────────────────────────
   Momentum-adaptive: SL scales with current market volatility.
@@ -86,6 +94,9 @@ def compute_risk_params(
     sensex_ltp: float = 0.0,       # current SENSEX index price at entry
     swing_high: float | None = None,  # nearest confirmed swing HIGH (index pts)
     swing_low:  float | None = None,  # nearest confirmed swing LOW  (index pts)
+    # Mode D adequacy guard: reject swing SL when index distance < ATR × this mult
+    # 0.0 = disabled (always trust the swing level). Recommended: 0.6
+    swing_sl_min_atr_mult: float = 0.0,
 ) -> RiskParams:
     """
     Compute risk parameters for the current trade.
@@ -128,6 +139,20 @@ def compute_risk_params(
             # CE (bullish): thesis breaks if SENSEX falls back below the swing low
             sl_index_pts     = sensex_ltp - swing_low
             swing_level_used = swing_low
+
+        if sl_index_pts is not None and sl_index_pts > 0:
+            # ── Adequacy guard: reject swing if it is too close to entry ──────
+            # A swing level within one ATR of entry is just nearby noise, not
+            # a true structural level.  Fall through to Mode C when violated.
+            if swing_sl_min_atr_mult > 0 and current_atr and current_atr > 0:
+                min_index_distance = current_atr * swing_sl_min_atr_mult
+                if sl_index_pts < min_index_distance:
+                    logger.info(
+                        "Mode D swing SL rejected: index_pts=%.1f < ATR(%.0f)×%.2f=%.1f"
+                        " — falling through to Mode C",
+                        sl_index_pts, spot_atr_period, swing_sl_min_atr_mult, min_index_distance,
+                    )
+                    sl_index_pts = None  # trigger fall-through
 
         if sl_index_pts is not None and sl_index_pts > 0:
             sl_option_pts = round_to_tick(sl_index_pts * _ATM_DELTA)

@@ -835,6 +835,12 @@ def api_shadow_active():
                     trade["highest_ltp"]    = at["highest_ltp"]
                 if at.get("target") is not None:
                     trade["target_reference"] = at["target"]
+                if at.get("break_even_activated") is not None:
+                    trade["break_even_activated"] = at["break_even_activated"]
+                if at.get("trail_steps_completed") is not None:
+                    trade["trail_steps_completed"] = at["trail_steps_completed"]
+                if at.get("be_points") is not None:
+                    trade["be_points"] = at["be_points"]
         except Exception:
             pass
 
@@ -856,6 +862,20 @@ def api_shadow_active():
                     trade["option_ltp"] = float(opt_ltp)
         except Exception:
             pass
+
+    # Expose the break-even trigger points so the UI can compute TSL steps
+    # correctly.  be_points is not stored in the DB — derive it from the .env
+    # BREAK_EVEN_TRIGGER_POINTS setting (global for all trades).
+    try:
+        env_path = Path(__file__).resolve().parent.parent / ".env"
+        _env = {k: v for k, v in (
+            line.strip().split("=", 1)
+            for line in env_path.read_text().splitlines()
+            if "=" in line and not line.strip().startswith("#")
+        )}
+        trade["be_points"] = float(_env.get("BREAK_EVEN_TRIGGER_POINTS", 30))
+    except Exception:
+        trade["be_points"] = 30.0
 
     return jsonify(trade)
 
@@ -894,7 +914,19 @@ _SAFE_KEYS = {
     "FORCE_EXIT_TIME", "NO_NEW_ENTRY_AFTER", "TIMEZONE",
     "EXPIRY_MODE", "CONFIGURED_EXPIRY", "DB_PATH", "LOG_LEVEL",
     "KITE_TOTP_SECRET", "KITE_USER_ID", "KITE_USERNAME",
-    "ENABLE_EMA_STRATEGY", "ENABLE_ORB_STRATEGY",
+    "ENABLE_EMA_STRATEGY",
+    "EMA_QUANTITY", "EMA_TARGET_RR", "EMA_NO_NEW_ENTRY_AFTER", "EMA_COOLDOWN_CANDLES",
+    "EMA_SCAN_START", "EMA_RSI_PERIOD", "EMA_RSI_CE_MIN", "EMA_RSI_PE_MAX", "EMA_PULLBACK_TOL_PTS",
+    "EMA_SKIP_SMART_FILTERS", "EMA_OPTION_EMA_CHECK", "EMA_MAX_SLIPPAGE_PCT",
+    "EXPIRY_DAY_ROLLOVER_TIME",
+    "EMA_SWING_LENGTH", "EMA_SWING_BUFFER_ATR", "EMA_SL_MIN_ATR", "EMA_SL_MAX_ATR",
+    "EMA_SL_FALLBACK_ATR", "EMA_OPTION_DELTA", "EMA_EXPIRY_DELTA", "EMA_MAX_SL_PCT",
+    "EMA_EXPIRY_MAX_SL_PCT", "EMA_HARD_SL_CUSHION", "EMA_MAX_RISK_RUPEES",
+    "EMA_BE_TRIGGER_R", "EMA_BE_BUFFER_PTS", "EMA_TRAIL_ATR_MULT", "EMA_TRAIL_EMA9_EXIT",
+    "EMA_TIME_STOP_BARS", "EMA_TIME_STOP_MIN_R", "EMA_MIN_ROOM_R", "EMA_COLLAPSE_CLOSES",
+    "EMA_PROFIT_LOCK", "EMA_MAX_TRADES_PER_DAY", "EMA_MAX_CONSEC_LOSSES",
+    "EMA_EXPIRY_NO_ENTRY_AFTER",
+    "ENABLE_ORB_STRATEGY",
     "ENABLE_MOMENTUM_PHASE", "MOMENTUM_MIN_BODY_PTS",
     "MOMENTUM_WINDOW_START", "MOMENTUM_WINDOW_END",
     # Order Block strategy
@@ -905,6 +937,11 @@ _SAFE_KEYS = {
     "TRB_MIN_BODY_RATIO", "TRB_BUFFER_ATR_MULT",
     # VWAP Retest strategy
     "ENABLE_VWAP_STRATEGY", "VWAP_RETEST_LOOKBACK", "VWAP_MIN_BOUNCE_PTS",
+    # Pivot Levels + EMA filter
+    "ENABLE_PIVOT_LEVELS", "PIVOT_ZONE_BUFFER", "PIVOT_COUNTER_TREND_BLOCK", "PIVOT_BREAKOUT_CONFIRM",
+    "ENABLE_PIVOT_STRATEGY", "PIVOT_SUSTAIN_CANDLES", "PIVOT_SL_MODE", "PIVOT_SL_ATR_MULT",
+    "PIVOT_SL_BUFFER_ATR", "PIVOT_MIN_ROOM_R", "PIVOT_BE_TRIGGER_R", "PIVOT_BE_BUFFER_PTS",
+    "PIVOT_T1_LOCK_PCT", "PIVOT_TRAIL_ATR_MULT", "PIVOT_HARD_SL_CUSHION", "PIVOT_MAX_TRADES_PER_DAY",
     # PDHL Breakout strategy
     "ENABLE_PDHL_STRATEGY", "PDHL_BUFFER_PTS",
     # NATR Trailing Stop strategy
@@ -933,7 +970,19 @@ _EDITABLE_KEYS = {
     "TRAIL_STEP_POINTS", "INITIAL_TARGET_OFFSET_POINTS", "FORCE_EXIT_TIME",
     "NO_NEW_ENTRY_AFTER", "CONFIGURED_EXPIRY", "EXPIRY_MODE", "LOG_LEVEL",
     "ENABLE_LIVE_TRADING", "KITE_TOTP_SECRET",
-    "ENABLE_EMA_STRATEGY", "ENABLE_ORB_STRATEGY",
+    "ENABLE_EMA_STRATEGY",
+    "EMA_QUANTITY", "EMA_TARGET_RR", "EMA_NO_NEW_ENTRY_AFTER", "EMA_COOLDOWN_CANDLES",
+    "EMA_SCAN_START", "EMA_RSI_PERIOD", "EMA_RSI_CE_MIN", "EMA_RSI_PE_MAX", "EMA_PULLBACK_TOL_PTS",
+    "EMA_SKIP_SMART_FILTERS", "EMA_OPTION_EMA_CHECK", "EMA_MAX_SLIPPAGE_PCT",
+    "EXPIRY_DAY_ROLLOVER_TIME",
+    "EMA_SWING_LENGTH", "EMA_SWING_BUFFER_ATR", "EMA_SL_MIN_ATR", "EMA_SL_MAX_ATR",
+    "EMA_SL_FALLBACK_ATR", "EMA_OPTION_DELTA", "EMA_EXPIRY_DELTA", "EMA_MAX_SL_PCT",
+    "EMA_EXPIRY_MAX_SL_PCT", "EMA_HARD_SL_CUSHION", "EMA_MAX_RISK_RUPEES",
+    "EMA_BE_TRIGGER_R", "EMA_BE_BUFFER_PTS", "EMA_TRAIL_ATR_MULT", "EMA_TRAIL_EMA9_EXIT",
+    "EMA_TIME_STOP_BARS", "EMA_TIME_STOP_MIN_R", "EMA_MIN_ROOM_R", "EMA_COLLAPSE_CLOSES",
+    "EMA_PROFIT_LOCK", "EMA_MAX_TRADES_PER_DAY", "EMA_MAX_CONSEC_LOSSES",
+    "EMA_EXPIRY_NO_ENTRY_AFTER",
+    "ENABLE_ORB_STRATEGY",
     "ENABLE_MOMENTUM_PHASE", "MOMENTUM_MIN_BODY_PTS",
     "MOMENTUM_WINDOW_START", "MOMENTUM_WINDOW_END",
     # Order Block strategy
@@ -944,6 +993,11 @@ _EDITABLE_KEYS = {
     "TRB_MIN_BODY_RATIO", "TRB_BUFFER_ATR_MULT",
     # VWAP Retest strategy
     "ENABLE_VWAP_STRATEGY", "VWAP_RETEST_LOOKBACK", "VWAP_MIN_BOUNCE_PTS",
+    # Pivot Levels + EMA filter
+    "ENABLE_PIVOT_LEVELS", "PIVOT_ZONE_BUFFER", "PIVOT_COUNTER_TREND_BLOCK", "PIVOT_BREAKOUT_CONFIRM",
+    "ENABLE_PIVOT_STRATEGY", "PIVOT_SUSTAIN_CANDLES", "PIVOT_SL_MODE", "PIVOT_SL_ATR_MULT",
+    "PIVOT_SL_BUFFER_ATR", "PIVOT_MIN_ROOM_R", "PIVOT_BE_TRIGGER_R", "PIVOT_BE_BUFFER_PTS",
+    "PIVOT_T1_LOCK_PCT", "PIVOT_TRAIL_ATR_MULT", "PIVOT_HARD_SL_CUSHION", "PIVOT_MAX_TRADES_PER_DAY",
     # PDHL Breakout strategy
     "ENABLE_PDHL_STRATEGY", "PDHL_BUFFER_PTS",
     # NATR Trailing Stop strategy

@@ -1,0 +1,627 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>All Trades &amp; Signals Analysis</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-size: 13px; background: #f7f8fa; color: #1f2328; line-height: 1.5; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #57606a; font-size: 12px; margin-bottom: 24px; }
+  h2 { font-size: 14px; font-weight: 700; margin: 28px 0 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+  h3 { font-size: 12px; font-weight: 600; color: #57606a; text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 8px; }
+
+  /* Summary cards */
+  .cards { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 16px; min-width: 130px; flex: 1; }
+  .card-label { font-size: 11px; color: #57606a; margin-bottom: 2px; }
+  .card-val { font-size: 20px; font-weight: 700; }
+  .win { color: #16a34a; }
+  .loss { color: #dc2626; }
+  .neutral { color: #1f2328; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; margin-bottom: 20px; font-size: 12px; }
+  th { background: #f7f8fa; color: #57606a; font-weight: 600; text-align: left; padding: 7px 10px; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+  td { padding: 6px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f9fafb; }
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+  .tag-ce  { background: #dbeafe; color: #1d4ed8; }
+  .tag-pe  { background: #fce7f3; color: #9d174d; }
+  .tag-win { background: #dcfce7; color: #15803d; }
+  .tag-loss{ background: #fee2e2; color: #b91c1c; }
+  .tag-be  { background: #fef9c3; color: #854d0e; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: #57606a; }
+  .bold { font-weight: 600; }
+
+  /* Day header rows */
+  .day-row td { background: #f7f8fa; font-weight: 700; color: #57606a; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 4px 10px; }
+
+  /* Signals table */
+  .sig-blocked { color: #dc2626; }
+  .sig-ok { color: #16a34a; }
+
+  /* Strategy breakdown */
+  .strat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .strat-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; }
+  .strat-name { font-weight: 700; font-size: 12px; margin-bottom: 6px; }
+  .strat-row { display: flex; justify-content: space-between; font-size: 11px; color: #57606a; margin-bottom: 2px; }
+  .strat-row span:last-child { font-weight: 600; color: #1f2328; }
+
+  footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 11px; color: #57606a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>All Trades &amp; Signals Analysis</h1>
+  <div class="subtitle">SHADOW mode · 4 trading days (Oct 6–12, 2026) · 27 filled trades · 34 processed signals · All strategies</div>
+
+  
+  <div class="cards">
+    <div class="card"><div class="card-label">Total Trades</div><div class="card-val neutral">27</div></div>
+    <div class="card"><div class="card-label">Winning</div><div class="card-val win">14</div></div>
+    <div class="card"><div class="card-label">Losing</div><div class="card-val loss">13</div></div>
+    <div class="card"><div class="card-label">Win Rate</div><div class="card-val neutral">51.9%</div></div>
+    <div class="card"><div class="card-label">Total P&amp;L</div><div class="card-val win">+₹2,913</div></div>
+    <div class="card"><div class="card-label">Avg SL pts</div><div class="card-val neutral">72.8</div></div>
+    <div class="card"><div class="card-label">Avg TSL pts</div><div class="card-val neutral">21.8</div></div>
+    <div class="card"><div class="card-label">Avg Target pts</div><div class="card-val neutral">173.8</div></div>
+    <div class="card"><div class="card-label">Signals Processed</div><div class="card-val neutral">34</div></div>
+  </div>
+
+  
+  <h2>By Strategy</h2>
+  <div class="strat-grid">
+    <div class="strat-card">
+      <div class="strat-name" style="color:#1d4ed8">CE (EMA)</div>
+      <div class="strat-row"><span>Trades</span><span>5</span></div>
+      <div class="strat-row"><span>W/L</span><span>3W / 2L</span></div>
+      <div class="strat-row"><span>P&amp;L</span><span style="color:#16a34a">+₹1,197</span></div>
+      <div class="strat-row"><span>Avg SL pts</span><span>62.2</span></div>
+      <div class="strat-row"><span>Avg TSL pts</span><span>14.7</span></div>
+      <div class="strat-row"><span>Avg Target pts</span><span>102.1</span></div>
+    </div>
+    <div class="strat-card">
+      <div class="strat-name" style="color:#9d174d">PE (EMA)</div>
+      <div class="strat-row"><span>Trades</span><span>3</span></div>
+      <div class="strat-row"><span>W/L</span><span>3W / 0L</span></div>
+      <div class="strat-row"><span>P&amp;L</span><span style="color:#16a34a">+₹699</span></div>
+      <div class="strat-row"><span>Avg SL pts</span><span>53.0</span></div>
+      <div class="strat-row"><span>Avg TSL pts</span><span>15.9</span></div>
+      <div class="strat-row"><span>Avg Target pts</span><span>79.4</span></div>
+    </div>
+    <div class="strat-card">
+      <div class="strat-name" style="color:#6d28d9">CE_PIVOT</div>
+      <div class="strat-row"><span>Trades</span><span>3</span></div>
+      <div class="strat-row"><span>W/L</span><span>1W / 2L</span></div>
+      <div class="strat-row"><span>P&amp;L</span><span style="color:#16a34a">+₹1,252</span></div>
+      <div class="strat-row"><span>Avg SL pts</span><span>67.8</span></div>
+      <div class="strat-row"><span>Avg TSL pts</span><span>40.4</span></div>
+      <div class="strat-row"><span>Avg Target pts</span><span>491.9</span></div>
+    </div>
+    <div class="strat-card">
+      <div class="strat-name" style="color:#9d174d">PE_PIVOT</div>
+      <div class="strat-row"><span>Trades</span><span>1</span></div>
+      <div class="strat-row"><span>W/L</span><span>0W / 1L</span></div>
+      <div class="strat-row"><span>P&amp;L</span><span style="color:#dc2626">-₹1,844</span></div>
+      <div class="strat-row"><span>Avg SL pts</span><span>107.3</span></div>
+      <div class="strat-row"><span>Avg TSL pts</span><span>45.7</span></div>
+      <div class="strat-row"><span>Avg Target pts</span><span>527.8</span></div>
+    </div>
+    <div class="strat-card">
+      <div class="strat-name" style="color:#0369a1">PE_VWAP</div>
+      <div class="strat-row"><span>Trades</span><span>8</span></div>
+      <div class="strat-row"><span>W/L</span><span>5W / 3L</span></div>
+      <div class="strat-row"><span>P&amp;L</span><span style="color:#16a34a">+₹4,302</span></div>
+      <div class="strat-row"><span>Avg SL pts</span><span>83.4</span></div>
+      <div class="strat-row"><span>Avg TSL pts</span><span>25.0</span></div>
+      <div class="strat-row"><span>Avg Target pts</span><span>183.5</span></div>
+    </div>
+    <div class="strat-card">
+      <div class="strat-name" style="color:#0369a1">CE_VWAP</div>
+      <div class="strat-row"><span>Trades</span><span>2</span></div>
+      <div class="strat-row"><span>W/L</span><span>1W / 1L</span></div>
+      <div class="strat-row"><span>P&amp;L</span><span style="color:#dc2626">-₹574</span></div>
+      <div class="strat-row"><span>Avg SL pts</span><span>50.2</span></div>
+      <div class="strat-row"><span>Avg TSL pts</span><span>12.4</span></div>
+      <div class="strat-row"><span>Avg Target pts</span><span>75.3</span></div>
+    </div>
+    <div class="strat-card">
+      <div class="strat-name" style="color:#065f46">CE_MOM</div>
+      <div class="strat-row"><span>Trades</span><span>2</span></div>
+      <div class="strat-row"><span>W/L</span><span>1W / 1L</span></div>
+      <div class="strat-row"><span>P&amp;L</span><span style="color:#dc2626">-₹869</span></div>
+      <div class="strat-row"><span>Avg SL pts</span><span>87.8</span></div>
+      <div class="strat-row"><span>Avg TSL pts</span><span>26.3</span></div>
+      <div class="strat-row"><span>Avg Target pts</span><span>131.6</span></div>
+    </div>
+    <div class="strat-card">
+      <div class="strat-name" style="color:#dc2626">PE_ATR</div>
+      <div class="strat-row"><span>Trades</span><span>1</span></div>
+      <div class="strat-row"><span>W/L</span><span>1W / 0L</span></div>
+      <div class="strat-row"><span>P&amp;L</span><span style="color:#16a34a">+₹1,088</span></div>
+      <div class="strat-row"><span>Avg SL pts</span><span>105.1</span></div>
+      <div class="strat-row"><span>Avg TSL pts</span><span>31.5</span></div>
+      <div class="strat-row"><span>Avg Target pts</span><span>231.1</span></div>
+    </div>
+    <div class="strat-card">
+      <div class="strat-name" style="color:#92400e">CE_NATR</div>
+      <div class="strat-row"><span>Trades</span><span>1</span></div>
+      <div class="strat-row"><span>W/L</span><span>0W / 1L</span></div>
+      <div class="strat-row"><span>P&amp;L</span><span style="color:#dc2626">-₹920</span></div>
+      <div class="strat-row"><span>Avg SL pts</span><span>45.7</span></div>
+      <div class="strat-row"><span>Avg TSL pts</span><span>13.7</span></div>
+      <div class="strat-row"><span>Avg Target pts</span><span>100.5</span></div>
+    </div>
+  </div>
+
+  
+  <h2>All Filled Trades — SL / TSL / Target Detail</h2>
+  <p class="muted" style="font-size:11px;margin-bottom:10px">TSL pts = initial trailing stop distance set at entry. SL pts = initial stop distance. Target pts = distance to T1.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Date/Time</th>
+        <th>Strategy</th>
+        <th>Symbol</th>
+        <th class="num">Entry ₹</th>
+        <th class="num">Exit ₹</th>
+        <th class="num">SL pts</th>
+        <th class="num">TSL pts</th>
+        <th class="num">Target pts</th>
+        <th class="num">ATR</th>
+        <th>Exit Reason</th>
+        <th class="num">P&amp;L ₹</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+      <tr class="day-row"><td colspan="11">Monday 12 Oct 2026</td></tr>
+      <tr>
+        <td class="muted">14:15</td>
+        <td><span class="tag tag-pe">PE</span> VWAP</td>
+        <td class="muted">71800PE</td>
+        <td class="num">429.05</td>
+        <td class="num">446.70</td>
+        <td class="num bold">71.25</td>
+        <td class="num bold" style="color:#3b82d4">21.4</td>
+        <td class="num bold">156.75</td>
+        <td class="num muted">50.8</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+353</td>
+      </tr>
+      <tr>
+        <td class="muted">13:15</td>
+        <td><span class="tag tag-pe">PE</span> VWAP</td>
+        <td class="muted">71900PE</td>
+        <td class="num">459.85</td>
+        <td class="num">417.00</td>
+        <td class="num bold">42.0</td>
+        <td class="num bold" style="color:#3b82d4">12.6</td>
+        <td class="num bold">92.4</td>
+        <td class="num muted">69.3</td>
+        <td><span class="tag tag-loss">STOP_HIT</span></td>
+        <td class="num loss bold">-857</td>
+      </tr>
+      <tr>
+        <td class="muted">11:20</td>
+        <td><span class="tag tag-ce">CE</span> PIVOT</td>
+        <td class="muted">72000CE</td>
+        <td class="num">466.45</td>
+        <td class="num">449.60</td>
+        <td class="num bold">31.85</td>
+        <td class="num bold" style="color:#3b82d4">36.8</td>
+        <td class="num bold">506.35</td>
+        <td class="num muted">79.6</td>
+        <td><span class="tag tag-loss">PIVOT_SL_HIT</span></td>
+        <td class="num loss bold">-337</td>
+      </tr>
+      <tr>
+        <td class="muted">11:20</td>
+        <td><span class="tag tag-ce">CE</span> PIVOT <span class="muted" style="font-size:10px">(dup)</span></td>
+        <td class="muted">72000CE</td>
+        <td class="num">466.45</td>
+        <td class="num">431.00</td>
+        <td class="num bold">31.8</td>
+        <td class="num bold" style="color:#3b82d4">36.3</td>
+        <td class="num bold">506.35</td>
+        <td class="num muted">78.7</td>
+        <td><span class="tag tag-loss">STOP_HIT</span></td>
+        <td class="num loss bold">-709</td>
+      </tr>
+      <tr>
+        <td class="muted">11:05</td>
+        <td><span class="tag tag-pe">PE</span> VWAP</td>
+        <td class="muted">72000PE</td>
+        <td class="num">472.15</td>
+        <td class="num">510.20</td>
+        <td class="num bold">128.1</td>
+        <td class="num bold" style="color:#3b82d4">38.5</td>
+        <td class="num bold">281.8</td>
+        <td class="num muted">72.4</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+761</td>
+      </tr>
+      <tr>
+        <td class="muted">10:30</td>
+        <td><span class="tag tag-pe">PE</span> ATR</td>
+        <td class="muted">72200PE</td>
+        <td class="num">459.90</td>
+        <td class="num">514.30</td>
+        <td class="num bold">105.1</td>
+        <td class="num bold" style="color:#3b82d4">31.5</td>
+        <td class="num bold">231.1</td>
+        <td class="num muted">79.5</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+1,088</td>
+      </tr>
+      <tr>
+        <td class="muted">10:30</td>
+        <td><span class="tag tag-pe">PE</span> VWAP</td>
+        <td class="muted">72200PE</td>
+        <td class="num">459.90</td>
+        <td class="num">513.40</td>
+        <td class="num bold">105.1</td>
+        <td class="num bold" style="color:#3b82d4">31.5</td>
+        <td class="num bold">231.1</td>
+        <td class="num muted">87.5</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+1,070</td>
+      </tr>
+      <tr>
+        <td class="muted">09:25</td>
+        <td><span class="tag tag-pe">PE</span> VWAP</td>
+        <td class="muted">72400PE</td>
+        <td class="num">418.10</td>
+        <td class="num">514.00</td>
+        <td class="num bold">176.3</td>
+        <td class="num bold" style="color:#3b82d4">52.9</td>
+        <td class="num bold">387.75</td>
+        <td class="num muted">146.9</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+1,918</td>
+      </tr>
+      <tr>
+        <td class="muted">09:20</td>
+        <td><span class="tag tag-ce">CE</span> NATR</td>
+        <td class="muted">72600CE</td>
+        <td class="num">567.00</td>
+        <td class="num">521.00</td>
+        <td class="num bold">45.7</td>
+        <td class="num bold" style="color:#3b82d4">13.7</td>
+        <td class="num bold">100.5</td>
+        <td class="num muted">115.6</td>
+        <td><span class="tag tag-loss">STOP_HIT</span></td>
+        <td class="num loss bold">-920</td>
+      </tr>
+
+      
+      <tr class="day-row"><td colspan="11">Thursday 9 Oct 2026</td></tr>
+      <tr>
+        <td class="muted">14:20</td>
+        <td><span class="tag tag-ce">CE</span> MOM</td>
+        <td class="muted">72700CE</td>
+        <td class="num">522.00</td>
+        <td class="num">425.85</td>
+        <td class="num bold">97.2</td>
+        <td class="num bold" style="color:#3b82d4">29.2</td>
+        <td class="num bold">145.8</td>
+        <td class="num muted">68.4</td>
+        <td><span class="tag tag-loss">TIME_DECAY</span></td>
+        <td class="num loss bold">-1,923</td>
+      </tr>
+      <tr>
+        <td class="muted">14:00</td>
+        <td><span class="tag tag-ce">CE</span> MOM</td>
+        <td class="muted">72600CE</td>
+        <td class="num">534.00</td>
+        <td class="num">586.70</td>
+        <td class="num bold">78.4</td>
+        <td class="num bold" style="color:#3b82d4">23.5</td>
+        <td class="num bold">117.5</td>
+        <td class="num muted">56.1</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+1,054</td>
+      </tr>
+      <tr>
+        <td class="muted">13:25</td>
+        <td><span class="tag tag-ce">CE</span> EMA</td>
+        <td class="muted">72500CE</td>
+        <td class="num">544.95</td>
+        <td class="num">557.65</td>
+        <td class="num bold">49.8</td>
+        <td class="num bold" style="color:#3b82d4">14.95</td>
+        <td class="num bold">124.5</td>
+        <td class="num muted">45.3</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+254</td>
+      </tr>
+      <tr>
+        <td class="muted">13:00</td>
+        <td><span class="tag tag-ce">CE</span> VWAP</td>
+        <td class="muted">72400CE</td>
+        <td class="num">616.10</td>
+        <td class="num">567.45</td>
+        <td class="num bold">46.3</td>
+        <td class="num bold" style="color:#3b82d4">13.9</td>
+        <td class="num bold">69.4</td>
+        <td class="num muted">44.0</td>
+        <td><span class="tag tag-loss">STOP_HIT</span></td>
+        <td class="num loss bold">-973</td>
+      </tr>
+      <tr>
+        <td class="muted">12:00</td>
+        <td><span class="tag tag-pe">PE</span> VWAP</td>
+        <td class="muted">72200PE</td>
+        <td class="num">469.65</td>
+        <td class="num">404.85</td>
+        <td class="num bold">64.5</td>
+        <td class="num bold" style="color:#3b82d4">19.4</td>
+        <td class="num bold">96.7</td>
+        <td class="num muted">53.7</td>
+        <td><span class="tag tag-loss">STOP_HIT</span></td>
+        <td class="num loss bold">-1,296</td>
+      </tr>
+      <tr>
+        <td class="muted">09:35</td>
+        <td><span class="tag tag-ce">CE</span> PIVOT</td>
+        <td class="muted">72100CE</td>
+        <td class="num">599.05</td>
+        <td class="num">713.95</td>
+        <td class="num bold">139.7</td>
+        <td class="num bold" style="color:#3b82d4">48.2</td>
+        <td class="num bold">463.0</td>
+        <td class="num muted">152.0</td>
+        <td><span class="tag tag-win">PIVOT_TSL_HIT ✓✓</span></td>
+        <td class="num win bold">+2,298</td>
+      </tr>
+      <tr>
+        <td class="muted">09:25</td>
+        <td><span class="tag tag-pe">PE</span> PIVOT</td>
+        <td class="muted">71800PE</td>
+        <td class="num">490.80</td>
+        <td class="num">398.60</td>
+        <td class="num bold">107.3</td>
+        <td class="num bold" style="color:#3b82d4">45.7</td>
+        <td class="num bold">527.8</td>
+        <td class="num muted">150.9</td>
+        <td><span class="tag tag-loss">PIVOT_SL_HIT</span></td>
+        <td class="num loss bold">-1,844</td>
+      </tr>
+
+      
+      <tr class="day-row"><td colspan="11">Wednesday 8 Oct 2026</td></tr>
+      <tr>
+        <td class="muted">14:05</td>
+        <td><span class="tag tag-pe">PE</span> EMA</td>
+        <td class="muted">71500PE</td>
+        <td class="num">125.00</td>
+        <td class="num">138.35</td>
+        <td class="num bold">43.75</td>
+        <td class="num bold" style="color:#3b82d4">13.1</td>
+        <td class="num bold">65.6</td>
+        <td class="num muted">74.1</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+267</td>
+      </tr>
+      <tr>
+        <td class="muted">13:20</td>
+        <td><span class="tag tag-pe">PE</span> VWAP</td>
+        <td class="muted">71600PE</td>
+        <td class="num">128.20</td>
+        <td class="num">153.35</td>
+        <td class="num bold">44.85</td>
+        <td class="num bold" style="color:#3b82d4">13.5</td>
+        <td class="num bold">67.3</td>
+        <td class="num muted">78.1</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+503</td>
+      </tr>
+      <tr>
+        <td class="muted">13:00</td>
+        <td><span class="tag tag-pe">PE</span> EMA</td>
+        <td class="muted">71700PE</td>
+        <td class="num">152.50</td>
+        <td class="num">165.60</td>
+        <td class="num bold">53.4</td>
+        <td class="num bold" style="color:#3b82d4">16.0</td>
+        <td class="num bold">80.1</td>
+        <td class="num muted">77.6</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+262</td>
+      </tr>
+      <tr>
+        <td class="muted">12:35</td>
+        <td><span class="tag tag-pe">PE</span> EMA</td>
+        <td class="muted">71800PE</td>
+        <td class="num">176.30</td>
+        <td class="num">184.80</td>
+        <td class="num bold">61.7</td>
+        <td class="num bold" style="color:#3b82d4">18.5</td>
+        <td class="num bold">92.6</td>
+        <td class="num muted">102.5</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+170</td>
+      </tr>
+      <tr>
+        <td class="muted">12:20</td>
+        <td><span class="tag tag-pe">PE</span> VWAP</td>
+        <td class="muted">71900PE</td>
+        <td class="num">181.40</td>
+        <td class="num">209.10</td>
+        <td class="num bold">63.5</td>
+        <td class="num bold" style="color:#3b82d4">19.1</td>
+        <td class="num bold">95.3</td>
+        <td class="num muted">86.4</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+554</td>
+      </tr>
+
+      
+      <tr class="day-row"><td colspan="11">Tuesday 7 Oct 2026</td></tr>
+      <tr>
+        <td class="muted">13:25</td>
+        <td><span class="tag tag-pe">PE</span> EMA</td>
+        <td class="muted">72500PE</td>
+        <td class="num">292.65</td>
+        <td class="num">189.25</td>
+        <td class="num bold">102.5</td>
+        <td class="num bold" style="color:#3b82d4">20.5</td>
+        <td class="num bold">153.7</td>
+        <td class="num muted">75.0</td>
+        <td><span class="tag tag-loss">STOP_HIT</span></td>
+        <td class="num loss bold">-2,068</td>
+      </tr>
+      <tr>
+        <td class="muted">13:00</td>
+        <td><span class="tag tag-pe">PE</span> VWAP</td>
+        <td class="muted">72700PE</td>
+        <td class="num">296.85</td>
+        <td class="num">387.05</td>
+        <td class="num bold">91.7</td>
+        <td class="num bold" style="color:#3b82d4">18.4</td>
+        <td class="num bold">137.5</td>
+        <td class="num muted">60.7</td>
+        <td><span class="tag tag-win">STOP_HIT ✓TSL</span></td>
+        <td class="num win bold">+1,804</td>
+      </tr>
+      <tr>
+        <td class="muted">10:55</td>
+        <td><span class="tag tag-ce">CE</span> EMA</td>
+        <td class="muted">72900CE</td>
+        <td class="num">286.25</td>
+        <td class="num">282.65</td>
+        <td class="num bold">20.0</td>
+        <td class="num bold" style="color:#3b82d4">5.0</td>
+        <td class="num bold">30.0</td>
+        <td class="num muted">90.8</td>
+        <td><span class="tag tag-loss">STOP_HIT</span></td>
+        <td class="num loss bold">-72</td>
+      </tr>
+
+      
+      <tr class="day-row"><td colspan="11">Monday 6 Oct 2026</td></tr>
+      <tr>
+        <td class="muted">14:05</td>
+        <td><span class="tag tag-ce">CE</span> EMA</td>
+        <td class="muted">72900CE</td>
+        <td class="num">396.00</td>
+        <td class="num">396.00</td>
+        <td class="num bold">38.25</td>
+        <td class="num bold" style="color:#3b82d4">7.7</td>
+        <td class="num bold">57.4</td>
+        <td class="num muted">36.0</td>
+        <td><span class="tag tag-be">STOP_HIT BE</span></td>
+        <td class="num">±0</td>
+      </tr>
+      <tr>
+        <td class="muted">11:50</td>
+        <td><span class="tag tag-ce">CE</span> VWAP</td>
+        <td class="muted">72800CE</td>
+        <td class="num">415.80</td>
+        <td class="num">435.75</td>
+        <td class="num bold">54.1</td>
+        <td class="num bold" style="color:#3b82d4">10.8</td>
+        <td class="num bold">81.2</td>
+        <td class="num muted">38.1</td>
+        <td><span class="tag tag-win">PROFIT_LOCK</span></td>
+        <td class="num win bold">+399</td>
+      </tr>
+      <tr>
+        <td class="muted">10:25</td>
+        <td><span class="tag tag-ce">CE</span> EMA</td>
+        <td class="muted">72700CE</td>
+        <td class="num">396.90</td>
+        <td class="num">437.60</td>
+        <td class="num bold">138.9</td>
+        <td class="num bold" style="color:#3b82d4">27.8</td>
+        <td class="num bold">208.4</td>
+        <td class="num muted">79.9</td>
+        <td><span class="tag tag-win">PROFIT_LOCK</span></td>
+        <td class="num win bold">+814</td>
+      </tr>
+    </tbody>
+  </table>
+
+  
+  <h2>All Processed Signals (Entries + Blocked/Deduped)</h2>
+  <p class="muted" style="font-size:11px;margin-bottom:10px">These are signals the engine attempted — each maps to either a filled trade above or was blocked by dedup / cap / cooldown. A signal in this table without a matching trade was skipped.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Signal ID</th>
+        <th>Strategy</th>
+        <th>Candle Time</th>
+        <th>Processed At (UTC)</th>
+        <th>Outcome</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="day-row"><td colspan="5">Monday 12 Oct 2026</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_SIGNAL_…14:55</td><td><span class="tag tag-pe">PE</span> EMA</td><td>14:55</td><td class="muted">09:43</td><td class="sig-blocked">Blocked — no filled trade (cap / cooldown)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_VWAP_SIGNAL_…14:10</td><td><span class="tag tag-pe">PE</span> VWAP</td><td>14:10</td><td class="muted">08:45</td><td class="sig-ok">→ Filled (14:15 trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_SIGNAL_…13:55</td><td><span class="tag tag-pe">PE</span> EMA</td><td>13:55</td><td class="muted">08:30</td><td class="sig-blocked">Blocked — no filled trade (cap / cooldown)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_VWAP_SIGNAL_…13:10</td><td><span class="tag tag-pe">PE</span> VWAP</td><td>13:10</td><td class="muted">07:45</td><td class="sig-ok">→ Filled (13:15 trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_SIGNAL_…12:50</td><td><span class="tag tag-pe">PE</span> EMA</td><td>12:50</td><td class="muted">07:25</td><td class="sig-blocked">Blocked — no filled trade (cap / cooldown)</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_PIVOT_SIGNAL_…11:15</td><td><span class="tag tag-ce">CE</span> PIVOT</td><td>11:15</td><td class="muted">05:50</td><td class="sig-ok">→ Filled (11:20 trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_VWAP_SIGNAL_…11:00</td><td><span class="tag tag-pe">PE</span> VWAP</td><td>11:00</td><td class="muted">05:35</td><td class="sig-ok">→ Filled (11:05 trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_VWAP_SIGNAL_…10:25</td><td><span class="tag tag-pe">PE</span> VWAP</td><td>10:25</td><td class="muted">05:00</td><td class="sig-ok">→ Filled (10:30 VWAP trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_ATR_SIGNAL_…10:25</td><td><span class="tag tag-pe">PE</span> ATR</td><td>10:25</td><td class="muted">05:00</td><td class="sig-ok">→ Filled (10:30 ATR trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_VWAP_SIGNAL_…09:20</td><td><span class="tag tag-pe">PE</span> VWAP</td><td>09:20</td><td class="muted">03:55</td><td class="sig-ok">→ Filled (09:25 trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_NATR_SIGNAL_…09:15</td><td><span class="tag tag-ce">CE</span> NATR</td><td>09:15</td><td class="muted">03:50</td><td class="sig-ok">→ Filled (09:20 NATR trade)</td></tr>
+
+      <tr class="day-row"><td colspan="5">Thursday 9 Oct 2026</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_MOM_SIGNAL_…14:15</td><td><span class="tag tag-ce">CE</span> MOM</td><td>14:15</td><td class="muted">08:50</td><td class="sig-ok">→ Filled (14:20 MOM trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_MOM_SIGNAL_…13:55</td><td><span class="tag tag-ce">CE</span> MOM</td><td>13:55</td><td class="muted">08:30</td><td class="sig-blocked">Blocked — no filled trade (dedup / cap)</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_SIGNAL_…13:20</td><td><span class="tag tag-ce">CE</span> EMA</td><td>13:20</td><td class="muted">07:55</td><td class="sig-ok">→ Filled (13:25 EMA trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_VWAP_SIGNAL_…12:55</td><td><span class="tag tag-ce">CE</span> VWAP</td><td>12:55</td><td class="muted">07:30</td><td class="sig-ok">→ Filled (13:00 VWAP trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_VWAP_SIGNAL_…11:55</td><td><span class="tag tag-pe">PE</span> VWAP</td><td>11:55</td><td class="muted">06:30</td><td class="sig-ok">→ Filled (12:00 VWAP trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_PIVOT_SIGNAL_…09:30</td><td><span class="tag tag-ce">CE</span> PIVOT</td><td>09:30</td><td class="muted">04:05</td><td class="sig-ok">→ Filled (09:35 PIVOT trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_PIVOT_SIGNAL_…09:20</td><td><span class="tag tag-pe">PE</span> PIVOT</td><td>09:20</td><td class="muted">03:55</td><td class="sig-ok">→ Filled (09:25 PIVOT trade)</td></tr>
+
+      <tr class="day-row"><td colspan="5">Wednesday 8 Oct 2026</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_SIGNAL_…15:05</td><td><span class="tag tag-pe">PE</span> EMA</td><td>15:05</td><td class="muted">09:40</td><td class="sig-blocked">Blocked — no filled trade</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_SIGNAL_…14:55</td><td><span class="tag tag-pe">PE</span> EMA</td><td>14:55</td><td class="muted">09:30</td><td class="sig-blocked">Blocked — no filled trade</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_SIGNAL_…14:00</td><td><span class="tag tag-pe">PE</span> EMA</td><td>14:00</td><td class="muted">08:35</td><td class="sig-blocked">Blocked — no filled trade (3 PE trades already done)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_VWAP_SIGNAL_…13:15</td><td><span class="tag tag-pe">PE</span> VWAP</td><td>13:15</td><td class="muted">07:50</td><td class="sig-ok">→ Filled (13:20 trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_SIGNAL_…12:55</td><td><span class="tag tag-pe">PE</span> EMA</td><td>12:55</td><td class="muted">07:30</td><td class="sig-blocked">Blocked — no filled trade</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_SIGNAL_…12:30</td><td><span class="tag tag-pe">PE</span> EMA</td><td>12:30</td><td class="muted">07:05</td><td class="sig-ok">→ Filled (12:35 EMA trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_VWAP_SIGNAL_…12:15</td><td><span class="tag tag-pe">PE</span> VWAP</td><td>12:15</td><td class="muted">06:50</td><td class="sig-ok">→ Filled (12:20 VWAP trade)</td></tr>
+
+      <tr class="day-row"><td colspan="5">Tuesday 7 Oct 2026</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_VWAP_SIGNAL_…15:05</td><td><span class="tag tag-pe">PE</span> VWAP</td><td>15:05</td><td class="muted">09:40</td><td class="sig-blocked">Blocked — no filled trade (EOD)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_SIGNAL_…13:20</td><td><span class="tag tag-pe">PE</span> EMA</td><td>13:20</td><td class="muted">07:55</td><td class="sig-ok">→ Filled (13:25 EMA trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">PE_VWAP_SIGNAL_…12:55</td><td><span class="tag tag-pe">PE</span> VWAP</td><td>12:55</td><td class="muted">07:30</td><td class="sig-ok">→ Filled (13:00 VWAP trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_SIGNAL_…10:50</td><td><span class="tag tag-ce">CE</span> EMA</td><td>10:50</td><td class="muted">05:25</td><td class="sig-ok">→ Filled (10:55 EMA trade)</td></tr>
+
+      <tr class="day-row"><td colspan="5">Monday 6 Oct 2026</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_SIGNAL_…14:00</td><td><span class="tag tag-ce">CE</span> EMA</td><td>14:00</td><td class="muted">08:35</td><td class="sig-ok">→ Filled (14:05 trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_SIGNAL_…12:35</td><td><span class="tag tag-ce">CE</span> EMA</td><td>12:35</td><td class="muted">07:10</td><td class="sig-blocked">Blocked — no filled trade</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_VWAP_SIGNAL_…11:45</td><td><span class="tag tag-ce">CE</span> VWAP</td><td>11:45</td><td class="muted">06:20</td><td class="sig-ok">→ Filled (11:50 VWAP trade)</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_SIGNAL_…11:00</td><td><span class="tag tag-ce">CE</span> EMA</td><td>11:00</td><td class="muted">05:35</td><td class="sig-blocked">Blocked — no filled trade</td></tr>
+      <tr><td class="muted" style="font-size:11px">CE_SIGNAL_…09:15</td><td><span class="tag tag-ce">CE</span> EMA</td><td>09:15</td><td class="muted">04:55</td><td class="sig-ok">→ Filled (10:25 EMA trade)</td></tr>
+    </tbody>
+  </table>
+
+  
+  <h2>Key Observations</h2>
+  <table>
+    <thead><tr><th>Observation</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td class="bold">TSL pts are always ~30% of SL pts</td><td class="muted">TSL = 30% × SL is consistent across all strategies. E.g. SL 71.25 → TSL 21.4; SL 105.1 → TSL 31.5. This is your ATR-based trailing ratio.</td></tr>
+      <tr><td class="bold">PIVOT SL pts ≠ initial hard SL cushion</td><td class="muted">CE_PIVOT Oct 12: SL pts 31.8 is the hard cushion (≈0.4× ATR 78.7). TSL pts 36.3 is larger — means TSL was already wider than the hard SL, so TSL was the binding exit.</td></tr>
+      <tr><td class="bold">All "STOP_HIT ✓TSL" exits are wins</td><td class="muted">When TSL kicks in (highest_ltp &gt; entry) and stop is then hit, the trade is profitable. This validates the TSL design — it locks profit before letting go.</td></tr>
+      <tr><td class="bold">8 signals blocked on Oct 12 PE side</td><td class="muted">7 PE signals were claimed but no trade filled — the global PE cap (3/day) was hit by 11:05. EMA PE signals at 12:50, 13:55, 14:55 were all blocked by MAX_TRADES_PER_SIDE=3.</td></tr>
+      <tr><td class="bold">CE_MOM 13:55 signal — dedup blocked</td><td class="muted">A CE_MOM signal fired at 13:55 (Oct 9) but was already blocked by dedup (14:00 signal had already claimed that candle window) — MOMENTUM_MAX_TRADES_PER_DAY=1 now prevents this.</td></tr>
+      <tr><td class="bold">Best strategy: PE_VWAP</td><td class="muted">8 trades, 5 wins, +₹4,302 gross. Best single-day: Oct 12 morning (3 consecutive wins).</td></tr>
+      <tr><td class="bold">Worst single trade: PE_EMA Oct 7</td><td class="muted">13:25 entry at 292.65, SL hit at 189.25 = -₹2,068. SL pts 102.5 was 1.37× ATR — wider than typical, no TSL ever activated (highest_ltp = entry).</td></tr>
+    </tbody>
+  </table>
+
+  <footer>Made with IBM Bob</footer>
+</div>
+</body>
+</html>

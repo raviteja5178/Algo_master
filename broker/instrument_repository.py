@@ -97,7 +97,31 @@ def resolve_expiry() -> date:
     )
     if not expiries:
         raise ValueError("No upcoming SENSEX option expiries found in instrument master.")
+
+    # Expiry-day rollover: on the expiry day itself, after EXPIRY_DAY_ROLLOVER_TIME,
+    # new entries use the next expiry to avoid near-zero-theta contracts.
+    if expiries[0] == today and len(expiries) > 1 and settings.EXPIRY_DAY_ROLLOVER_TIME:
+        from utils.time_utils import is_after_or_equal, now_ist, parse_time_ist
+        try:
+            if is_after_or_equal(now_ist().time(), parse_time_ist(settings.EXPIRY_DAY_ROLLOVER_TIME)):
+                log_event(logger, "EXPIRY_ROLLOVER", today=today, next_expiry=expiries[1])
+                return expiries[1]
+        except ValueError:
+            pass   # bad config — keep nearest expiry
     return expiries[0]
+
+
+def is_expiry_day() -> bool:
+    """True when today is a SENSEX option expiry date (fails safe to False)."""
+    try:
+        today = date.today()
+        return any(
+            _parse_expiry(i.get("expiry")) == today
+            for i in load_instruments()
+            if i.get("name") == settings.UNDERLYING and i.get("segment") in ("BFO", "BFO-OPT")
+        )
+    except Exception:
+        return False
 
 
 def find_instrument(tradingsymbol: str) -> dict | None:

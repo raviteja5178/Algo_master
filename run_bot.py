@@ -18,6 +18,7 @@ import sys
 import time
 import signal
 import os
+import atexit
 from datetime import datetime, time as dtime
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -25,6 +26,21 @@ RESTART_DELAY_SECS   = 10    # wait before restarting after unexpected exit
 MARKET_OPEN_H        = 9     # don't restart before this hour (IST)
 MARKET_CLOSE_H       = 15    # don't restart after this hour (IST)
 MARKET_CLOSE_M       = 30    # don't restart after 15:30 IST
+
+_LAUNCHER_PID_FILE = ".launcher.pid"
+
+# ── Single-instance guard ─────────────────────────────────────────────────────
+def _acquire_launcher_lock() -> None:
+    """Exit immediately if another launcher is already running."""
+    from utils.process_lock import acquire_process_lock
+    if not acquire_process_lock("launcher"):
+        print(
+            "[Launcher] Another launcher is already running. "
+            "Exiting to prevent duplicate bot instances.",
+            flush=True,
+        )
+        sys.exit(0)
+
 
 # ── State ─────────────────────────────────────────────────────────────────────
 _stop_launcher = False
@@ -57,6 +73,8 @@ def _ts() -> str:
 
 def main():
     global _stop_launcher
+
+    _acquire_launcher_lock()
 
     print("=" * 60)
     print("  SENSEX Auto-Trader — Persistent Launcher")

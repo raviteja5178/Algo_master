@@ -10,3 +10,34 @@ build/
 venv/
 bot.log
 *.log
+
+# Runtime state
+.bot.pid
+.launcher.pid
+.bot_state.json
+.ema_trade.json
+
+# Backtest outputs (large generated files - not source)
+backtest_6m*.html
+backtest_6m*.json
+backtest_ema_vwap*.html
+backtest_*_results.json
+backtest_*_report.html
+
+# Scratch / one-off analysis scripts
+_bt6m_*.py
+_debug_*.py
+_apr10_*.py
+
+# Scratch / research outputs (cleanup)
+_*.py
+_*.json
+_*.csv
+_*.xlsx
+_*.txt
+_frames/
+backtest*.py
+backtest*.json
+backtest*.html
+backtest*.log
+.pivot_trade.json
