@@ -7,7 +7,7 @@ import pytest
 
 from execution.pivot_trade_manager import PivotTradeManager
 from market.candle_builder import Candle
-from market.historical_data import PivotLevels
+from market.historical_data import PivotLevels, compute_pivot_levels
 from strategies.pivot_strategy import find_pivot_setup
 
 # ── Shared fixture helpers ────────────────────────────────────────────────────
@@ -444,13 +444,28 @@ class TestBounce:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestPivotLevelFormulas:
-    def test_r3_formula(self):
-        # R3 = H + 2*(P - L)
-        assert PV.r3 == pytest.approx(1100 + 2 * (1000 - 900))   # = 1300
+    def test_fibonacci_formula(self):
+        # H=72884.25, L=71676.10, C=71924.68
+        # P = 72161.68, Range = 1208.15
+        pl = compute_pivot_levels(72884.25, 71676.10, 71924.68, formula="FIBONACCI")
+        assert pl.pivot == pytest.approx(72161.68, abs=0.01)
+        assert pl.r1 == pytest.approx(72161.68 + 0.382 * 1208.15, abs=0.01)
+        assert pl.r2 == pytest.approx(72161.68 + 0.618 * 1208.15, abs=0.01)
+        assert pl.r3 == pytest.approx(72161.68 + 1.000 * 1208.15, abs=0.01)
+        assert pl.s1 == pytest.approx(72161.68 - 0.382 * 1208.15, abs=0.01)
+        assert pl.s2 == pytest.approx(72161.68 - 0.618 * 1208.15, abs=0.01)
+        assert pl.s3 == pytest.approx(72161.68 - 1.000 * 1208.15, abs=0.01)
 
-    def test_s3_formula(self):
-        # S3 = L - 2*(H - P)
-        assert PV.s3 == pytest.approx(900 - 2 * (1100 - 1000))   # = 700
+    def test_traditional_formula(self):
+        # H=1100, L=900, C=1000 -> P=1000
+        pl = compute_pivot_levels(1100, 900, 1000, formula="TRADITIONAL")
+        assert pl.pivot == 1000.0
+        assert pl.r1 == 1100.0
+        assert pl.r2 == 1200.0
+        assert pl.r3 == 1300.0
+        assert pl.s1 == 900.0
+        assert pl.s2 == 800.0
+        assert pl.s3 == 700.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────

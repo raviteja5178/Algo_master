@@ -111,18 +111,34 @@ def init_db() -> None:
 # ── Trade CRUD ─────────────────────────────────────────────────────────────────
 
 def upsert_trade(row: dict) -> None:
-    cols = ", ".join(row.keys())
-    placeholders = ", ".join(f":{k}" for k in row.keys())
-    updates = ", ".join(
-        f"{k} = excluded.{k}" for k in row.keys() if k != "trade_id"
-    )
-    sql = (
-        f"INSERT INTO trades ({cols}) VALUES ({placeholders}) "
-        f"ON CONFLICT(trade_id) DO UPDATE SET {updates}, "
-        f"updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')"
-    )
+    trade_id = row.get("trade_id")
+    if not trade_id:
+        return
     with _conn() as con:
-        con.execute(sql, row)
+        exists = con.execute("SELECT 1 FROM trades WHERE trade_id = ?", (trade_id,)).fetchone()
+        if exists:
+            # Existing row: update only the supplied fields without violating NOT NULL on omitted fields
+            fields = {k: v for k, v in row.items() if k != "trade_id"}
+            if fields:
+                updates = ", ".join(f"{k} = :{k}" for k in fields.keys())
+                sql = (
+                    f"UPDATE trades SET {updates}, "
+                    f"updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') "
+                    f"WHERE trade_id = :trade_id"
+                )
+                con.execute(sql, row)
+        else:
+            cols = ", ".join(row.keys())
+            placeholders = ", ".join(f":{k}" for k in row.keys())
+            updates = ", ".join(
+                f"{k} = excluded.{k}" for k in row.keys() if k != "trade_id"
+            )
+            sql = (
+                f"INSERT INTO trades ({cols}) VALUES ({placeholders}) "
+                f"ON CONFLICT(trade_id) DO UPDATE SET {updates}, "
+                f"updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')"
+            )
+            con.execute(sql, row)
 
 
 def fetch_active_trade() -> dict | None:

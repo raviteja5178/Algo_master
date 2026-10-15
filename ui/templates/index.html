@@ -444,6 +444,13 @@
         <div class="sb-row"><span class="sb-lbl" style="color:var(--red)">Low</span><span id="sb-orb-low" class="sb-val">—</span></div>
         <div class="sb-row"><span class="sb-lbl">ATR(14)</span><span id="sb-atr" class="sb-val" style="color:var(--yellow)">—</span></div>
         <div class="sb-divider"></div>
+        <!-- Market regime (rule-based: ER / ADX / ATR ratio — no AI) -->
+        <div class="sb-section">Market Regime</div>
+        <div class="sb-row"><span class="sb-lbl">Now</span><span id="sb-mr-label" class="sb-val">—</span></div>
+        <div class="sb-row"><span class="sb-lbl">ER (1h)</span><span id="sb-mr-er" class="sb-val">—</span></div>
+        <div class="sb-row"><span class="sb-lbl">ADX</span><span id="sb-mr-adx" class="sb-val">—</span></div>
+        <div class="sb-row"><span class="sb-lbl">ATR vs avg</span><span id="sb-mr-vol" class="sb-val">—</span></div>
+        <div class="sb-divider"></div>
         <!-- AI engine -->
         <div class="sb-section">AI Engine</div>
         <div class="sb-ai-row"><span class="muted">Regime</span><span id="ai-regime" class="sb-val">—</span></div>
@@ -1642,6 +1649,16 @@ function calcSignalConds(state,candles,ema9,ema21){
     document.getElementById('sb-s1').textContent=pl.s1.toFixed(1);
     document.getElementById('sb-s2').textContent=pl.s2.toFixed(1);
   }
+  // ── Market regime (rule-based ER / ADX / ATR ratio) ──────────────────────────
+  (function(){
+    const mr=state.market_regime,set=(id,t,c)=>{const e=document.getElementById(id);if(e){e.textContent=t;e.style.color=c||'';}};
+    if(!mr){set('sb-mr-label','—');set('sb-mr-er','—');set('sb-mr-adx','—');set('sb-mr-vol','—');return;}
+    const col=mr.regime==='TRENDING'?(mr.direction==='DOWN'?'var(--red)':'var(--green)'):mr.regime==='CHOPPY'?'var(--yellow)':'';
+    set('sb-mr-label',mr.regime==='WARMUP'?'Warming up':(mr.label||mr.regime),col);
+    set('sb-mr-er',mr.er!=null?mr.er.toFixed(2):'—');
+    set('sb-mr-adx',mr.adx!=null?mr.adx.toFixed(1):'—');
+    set('sb-mr-vol',mr.vol_ratio!=null?mr.vol_ratio.toFixed(2)+'×':'—',mr.volatile?'var(--red)':'');
+  })();
   document.getElementById('ema-section').style.display=emaOn?'block':'none';
   document.getElementById('pivot-filter-section').style.display=(emaOn&&!!pl)?'block':'none';
   document.getElementById('orb-section').style.display=orbOn?'block':'none';

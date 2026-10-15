@@ -528,12 +528,20 @@ ENABLE_VWAP_STRATEGY: bool    = _getbool("ENABLE_VWAP_STRATEGY", False)
 VWAP_RETEST_LOOKBACK: int     = _getint("VWAP_RETEST_LOOKBACK", 3)
 # Minimum distance close must be above/below VWAP to confirm bounce (0 = disabled)
 VWAP_MIN_BOUNCE_PTS: float    = _getfloat("VWAP_MIN_BOUNCE_PTS", 0.0)
+# Maximum consecutive candles price can stay on the opposite side of VWAP before bouncing (0 = disabled)
+VWAP_MAX_SUBMERGED_CANDLES: int = _getint("VWAP_MAX_SUBMERGED_CANDLES", 3)
 
-# ── Pivot Levels (floor pivots) ──────────────────────────────────────────────
-# Standard floor-pivot levels computed from the previous day's H/L/C.
-#   P  = (H+L+C)/3
-#   R1 = 2P−L    R2 = P+(H−L)
-#   S1 = 2P−H    S2 = P−(H−L)
+# ── Pivot Levels ─────────────────────────────────────────────────────────────
+# Pivot levels computed from previous day's H/L/C.
+# PIVOT_FORMULA: "FIBONACCI" (default) or "TRADITIONAL"
+#   Fibonacci (symmetric golden ratios):
+#     P  = (H+L+C)/3
+#     R1 = P + 0.382×(H−L)   R2 = P + 0.618×(H−L)   R3 = P + 1.000×(H−L)
+#     S1 = P − 0.382×(H−L)   S2 = P − 0.618×(H−L)   S3 = P − 1.000×(H−L)
+#   Traditional (standard floor):
+#     P  = (H+L+C)/3
+#     R1 = 2P−L              R2 = P+(H−L)           R3 = H+2(P−L)
+#     S1 = 2P−H              S2 = P−(H−L)           S3 = L−2(H−P)
 #
 # ENABLE_PIVOT_LEVELS: fetch and store pivot levels at startup (for display + filter).
 #   false = no pivot computation, no filter, no display. Default.
@@ -552,6 +560,7 @@ VWAP_MIN_BOUNCE_PTS: float    = _getfloat("VWAP_MIN_BOUNCE_PTS", 0.0)
 # PIVOT_BREAKOUT_CONFIRM: require price to be ABOVE R1 for CE (momentum above resistance)
 #   and BELOW S1 for PE (breakdown below support) before allowing EMA signal.
 #   false = disabled.  Use only on strongly trending days.
+PIVOT_FORMULA: str              = os.getenv("PIVOT_FORMULA", "FIBONACCI").upper()
 ENABLE_PIVOT_LEVELS: bool       = _getbool("ENABLE_PIVOT_LEVELS", False)
 PIVOT_ZONE_BUFFER: float        = _getfloat("PIVOT_ZONE_BUFFER", 25.0)
 PIVOT_COUNTER_TREND_BLOCK: bool = _getbool("PIVOT_COUNTER_TREND_BLOCK", False)
@@ -747,6 +756,19 @@ REGIME_ATR_MULT_VOLATILE: float  = _getfloat("REGIME_ATR_MULT_VOLATILE",  1.2)
 REGIME_MIN_PCT_TRENDING: float   = _getfloat("REGIME_MIN_PCT_TRENDING",   0.6)
 REGIME_MIN_PCT_CHOPPY: float     = _getfloat("REGIME_MIN_PCT_CHOPPY",     0.3)
 REGIME_MIN_PCT_VOLATILE: float   = _getfloat("REGIME_MIN_PCT_VOLATILE",   0.5)
+
+# ── Intraday market regime (rule-based, no AI) ────────────────────────────────
+# Classifies TRENDING / CHOPPY / MIXED (+ a VOLATILE overlay) on every closed
+# 5m candle from Efficiency Ratio, ADX and ATR-vs-baseline.  Observational only:
+# shown on the dashboard and stored in trades.smart_entry_flags; it never blocks
+# or alters an entry/exit.
+ENABLE_INTRADAY_REGIME: bool     = _getbool("ENABLE_INTRADAY_REGIME", True)
+INTRADAY_REGIME_ER_PERIOD: int   = _getint("INTRADAY_REGIME_ER_PERIOD", 12)       # candles (12 = 1h)
+INTRADAY_REGIME_ADX_PERIOD: int  = _getint("INTRADAY_REGIME_ADX_PERIOD", 14)
+INTRADAY_REGIME_ER_TRENDING: float  = _getfloat("INTRADAY_REGIME_ER_TRENDING", 0.5)
+INTRADAY_REGIME_ER_CHOPPY: float    = _getfloat("INTRADAY_REGIME_ER_CHOPPY", 0.3)
+INTRADAY_REGIME_ADX_TRENDING: float = _getfloat("INTRADAY_REGIME_ADX_TRENDING", 25.0)
+INTRADAY_REGIME_VOL_RATIO: float    = _getfloat("INTRADAY_REGIME_VOL_RATIO", 1.5)  # ATR / baseline ATR
 
 # ── Validation ────────────────────────────────────────────────────────────────
 ALLOWED_MODES = {"PAPER", "SHADOW", "LIVE"}

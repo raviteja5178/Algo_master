@@ -139,10 +139,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class PivotLevels:
-    """Standard floor-pivot levels computed from the previous day's OHLC.
-
-    R3 = High + 2(PP - Low)
-    S3 = Low  - 2(High - PP)
+    """Pivot levels computed from the previous day's OHLC.
+    Supports Fibonacci and Traditional floor formulas.
     """
     pivot: float
     r1: float
@@ -156,16 +154,76 @@ class PivotLevels:
     prev_close: float
 
 
-def fetch_pivot_levels(instrument_token: int) -> PivotLevels | None:
+def compute_pivot_levels(
+    high: float,
+    low: float,
+    close: float,
+    formula: str | None = None,
+) -> PivotLevels:
     """
-    Compute standard floor-pivot levels from the previous completed trading day.
+    Compute pivot levels from high, low, close using either FIBONACCI (default)
+    or TRADITIONAL floor pivot formula.
 
-    Formula:
+    Fibonacci formula:
+        Range = H - L
         P  = (H + L + C) / 3
-        R1 = 2P − L
-        R2 = P + (H − L)
-        S1 = 2P − H
-        S2 = P − (H − L)
+        R1 = P + 0.382 * Range
+        R2 = P + 0.618 * Range
+        R3 = P + 1.000 * Range
+        S1 = P - 0.382 * Range
+        S2 = P - 0.618 * Range
+        S3 = P - 1.000 * Range
+
+    Traditional formula:
+        P  = (H + L + C) / 3
+        R1 = 2P - L
+        R2 = P + (H - L)
+        R3 = H + 2*(P - L)
+        S1 = 2P - H
+        S2 = P - (H - L)
+        S3 = L - 2*(H - P)
+    """
+    from config import settings
+    formula_mode = (formula or getattr(settings, "PIVOT_FORMULA", "FIBONACCI")).upper()
+
+    H = float(high)
+    L = float(low)
+    C = float(close)
+    P = (H + L + C) / 3.0
+    rng = H - L
+
+    if formula_mode == "TRADITIONAL":
+        r1 = 2 * P - L
+        r2 = P + rng
+        r3 = H + 2 * (P - L)
+        s1 = 2 * P - H
+        s2 = P - rng
+        s3 = L - 2 * (H - P)
+    else:  # FIBONACCI
+        r1 = P + 0.382 * rng
+        r2 = P + 0.618 * rng
+        r3 = P + 1.000 * rng
+        s1 = P - 0.382 * rng
+        s2 = P - 0.618 * rng
+        s3 = P - 1.000 * rng
+
+    return PivotLevels(
+        pivot      = round(P, 2),
+        r1         = round(r1, 2),
+        r2         = round(r2, 2),
+        r3         = round(r3, 2),
+        s1         = round(s1, 2),
+        s2         = round(s2, 2),
+        s3         = round(s3, 2),
+        prev_high  = H,
+        prev_low   = L,
+        prev_close = C,
+    )
+
+
+def fetch_pivot_levels(instrument_token: int, formula: str | None = None) -> PivotLevels | None:
+    """
+    Compute pivot levels from the previous completed trading day.
 
     Returns None on any error or if no prior-day data is available.
     """
@@ -194,22 +252,11 @@ def fetch_pivot_levels(instrument_token: int) -> PivotLevels | None:
         logger.warning("fetch_pivot_levels: no prior-day candle found.")
         return None
 
-    H = float(prev["high"])
-    L = float(prev["low"])
-    C = float(prev["close"])
-    P  = (H + L + C) / 3.0
-
-    levels = PivotLevels(
-        pivot      = round(P, 2),
-        r1         = round(2 * P - L, 2),
-        r2         = round(P + (H - L), 2),
-        r3         = round(H + 2 * (P - L), 2),
-        s1         = round(2 * P - H, 2),
-        s2         = round(P - (H - L), 2),
-        s3         = round(L - 2 * (H - P), 2),
-        prev_high  = H,
-        prev_low   = L,
-        prev_close = C,
+    levels = compute_pivot_levels(
+        float(prev["high"]),
+        float(prev["low"]),
+        float(prev["close"]),
+        formula=formula,
     )
     log_event(
         logger, "PIVOT_LEVELS_LOADED",

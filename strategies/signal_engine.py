@@ -544,6 +544,7 @@ def evaluate_signals(
         _vwap_kwargs = dict(
             retest_lookback=settings.VWAP_RETEST_LOOKBACK,
             min_bounce_pts=settings.VWAP_MIN_BOUNCE_PTS,
+            max_submerged_candles=settings.VWAP_MAX_SUBMERGED_CANDLES,
         )
 
         if is_vwap_ce_signal(candles_5m, vwap, **_vwap_kwargs):

@@ -43,12 +43,19 @@ from execution.ema_trade_manager import EmaTradeManager, plan_ema_risk
 from execution.smart_exit import SmartExitEngine
 from strategies.ai_confirmation import AIConfirmationFilter
 from strategies.regime_classifier import RegimeClassifier
+from strategies.market_regime import classify_intraday
 from strategies.smart_entry import SmartEntryFilter
 from execution.target_manager import DynamicTargetManager
 from execution.trailing_stop import TrailingStopManager
 from market.candle_aggregator import CandleAggregator
 from market.candle_builder import Candle
-from market.historical_data import SENSEX_TOKEN, fetch_historical_candles, fetch_previous_day_hl, PivotLevels
+from market.historical_data import (
+    SENSEX_TOKEN,
+    fetch_historical_candles,
+    fetch_previous_day_hl,
+    PivotLevels,
+    compute_pivot_levels,
+)
 from market.vwap import VWAPCalculator
 from market.paper_feed import PaperFeed
 from market.websocket_client import WebSocketClient
@@ -228,6 +235,11 @@ class BotContext:
         )
         # Current day's AI regime label (updated after classify())
         self.ai_regime: str = "UNKNOWN"
+
+        # Intraday rule-based regime (TRENDING/CHOPPY/MIXED + volatile overlay).
+        # Refreshed on every closed 5m candle; observational only (dashboard +
+        # trades.smart_entry_flags) — never read by entry/exit logic.
+        self.intraday_regime: dict | None = None
 
     def can_create_entry(self, signal_type: str = "") -> bool:
         # EMA-specific no-new-entry cutoff (overrides global when set)
@@ -1013,6 +1025,8 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         "sensex_sl":    _sx_sl,
         "sensex_t1":    _sx_t1,
         "sensex_t2":    _sx_t2,
+        # Market regime at entry, for later per-regime P&L analysis
+        "smart_entry_flags": json.dumps({"regime": ctx.intraday_regime}) if ctx.intraday_regime else None,
     })
     record_action(action_id, ctx.trade_id, "ENTRY", fill["order_id"], "COMPLETE")
 
@@ -1802,6 +1816,7 @@ def _write_state(ctx: BotContext) -> None:
             "vwap":        round(ctx.vwap.value, 2) if ctx.vwap.value else None,
             "prev_day_high": ctx.prev_day_high,
             "prev_day_low":  ctx.prev_day_low,
+            "market_regime": ctx.intraday_regime,
             "pivot_levels": {
                 "pivot":      ctx.pivot_levels.pivot,
                 "r1":         ctx.pivot_levels.r1,
@@ -1911,8 +1926,37 @@ def _make_tick_handler(ctx: BotContext):
     return handler
 
 
+def _refresh_intraday_regime(ctx: BotContext, *, log: bool = True) -> None:
+    """Recompute ctx.intraday_regime from completed 5m candles. Never raises."""
+    if not settings.ENABLE_INTRADAY_REGIME:
+        return
+    try:
+        snap = classify_intraday(
+            ctx.agg_5m.get_completed(),
+            er_period=settings.INTRADAY_REGIME_ER_PERIOD,
+            adx_period=settings.INTRADAY_REGIME_ADX_PERIOD,
+            er_trending=settings.INTRADAY_REGIME_ER_TRENDING,
+            er_choppy=settings.INTRADAY_REGIME_ER_CHOPPY,
+            adx_trending=settings.INTRADAY_REGIME_ADX_TRENDING,
+            vol_ratio_threshold=settings.INTRADAY_REGIME_VOL_RATIO,
+        )
+        ctx.intraday_regime = {**snap.to_dict(), "label": snap.label}
+        if log:
+            log_event(
+                logger, "REGIME_INTRADAY",
+                regime=snap.regime, direction=snap.direction, volatile=snap.volatile,
+                er=snap.er, adx=snap.adx, vol_ratio=snap.vol_ratio,
+            )
+    except Exception as exc:
+        logger.debug("Intraday regime compute failed (non-critical): %s", exc)
+
+
 def _make_candle_handler_5m(ctx: BotContext):
     def handler(candle: Candle) -> None:
+        # Refresh the intraday regime first so the state file written just below
+        # (and any trade opened on this candle) carries the up-to-date value.
+        _refresh_intraday_regime(ctx)
+
         # Always write state on candle close so the chart updates immediately
         _write_state(ctx)
 
@@ -2209,23 +2253,21 @@ def main() -> None:
     # Compute pivot levels from prev-day H/L/C (no extra API call needed).
     # If ENABLE_PIVOT_LEVELS is true and we have the data, build PivotLevels directly.
     if settings.ENABLE_PIVOT_LEVELS and ctx.prev_day_high and ctx.prev_day_low and ctx.prev_day_close:
-        H, L, C = ctx.prev_day_high, ctx.prev_day_low, ctx.prev_day_close
-        P = (H + L + C) / 3.0
-        ctx.pivot_levels = PivotLevels(
-            pivot      = round(P, 2),
-            r1         = round(2 * P - L, 2),
-            r2         = round(P + (H - L), 2),
-            r3         = round(H + 2 * (P - L), 2),
-            s1         = round(2 * P - H, 2),
-            s2         = round(P - (H - L), 2),
-            s3         = round(L - 2 * (H - P), 2),
-            prev_high  = H, prev_low = L, prev_close = C,
+        ctx.pivot_levels = compute_pivot_levels(
+            ctx.prev_day_high,
+            ctx.prev_day_low,
+            ctx.prev_day_close,
+            formula=settings.PIVOT_FORMULA,
         )
         pl = ctx.pivot_levels
         logger.info(
-            "Pivot levels computed — P=%.2f  R1=%.2f  R2=%.2f  R3=%.2f  S1=%.2f  S2=%.2f  S3=%.2f",
-            pl.pivot, pl.r1, pl.r2, pl.r3, pl.s1, pl.s2, pl.s3,
+            "Pivot levels computed (%s) — P=%.2f  R1=%.2f  R2=%.2f  R3=%.2f  S1=%.2f  S2=%.2f  S3=%.2f",
+            settings.PIVOT_FORMULA, pl.pivot, pl.r1, pl.r2, pl.r3, pl.s1, pl.s2, pl.s3,
         )
+
+    # Seed the intraday regime from the historical candles so the dashboard has a
+    # value immediately after a restart instead of waiting for the next candle.
+    _refresh_intraday_regime(ctx, log=False)
 
     # Wire 5m candle handler (signal evaluation fires on every completed 5m candle)
     ctx.agg_5m.subscribe(_make_candle_handler_5m(ctx))
