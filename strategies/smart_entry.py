@@ -174,6 +174,12 @@ class SmartEntryFilter:
                                           the 15m trend / gap-widening filters. These
                                           strategies trade bounces/retests, not trends.
     slope_exempt_strategies    : set    — strategy names that skip the EMA9 slope filter.
+    squeeze_exempt_strategies  : set    — strategy names that are EXCLUDED from the squeeze
+                                          bypass even when squeeze_bypass=True. Use this for
+                                          bounce/retest strategies (e.g. VWAP, NATR) where
+                                          N consecutive same-direction candles are a normal
+                                          part of the retest setup, NOT a squeeze breakout.
+                                          Default: {"VWAP", "NATR"}.
     """
 
     def __init__(
@@ -194,6 +200,7 @@ class SmartEntryFilter:
         structure_bypass_ema_confirm: bool = False,
         bounce_exempt_strategies: set | None = None,
         slope_exempt_strategies: set | None = None,
+        squeeze_exempt_strategies: set | None = None,
     ) -> None:
         self._min_body_atr       = min_body_atr_ratio
         self._require_slope      = require_ema_slope
@@ -210,8 +217,12 @@ class SmartEntryFilter:
         self._max_ext_pct        = max_premium_extension_pct  # 0 = disabled
         self._structure_bypass_n = max(0, structure_bypass_candles)
         self._structure_bypass_ema_confirm = structure_bypass_ema_confirm
-        self._bounce_exempt      = set(bounce_exempt_strategies) if bounce_exempt_strategies else set()
-        self._slope_exempt       = set(slope_exempt_strategies) if slope_exempt_strategies else set()
+        # None → documented defaults; an explicit empty set disables the exemption.
+        self._bounce_exempt      = {"VWAP", "NATR"} if bounce_exempt_strategies is None else set(bounce_exempt_strategies)
+        self._slope_exempt       = {"NATR"} if slope_exempt_strategies is None else set(slope_exempt_strategies)
+        # Strategies excluded from squeeze bypass — defaults to same set as bounce_exempt
+        # because bounce/retest setups should never be accelerated by a squeeze signal.
+        self._squeeze_exempt     = {"VWAP", "NATR"} if squeeze_exempt_strategies is None else set(squeeze_exempt_strategies)
         # {tradingsymbol: (date, first_ltp)} — resets automatically per day
         self._first_ltp: dict[str, tuple[date, float]] = {}
         # {tradingsymbol: (date, highest_ltp)} — rolling intraday high per symbol
@@ -301,12 +312,19 @@ class SmartEntryFilter:
 
     # ── Squeeze detection helper ───────────────────────────────────────────────
 
-    def _is_squeeze(self, side: str, candles_5m: Sequence[Candle]) -> bool:
+    def _is_squeeze(self, side: str, candles_5m: Sequence[Candle], strategy: str = "") -> bool:
         """
         Return True if the last N completed candles are all bullish (CE) or
         all bearish (PE) — indicating a momentum squeeze move.
+
+        Returns False for strategies in squeeze_exempt_strategies even when
+        the candle pattern qualifies — bounce/retest strategies (VWAP, NATR)
+        must not bypass the 15m trend filter just because price pulled back
+        for a few candles into the retest level.
         """
         if not self._squeeze_bypass or self._squeeze_n <= 0:
+            return False
+        if strategy and strategy in self._squeeze_exempt:
             return False
         if len(candles_5m) < self._squeeze_n:
             return False
@@ -315,6 +333,30 @@ class SmartEntryFilter:
             return all(c.close > c.open for c in recent)
         else:
             return all(c.close < c.open for c in recent)
+
+    def _structure_bypass(self, side: str, candles_5m: Sequence[Candle], direction: str) -> bool:
+        """
+        True when the last N candles show a clean trend structure (higher lows for CE,
+        lower highs for PE) — and, if configured, close is on the right side of EMA9.
+        Used to waive the post-loss cooldown on trending (non-choppy) markets.
+        """
+        n = self._structure_bypass_n
+        if n <= 0 or len(candles_5m) < n + 1:
+            return False
+        recent = candles_5m[-(n + 1):]
+        pairs = zip(recent, recent[1:])
+        if side == "CE":
+            ok = all(b.low > a.low for a, b in pairs)
+        else:
+            ok = all(b.high < a.high for a, b in pairs)
+        if ok and self._structure_bypass_ema_confirm:
+            e9 = ema(candles_5m, 9)[-1]
+            close = candles_5m[-1].close
+            ok = e9 is not None and (close > e9 if side == "CE" else close < e9)
+        if ok:
+            log_event(logger, "SMART_ENTRY_STRUCTURE_BYPASS", direction=direction,
+                      candles=n, cooldown_remaining=self._cooldown_left)
+        return ok
 
     def allow(
         self,
@@ -339,6 +381,10 @@ class SmartEntryFilter:
                         first-seen LTP.  When None the filter is skipped.
         """
         side = "CE" if direction.startswith("CE") else "PE"
+        # Strategy suffix: "CE_VWAP" → "VWAP"; plain "CE"/"PE" (EMA) → "".
+        strategy = direction.split("_", 1)[1].upper() if "_" in direction else ""
+        bounce_exempt = strategy in self._bounce_exempt
+        slope_exempt = strategy in self._slope_exempt
 
         # When called with no candles (e.g. Filter 7 late gate in execute_entry
         # where candle-based filters already ran), skip straight to Filter 7.
@@ -374,7 +420,9 @@ class SmartEntryFilter:
         # ── Squeeze bypass pre-check ──────────────────────────────────────────
         # If N consecutive 5m candles are all in the signal direction, the 15m
         # trend filter and EMA slope filter are skipped (squeeze move detected).
-        _squeeze_active = self._is_squeeze(side, candles_5m)
+        # Squeeze bypass is suppressed for squeeze_exempt strategies (VWAP, NATR)
+        # because their N pullback candles are the retest setup itself, not a breakout.
+        _squeeze_active = self._is_squeeze(side, candles_5m, strategy=strategy)
         if _squeeze_active:
             log_event(
                 logger, "SMART_ENTRY_SQUEEZE_BYPASS",
@@ -387,7 +435,7 @@ class SmartEntryFilter:
         # During a squeeze move, use the relaxed ratio (squeeze_body_atr_ratio)
         # if it is configured — captures valid continuation candles on trend days
         # whose bodies are smaller because momentum is already priced in.
-        if self._min_body_atr > 0:
+        if self._min_body_atr > 0 and not bounce_exempt:
             atr_val = atr_at(candles_5m, period=14)
             if atr_val:
                 body = abs(c0.close - c0.open)
@@ -409,7 +457,7 @@ class SmartEntryFilter:
                     return False
 
         # ── Filter 2: EMA9 slope ───────────────────────────────────────────────
-        if self._require_slope and not _squeeze_active and len(candles_5m) >= 10:
+        if self._require_slope and not _squeeze_active and not slope_exempt and len(candles_5m) >= 10:
             ema9_series = ema(candles_5m, 9)
             e9_now  = ema9_series[-1]
             e9_prev = ema9_series[-2]
@@ -435,7 +483,7 @@ class SmartEntryFilter:
                     return False
 
         # ── Filter 3: post-loss cooldown ──────────────────────────────────────
-        if self._cooldown_left > 0:
+        if self._cooldown_left > 0 and not self._structure_bypass(side, candles_5m, direction):
             log_event(
                 logger, "SMART_ENTRY_BLOCKED_COOLDOWN",
                 direction=direction,
@@ -444,7 +492,7 @@ class SmartEntryFilter:
             return False
 
         # ── Filters 4 & 5: EMA gap — need both EMA9 and EMA21 ────────────────
-        if (self._min_ema_gap > 0 or self._require_gap_wide) and len(candles_5m) >= 21:
+        if (self._min_ema_gap > 0 or self._require_gap_wide) and not bounce_exempt and len(candles_5m) >= 21:
             ema9_series  = ema(candles_5m, 9)
             ema21_series = ema(candles_5m, 21)
             e9_now   = ema9_series[-1]

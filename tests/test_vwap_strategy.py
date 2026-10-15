@@ -122,6 +122,18 @@ class TestVWAPCESignal:
         assert is_vwap_ce_signal(candles, vwap, retest_lookback=3, min_bounce_pts=10) is False
         assert is_vwap_ce_signal(candles, vwap, retest_lookback=3, min_bounce_pts=3) is True
 
+    def test_ce_excessive_submerge(self):
+        vwap = 73600.0
+        # 5 consecutive candles below VWAP before bouncing above
+        candles = self._make_candles([73550, 73560, 73570, 73580, 73590, 73650])
+        candles[-2] = _candle(10, 25, 73580, 73595, 73575, 73590)
+        candles[-1] = _candle(10, 30, 73590, 73660, 73588, 73650)
+        # With max_submerged_candles=3, 5 submerged candles should block
+        assert is_vwap_ce_signal(candles, vwap, max_submerged_candles=3) is False
+        # With max_submerged_candles=0 (disabled) or >= 5, it allows
+        assert is_vwap_ce_signal(candles, vwap, max_submerged_candles=0) is True
+        assert is_vwap_ce_signal(candles, vwap, max_submerged_candles=5) is True
+
 
 # ── is_vwap_pe_signal ─────────────────────────────────────────────────────────
 
@@ -154,3 +166,17 @@ class TestVWAPPESignal:
     def test_pe_vwap_none(self):
         candles = self._make_candles([73620, 73610, 73605, 73550])
         assert is_vwap_pe_signal(candles, None) is False
+
+    def test_pe_excessive_submerge(self):
+        vwap = 73600.0
+        # 5 consecutive candles above VWAP before breaking below
+        candles = self._make_candles([73650, 73640, 73630, 73620, 73610, 73550])
+        candles[-2] = _candle(10, 25, 73620, 73625, 73605, 73610)
+        candles[-1] = _candle(10, 30, 73610, 73612, 73545, 73550)
+        # With max_submerged_candles=3, 5 emerged candles should block
+        assert is_vwap_pe_signal(candles, vwap, max_submerged_candles=3) is False
+        # With max_submerged_candles=0 (disabled) or >= 5, it allows
+        assert is_vwap_pe_signal(candles, vwap, max_submerged_candles=0) is True
+        assert is_vwap_pe_signal(candles, vwap, max_submerged_candles=5) is True
+
+

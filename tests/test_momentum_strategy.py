@@ -381,6 +381,7 @@ class TestSignalEngineWithMomentum:
 
         with patch("strategies.signal_engine.settings") as mock_settings, \
              patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
              patch("strategies.signal_engine.record_processed_signal"):
 
             mock_settings.ENABLE_OB_STRATEGY    = False
@@ -401,6 +402,7 @@ class TestSignalEngineWithMomentum:
 
         with patch("strategies.signal_engine.settings") as mock_settings, \
              patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
              patch("strategies.signal_engine.record_processed_signal"), \
              patch("strategies.signal_engine.is_ce_signal", return_value=False), \
              patch("strategies.signal_engine.is_pe_signal", return_value=False):
@@ -417,6 +419,14 @@ class TestSignalEngineWithMomentum:
             mock_settings.MOMENTUM_MIN_BODY_PTS        = MIN_BODY
             mock_settings.MOMENTUM_WINDOW_START        = "13:30"
             mock_settings.MOMENTUM_WINDOW_END          = "14:30"
+            mock_settings.EMA_COOLDOWN_CANDLES         = 0
+            mock_settings.EMA_MAX_TRADES_PER_DAY       = 0
+            mock_settings.EMA_MAX_CONSEC_LOSSES        = 0
+            mock_settings.ENABLE_PIVOT_STRATEGY        = False
+            mock_settings.MOMENTUM_MAX_TRADES_PER_DAY  = 0
+            mock_settings.MOMENTUM_REENTRY_COOLDOWN_CANDLES = 0
+            mock_settings.ORB_MOMENTUM_SKIP_MONDAY     = False   # don't suppress on actual Mondays
+            mock_settings.MAX_TRADES_PER_SIDE          = 0       # unlimited for this test
 
             result = evaluate_signals(c5, c15)
             assert result == "CE_MOM"
@@ -431,6 +441,7 @@ class TestSignalEngineWithMomentum:
         record_calls = []
         with patch("strategies.signal_engine.settings") as mock_settings, \
              patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
              patch("strategies.signal_engine.record_processed_signal",
                    side_effect=lambda *a, **kw: record_calls.append(a[0])), \
              patch("strategies.signal_engine.is_ce_signal", return_value=True), \
@@ -448,11 +459,59 @@ class TestSignalEngineWithMomentum:
             mock_settings.MOMENTUM_MIN_BODY_PTS        = MIN_BODY
             mock_settings.MOMENTUM_WINDOW_START        = "13:30"
             mock_settings.MOMENTUM_WINDOW_END          = "14:30"
+            mock_settings.EMA_COOLDOWN_CANDLES         = 0
+
+            mock_settings.EMA_MAX_TRADES_PER_DAY       = 0
+            mock_settings.EMA_MAX_CONSEC_LOSSES        = 0
+            mock_settings.ENABLE_PIVOT_STRATEGY        = False
+            mock_settings.MAX_TRADES_PER_SIDE          = 0       # unlimited for this test
 
             result = evaluate_signals(c5, c15)
             assert result == "CE"
             # Only the standard CE id was recorded, not the momentum id
             assert all("_MOM_" not in rid for rid in record_calls)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Momentum guards — per-day cap + same-direction re-entry cooldown
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestMomentumGuards:
+    @pytest.fixture(autouse=True)
+    def _reset(self, monkeypatch):
+        import strategies.signal_engine as se
+        monkeypatch.setattr(se, "_mom_trades_today", {})
+        monkeypatch.setattr(se, "_mom_counter_seeded", {"D"})   # skip DB seed
+        monkeypatch.setattr(se, "_mom_cooldown_left", 0)
+        monkeypatch.setattr(se, "_mom_cooldown_side", None)
+        monkeypatch.setattr(se.settings, "MOMENTUM_MAX_TRADES_PER_DAY", 1)
+        monkeypatch.setattr(se.settings, "MOMENTUM_REENTRY_COOLDOWN_CANDLES", 6)
+        self.se = se
+
+    def test_cap_blocks_second_trade(self):
+        se = self.se
+        assert se.mom_block_reason("CE", "D") is None
+        se.note_mom_trade("D")
+        assert "max MOM trades" in se.mom_block_reason("CE", "D")
+        assert "max MOM trades" in se.mom_block_reason("PE", "D")
+
+    def test_cap_zero_is_unlimited(self, monkeypatch):
+        se = self.se
+        monkeypatch.setattr(se.settings, "MOMENTUM_MAX_TRADES_PER_DAY", 0)
+        monkeypatch.setattr(se.settings, "MOMENTUM_REENTRY_COOLDOWN_CANDLES", 0)
+        for _ in range(5):
+            se.note_mom_trade("D")
+        assert se.mom_block_reason("CE", "D") is None
+
+    def test_reentry_cooldown_same_direction_only(self, monkeypatch):
+        se = self.se
+        monkeypatch.setattr(se.settings, "MOMENTUM_MAX_TRADES_PER_DAY", 0)
+        se.note_mom_exit("CE")
+        assert "cooldown" in se.mom_block_reason("CE", "D")
+        assert se.mom_block_reason("PE", "D") is None      # opposite side allowed
+        for _ in range(6):
+            se.tick_mom_cooldown()
+        assert se.mom_block_reason("CE", "D") is None      # expired after 6 candles
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -508,6 +567,12 @@ class TestMomentumMondayFilter:
         ms.MOMENTUM_WINDOW_START        = "13:30"
         ms.MOMENTUM_WINDOW_END          = "14:30"
         ms.ORB_MOMENTUM_SKIP_MONDAY     = skip
+        ms.EMA_MAX_TRADES_PER_DAY       = 0
+        ms.EMA_MAX_CONSEC_LOSSES        = 0
+        ms.EMA_COOLDOWN_CANDLES         = 0
+        ms.MOMENTUM_MAX_TRADES_PER_DAY  = 0
+        ms.MOMENTUM_REENTRY_COOLDOWN_CANDLES = 0
+        ms.MAX_TRADES_PER_SIDE          = 0       # unlimited for this test
 
     def test_momentum_suppressed_on_monday(self) -> None:
         from unittest.mock import patch
@@ -519,6 +584,7 @@ class TestMomentumMondayFilter:
 
         with patch("strategies.signal_engine.settings") as ms, \
              patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
              patch("strategies.signal_engine.record_processed_signal"), \
              patch("strategies.signal_engine.is_ce_signal", return_value=False), \
              patch("strategies.signal_engine.is_pe_signal", return_value=False):

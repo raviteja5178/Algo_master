@@ -38,20 +38,30 @@ from execution.eod_manager import EODManager
 from execution.option_selector import select_atm_candidates, select_atm_option
 from execution.position_manager import State, StateMachine
 from execution.protective_stop import ProtectiveStop
+from execution.pivot_trade_manager import PivotTradeManager
+from execution.ema_trade_manager import EmaTradeManager, plan_ema_risk
 from execution.smart_exit import SmartExitEngine
 from strategies.ai_confirmation import AIConfirmationFilter
 from strategies.regime_classifier import RegimeClassifier
+from strategies.market_regime import classify_intraday
 from strategies.smart_entry import SmartEntryFilter
 from execution.target_manager import DynamicTargetManager
 from execution.trailing_stop import TrailingStopManager
 from market.candle_aggregator import CandleAggregator
 from market.candle_builder import Candle
-from market.historical_data import SENSEX_TOKEN, fetch_historical_candles, fetch_previous_day_hl
+from market.historical_data import (
+    SENSEX_TOKEN,
+    fetch_historical_candles,
+    fetch_previous_day_hl,
+    PivotLevels,
+    compute_pivot_levels,
+)
 from market.vwap import VWAPCalculator
 from market.paper_feed import PaperFeed
 from market.websocket_client import WebSocketClient
 from notifications.notifier import notify
 from persistence.trade_store import (
+    claim_entry_slot_atomic,
     fetch_active_trade,
     fetch_today_realised_pnl,
     has_action,
@@ -59,10 +69,15 @@ from persistence.trade_store import (
     mark_trade_closed,
     mark_trade_closed_with_reason,
     record_action,
+    release_entry_slot,
     upsert_trade,
 )
 from risk.safety_manager import SafetyManager
-from strategies.signal_engine import evaluate_signals
+from strategies.signal_engine import (
+    evaluate_signals, note_ema_result, note_ema_trade, tick_ema_cooldown,
+    note_mom_exit, note_mom_trade, tick_mom_cooldown,
+    note_side_trade,
+)
 from market.indicators import atr_at, ema as calc_ema, swing_levels
 from utils.latency import LatencyTracker
 from utils.logging_config import configure_logging, log_event
@@ -109,6 +124,8 @@ class BotContext:
         self.trailing: TrailingStopManager | None = None
         self.target: DynamicTargetManager | None = None
         self.strategy_type: str | None = None
+        # Pivot strategy owns its own SL/BE/TSL/target engine (None for other strategies)
+        self.pivot_mgr: PivotTradeManager | None = None
 
         # Last known SENSEX spot LTP (updated by every tick)
         self.sensex_ltp: float = 0.0
@@ -128,9 +145,13 @@ class BotContext:
         # VWAP calculator — fed by completed 5m candles + every SENSEX tick
         self.vwap = VWAPCalculator()
 
-        # Previous day High / Low — populated at startup from daily historical data
-        self.prev_day_high: float | None = None
-        self.prev_day_low:  float | None = None
+        # Previous day High / Low / Close — populated at startup from daily historical data
+        self.prev_day_high:  float | None = None
+        self.prev_day_low:   float | None = None
+        self.prev_day_close: float | None = None
+
+        # Pivot levels (P, R1, R2, S1, S2) — computed from prev-day OHLC at startup
+        self.pivot_levels: PivotLevels | None = None
 
         # WebSocket (LIVE/SHADOW) or paper feed (PAPER)
         self.ws = WebSocketClient() if settings.TRADING_MODE != "PAPER" else None
@@ -157,6 +178,8 @@ class BotContext:
                 enable_profit_lock        = settings.ENABLE_PROFIT_LOCK_EXIT,
                 enable_time_decay         = settings.ENABLE_TIME_DECAY_EXIT,
                 enable_daily_loss_limit   = settings.ENABLE_DAILY_LOSS_LIMIT,
+                ema_collapse_closes       = settings.EMA_COLLAPSE_CLOSES,
+                ema_profit_lock           = settings.EMA_PROFIT_LOCK,
             ) if settings.ENABLE_SMART_EXIT else None
         )
 
@@ -196,6 +219,7 @@ class BotContext:
             structure_bypass_ema_confirm= settings.SMART_ENTRY_STRUCTURE_BYPASS_EMA_CONFIRM,
             bounce_exempt_strategies    = settings.SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES,
             slope_exempt_strategies     = settings.SMART_ENTRY_SLOPE_EXEMPT_STRATEGIES,
+            squeeze_exempt_strategies   = settings.SMART_ENTRY_SQUEEZE_EXEMPT_STRATEGIES,
         )
 
         # AI Confirmation Filter (created only when ENABLE_AI_CONFIRMATION=true)
@@ -212,8 +236,20 @@ class BotContext:
         # Current day's AI regime label (updated after classify())
         self.ai_regime: str = "UNKNOWN"
 
-    def can_create_entry(self) -> bool:
-        if is_after_or_equal(now_ist().time(), self._no_entry_time):
+        # Intraday rule-based regime (TRENDING/CHOPPY/MIXED + volatile overlay).
+        # Refreshed on every closed 5m candle; observational only (dashboard +
+        # trades.smart_entry_flags) — never read by entry/exit logic.
+        self.intraday_regime: dict | None = None
+
+    def can_create_entry(self, signal_type: str = "") -> bool:
+        # EMA-specific no-new-entry cutoff (overrides global when set)
+        _is_ema = signal_type in ("CE", "PE")
+        if _is_ema and settings.EMA_NO_NEW_ENTRY_AFTER:
+            from utils.time_utils import parse_time_ist
+            _ema_cutoff = parse_time_ist(settings.EMA_NO_NEW_ENTRY_AFTER)
+            if is_after_or_equal(now_ist().time(), _ema_cutoff):
+                return False
+        elif is_after_or_equal(now_ist().time(), self._no_entry_time):
             return False
         # Block new entries if daily loss limit is hit
         if self.smart_exit is not None:
@@ -340,15 +376,124 @@ def print_startup_summary() -> None:
 
 # ── Entry execution ────────────────────────────────────────────────────────────
 
+def _ema_option_block_reason(instrument: dict, option_ltp: float | None) -> str | None:
+    """
+    EMA rule-set option-level checks (SHADOW/LIVE only — PAPER has no option data).
+
+      1. Slippage: best ask must not be more than EMA_MAX_SLIPPAGE_PCT above LTP.
+      2. Option trend: option LTP must be above EMA9 of the option's own 5m chart.
+
+    Returns a block reason, or None to allow.  Data errors fail open (allow).
+    """
+    if settings.TRADING_MODE == "PAPER" or not option_ltp or option_ltp <= 0:
+        return None
+    from broker.kite_client import get_kite as _gk
+    symbol = instrument["tradingsymbol"]
+
+    if settings.EMA_MAX_SLIPPAGE_PCT > 0:
+        try:
+            q = _gk().quote([f"BFO:{symbol}"])[f"BFO:{symbol}"]
+            asks = [d.get("price", 0) for d in (q.get("depth", {}).get("sell") or []) if d.get("price", 0) > 0]
+            if asks:
+                slip_pct = (asks[0] - option_ltp) / option_ltp * 100
+                if slip_pct > settings.EMA_MAX_SLIPPAGE_PCT:
+                    return f"slippage {slip_pct:.2f}% > {settings.EMA_MAX_SLIPPAGE_PCT}% (ask={asks[0]} ltp={option_ltp})"
+        except Exception as exc:
+            logger.warning("EMA slippage check skipped for %s: %s", symbol, exc)
+
+    if settings.EMA_OPTION_EMA_CHECK:
+        try:
+            opt_candles = fetch_historical_candles(int(instrument["instrument_token"]), "5minute", days_back=4)
+            e9 = calc_ema(opt_candles, 9)[-1] if len(opt_candles) >= 9 else None
+            if e9 is not None and option_ltp <= e9:
+                return f"option premium {option_ltp} <= option 5m EMA9 {e9:.2f}"
+        except Exception as exc:
+            logger.warning("EMA option-EMA9 check skipped for %s: %s", symbol, exc)
+    return None
+
+
+def _plan_ema_entry(ctx: BotContext, side: str, sensex_ltp: float):
+    """
+    Pre-fill EMA risk plan on the SENSEX index.
+    Returns (plan | None, delta, max_sl_pct, block_reason | None).
+    """
+    from broker.instrument_repository import is_expiry_day
+    expiry = settings.TRADING_MODE != "PAPER" and is_expiry_day()
+    # PAPER trades the index itself as the "option" price → delta 1
+    delta = 1.0 if settings.TRADING_MODE == "PAPER" else (
+        settings.EMA_EXPIRY_DELTA if expiry else settings.EMA_OPTION_DELTA)
+    max_sl_pct = settings.EMA_EXPIRY_MAX_SL_PCT if expiry else settings.EMA_MAX_SL_PCT
+    if expiry and settings.EMA_EXPIRY_NO_ENTRY_AFTER:
+        try:
+            if is_after_or_equal(now_ist().time(), parse_time_ist(settings.EMA_EXPIRY_NO_ENTRY_AFTER)):
+                return None, delta, max_sl_pct, f"expiry day — no EMA entries after {settings.EMA_EXPIRY_NO_ENTRY_AFTER}"
+        except ValueError:
+            pass
+
+    c5 = ctx.agg_5m.get_completed()
+    atr = atr_at(c5, period=settings.SPOT_ATR_PERIOD)
+    sh, sl = (swing_levels(c5, length=settings.EMA_SWING_LENGTH, reference_price=sensex_ltp)
+              if len(c5) >= settings.EMA_SWING_LENGTH + 2 else (None, None))
+
+    # Opposing levels for the room filter. Day high/low excludes the last 3
+    # candles (the move that produced the signal is not resistance/support).
+    # Pivot levels are intentionally not used: EMA is independent of pivots.
+    today = now_ist().date()
+    day = [c for c in c5[:-3] if c.timestamp.date() == today]
+    if side == "CE":
+        levels = [ctx.prev_day_high, max((c.high for c in day), default=None)]
+    else:
+        levels = [ctx.prev_day_low, min((c.low for c in day), default=None)]
+
+    plan, reason = plan_ema_risk(
+        side, sensex_ltp, atr, sh, sl,
+        swing_buffer_atr=settings.EMA_SWING_BUFFER_ATR,
+        min_atr=settings.EMA_SL_MIN_ATR,
+        max_atr=settings.EMA_SL_MAX_ATR,
+        fallback_atr=settings.EMA_SL_FALLBACK_ATR,
+        target_rr=settings.EMA_TARGET_RR if settings.EMA_TARGET_RR > 0 else 3.0,
+        levels=[lv for lv in levels if lv],
+        min_room_r=settings.EMA_MIN_ROOM_R,
+    )
+    if plan is not None:
+        # Rupee risk always estimated with the real option delta (also in PAPER)
+        _rd = settings.EMA_EXPIRY_DELTA if expiry else settings.EMA_OPTION_DELTA
+        plan["risk_rupees"] = round(plan["risk"] * _rd * ctx.quantity, 2)
+        if settings.EMA_MAX_RISK_RUPEES > 0 and plan["risk_rupees"] > settings.EMA_MAX_RISK_RUPEES:
+            reason = f"risk ₹{plan['risk_rupees']:.0f} > max ₹{settings.EMA_MAX_RISK_RUPEES:.0f}"
+            plan = None
+    log_event(logger, "EMA_RISK_PLAN", side=side, sensex=round(sensex_ltp, 2),
+              atr=round(atr, 2) if atr else None, swing_high=sh, swing_low=sl,
+              delta=delta, expiry=expiry, plan=plan, blocked=reason)
+    return plan, delta, max_sl_pct, reason
+
+
 def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
                   signal_candle_ts=None, candle_completed_ts: str | None = None) -> None:
-    if not ctx.can_create_entry():
+    if not ctx.can_create_entry(signal_type=signal_type):
         logger.warning("Entry blocked [%s]: %s.", signal_type, ctx.entry_block_reason())
         return
+    # Apply EMA-specific quantity override
+    _is_ema_signal = signal_type in ("CE", "PE")
+    if _is_ema_signal and settings.EMA_QUANTITY > 0:
+        ctx.quantity = settings.EMA_QUANTITY
+    else:
+        ctx.quantity = settings.QUANTITY
 
     action_id = f"{signal_type}_ENTRY_{now_ist().strftime('%Y-%m-%d_%H-%M')}"
     if has_action(action_id):
         logger.info("Entry action %s already recorded — skipping duplicate.", action_id)
+        return
+
+    # Second-line defence against duplicate orders from concurrent bot processes:
+    # the state machine above is in-memory and cannot protect across processes.
+    # A DB check here catches the case where another process already opened a
+    # trade (wrote it to DB) since the state-machine check above passed.
+    if fetch_active_trade() is not None:
+        logger.warning(
+            "Entry blocked [%s]: an OPEN trade already exists in DB "
+            "(concurrent process guard).", signal_type,
+        )
         return
 
     option_type = "CE" if signal_type.startswith("CE") else "PE"
@@ -497,8 +642,71 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         ctx.sm.transition(State.IDLE, reason="entry blocked: premium extension")
         return
 
+    # ── EMA rule-set: slippage + option EMA9 checks + index risk plan ─────────
+    _ema_plan = None
+    _ema_delta = settings.EMA_OPTION_DELTA
+    _ema_max_sl_pct = settings.EMA_MAX_SL_PCT
+    if signal_type in ("CE", "PE"):
+        _ema_block = _ema_option_block_reason(instrument, option_ltp_hint)
+        if not _ema_block:
+            _ema_plan, _ema_delta, _ema_max_sl_pct, _ema_block = _plan_ema_entry(ctx, option_type, sensex_ltp)
+        if _ema_block:
+            log_event(logger, "EMA_ENTRY_BLOCKED", signal=signal_type,
+                      symbol=instrument["tradingsymbol"], reason=_ema_block)
+            ctx.sm.transition(State.IDLE, reason=f"EMA entry blocked: {_ema_block}")
+            return
+
+    # ── Momentum: SL-distance and room-to-day-extreme guards ──────────────────
+    if signal_type in ("CE_MOM", "PE_MOM") and (
+            settings.MOMENTUM_MAX_SL_ATR > 0 or settings.MOMENTUM_MIN_ROOM_ATR > 0):
+        _c5 = ctx.agg_5m.get_completed()
+        _atr = atr_at(_c5, period=settings.SPOT_ATR_PERIOD)
+        _reason = None
+        if _atr and settings.MOMENTUM_MAX_SL_ATR > 0:
+            _sh, _sl = (swing_levels(_c5, length=settings.SWING_SL_LENGTH, reference_price=sensex_ltp)
+                        if len(_c5) >= settings.SWING_SL_LENGTH + 2 else (None, None))
+            _swing = _sl if option_type == "CE" else _sh
+            _dist = abs(sensex_ltp - _swing) if _swing is not None else None
+            if _dist is not None and _dist > settings.MOMENTUM_MAX_SL_ATR * _atr:
+                _reason = (f"swing SL {_dist:.1f} pts = {_dist / _atr:.2f}×ATR "
+                           f"> {settings.MOMENTUM_MAX_SL_ATR}×ATR")
+        if _atr and _reason is None and settings.MOMENTUM_MIN_ROOM_ATR > 0:
+            # Prior day extreme, excluding the last 3 candles (the signal move).
+            _day = [c for c in _c5[:-3] if c.timestamp.date() == now_ist().date()]
+            if _day:
+                _room = (max(c.high for c in _day) - sensex_ltp if option_type == "CE"
+                         else sensex_ltp - min(c.low for c in _day))
+                if 0 <= _room < settings.MOMENTUM_MIN_ROOM_ATR * _atr:
+                    _reason = (f"only {_room:.1f} pts = {_room / _atr:.2f}×ATR to prior day "
+                               f"{'high' if option_type == 'CE' else 'low'} "
+                               f"< {settings.MOMENTUM_MIN_ROOM_ATR}×ATR")
+        if _reason:
+            log_event(logger, "MOM_ENTRY_BLOCKED", signal=signal_type, reason=_reason)
+            ctx.sm.transition(State.IDLE, reason=f"MOM entry blocked: {_reason}")
+            return
+
     ctx.tradingsymbol = instrument["tradingsymbol"]
     ctx.instrument_token = instrument["instrument_token"]
+
+    # ── Atomic entry-slot claim ───────────────────────────────────────────────
+    # Generate trade_id NOW (before the order) and INSERT a PENDING row so any
+    # concurrent bot process racing here will see status IN ('OPEN','PENDING')
+    # in fetch_active_trade() and block itself — closing the race window between
+    # the fetch_active_trade() check above and the upsert_trade(OPEN) after fill.
+    ctx.trade_id = (
+        f"TRADE_{signal_type}_{now_ist().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+    )
+    ctx.strategy_type = signal_type
+    if not claim_entry_slot_atomic(
+        ctx.trade_id, signal_type, ctx.tradingsymbol,
+        ctx.instrument_token, ctx.quantity, now_ist().isoformat(),
+    ):
+        logger.warning(
+            "Entry blocked [%s]: concurrent process claimed the entry slot first.",
+            signal_type,
+        )
+        ctx.sm.transition(State.IDLE, reason="entry slot claimed by concurrent process")
+        return
 
     if settings.TRADING_MODE != "PAPER":
         # Subscribe to option LTP on WebSocket
@@ -522,12 +730,14 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     except Exception as exc:
         logger.error("Entry order placement raised an exception: %s", exc, exc_info=True)
         notify("ENTRY_REJECTED", symbol=ctx.tradingsymbol, reason=str(exc))
+        release_entry_slot(ctx.trade_id)
         ctx.sm.transition(State.IDLE, reason="broker exception on entry")
         return
 
     if fill["status"] != "COMPLETE" or fill["filled_qty"] == 0:
         logger.error("Entry fill failed: %s", fill)
         notify("ENTRY_REJECTED", symbol=ctx.tradingsymbol, reason=fill.get("status"))
+        release_entry_slot(ctx.trade_id)
         ctx.sm.transition(State.IDLE, reason="entry rejected/timeout")
         return
 
@@ -580,6 +790,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
                     "fallbacks failed. Skipping entry — bot returns to IDLE.",
                     settings.TRADING_MODE, ctx.tradingsymbol,
                 )
+                release_entry_slot(ctx.trade_id)
                 ctx.sm.transition(State.IDLE, reason="shadow/paper zero fill — no LTP available")
                 return
         else:
@@ -605,21 +816,32 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
 
     ctx.entry_price = fill["average_price"]
     ctx.quantity = fill["filled_qty"]
-    ctx.trade_id = f"TRADE_{signal_type}_{now_ist().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
-    ctx.strategy_type = signal_type
+    # trade_id and strategy_type were already set before the order (atomic slot claim)
     if ctx.latency:
         ctx.latency.trade_id = ctx.trade_id   # backfill real trade_id now that we have it
+    _fill_day = str(now_ist().date())
+    _fill_side = "CE" if signal_type.startswith("CE") else "PE"
+    note_side_trade(_fill_side, _fill_day)     # global per-side daily cap counter
+    if signal_type in ("CE", "PE"):
+        note_ema_trade(_fill_day)              # EMA cooldown starts only on a real fill
+    elif signal_type in ("CE_MOM", "PE_MOM"):
+        note_mom_trade(_fill_day)
 
     notify("ENTRY_FILLED", symbol=ctx.tradingsymbol, fill=ctx.entry_price, qty=ctx.quantity)
 
     # ── Compute risk parameters (ATR-adaptive or fixed) ────────────────────────
     _candles_5m   = ctx.agg_5m.get_completed()
     _option_type  = "CE" if signal_type.startswith("CE") else "PE"
+    # EMA CE/PE always use Mode D (swing SL) with Mode C (spot ATR) as fallback,
+    # regardless of the global USE_SWING_SL / USE_SPOT_ATR_RISK toggles.
+    _is_ema_signal = signal_type in ("CE", "PE")
+    _use_swing_sl  = settings.USE_SWING_SL or _is_ema_signal
+    _use_spot_atr  = settings.USE_SPOT_ATR_RISK or _is_ema_signal
 
     # Mode D: resolve nearest swing HIGH above and swing LOW below current price
     _swing_high: float | None = None
     _swing_low:  float | None = None
-    if settings.USE_SWING_SL and len(_candles_5m) >= settings.SWING_SL_LENGTH + 2:
+    if _use_swing_sl and len(_candles_5m) >= settings.SWING_SL_LENGTH + 2:
         _swing_high, _swing_low = swing_levels(
             _candles_5m,
             length=settings.SWING_SL_LENGTH,
@@ -636,13 +858,17 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         min_trail_pts       = settings.MIN_TRAIL_POINTS,
         entry_price         = ctx.entry_price,
         # Mode C: SENSEX spot ATR × multiplier
-        use_spot_atr        = settings.USE_SPOT_ATR_RISK,
+        use_spot_atr        = _use_spot_atr,
         spot_atr_period     = settings.SPOT_ATR_PERIOD,
         spot_sl_mult        = settings.SPOT_ATR_SL_MULT,
-        target_rr           = settings.SPOT_ATR_TARGET_RR,
+        target_rr           = (
+            settings.EMA_TARGET_RR
+            if signal_type in ("CE", "PE") and settings.EMA_TARGET_RR > 0
+            else settings.SPOT_ATR_TARGET_RR
+        ),
         trail_rr            = settings.SPOT_ATR_TRAIL_RR,
         # Mode D: swing high/low as SL (structure-based)
-        use_swing_sl           = settings.USE_SWING_SL,
+        use_swing_sl           = _use_swing_sl,
         option_type            = _option_type,
         sensex_ltp             = sensex_ltp,
         swing_high             = _swing_high,
@@ -656,6 +882,76 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     target_pts = risk.initial_target_points
     ctx.entry_atr = risk.atr_value   # stored for dynamic profit lock
 
+    # ── Pivot strategy: replace generic risk with its own index-based engine ──
+    from strategies import signal_engine as _se
+    # FIX (Flaw 15): snapshot last_pivot_setup under the tick lock (already held
+    # by the caller) rather than reading the module global twice.  The local
+    # variable is immutable (frozen dataclass) so it is safe to use below.
+    _pv_setup = _se.consume_pivot_setup()
+    _is_pivot = signal_type.endswith("_PIVOT") and _pv_setup is not None and _pv_setup.side == _option_type
+    if _is_pivot:
+        ctx.pivot_mgr = PivotTradeManager(
+            _pv_setup.side, sensex_ltp, _pv_setup.stop,
+            _pv_setup.t1, _pv_setup.t2, _pv_setup.t3,
+            _pv_setup.atr, ctx.entry_price,
+            # PAPER mode trades the index itself as the "option" price → delta 1
+            delta=1.0 if settings.TRADING_MODE == "PAPER" else settings.PIVOT_OPTION_DELTA,
+            be_trigger_r=settings.PIVOT_BE_TRIGGER_R,
+            be_buffer_pts=settings.PIVOT_BE_BUFFER_PTS,
+            t1_lock_pct=settings.PIVOT_T1_LOCK_PCT,
+            t2_lock_pct=settings.PIVOT_T2_LOCK_PCT,
+            trail_atr_mult=settings.PIVOT_TRAIL_ATR_MULT,
+            t2_trail_atr_mult=settings.PIVOT_T2_TRAIL_ATR_MULT,
+            hard_sl_cushion=settings.PIVOT_HARD_SL_CUSHION,
+            max_sl_pct=settings.MAX_SL_PCT,
+            signal_risk=_pv_setup.risk,
+        )
+        _pv_delta = ctx.pivot_mgr.delta
+        sl_pts     = round(ctx.entry_price - ctx.pivot_mgr.option_stop, 2)
+        target_pts = round(abs(_pv_setup.t3 - sensex_ltp) * _pv_delta, 2)
+        be_pts     = round(ctx.pivot_mgr.be_trigger_r * ctx.pivot_mgr.risk * _pv_delta, 2)
+        trail_pts  = round(settings.PIVOT_TRAIL_ATR_MULT * _pv_setup.atr * _pv_delta, 2)
+        log_event(
+            logger, "PIVOT_RISK_APPLIED",
+            side=_pv_setup.side, mode=_pv_setup.mode,
+            sensex_entry=round(sensex_ltp, 2), index_stop=_pv_setup.stop,
+            index_risk=ctx.pivot_mgr.risk,
+            t1=_pv_setup.t1, t2=_pv_setup.t2, t3=_pv_setup.t3,
+            option_entry=ctx.entry_price, option_sl=ctx.pivot_mgr.option_stop,
+        )
+    else:
+        ctx.pivot_mgr = None
+
+    # ── EMA strategy: index-based engine (swing SL clamped by ATR, BE, chandelier) ──
+    _is_ema_idx = _ema_plan is not None and not _is_pivot
+    if _is_ema_idx:
+        _trail_atr = atr_at(_candles_5m, period=settings.TSL_ATR_PERIOD) or _ema_plan["risk"]
+        ctx.pivot_mgr = EmaTradeManager(
+            _option_type, sensex_ltp, _ema_plan["stop"], _ema_plan["target"],
+            _trail_atr, ctx.entry_price,
+            delta=_ema_delta,
+            be_trigger_r=settings.EMA_BE_TRIGGER_R,
+            be_buffer_pts=settings.EMA_BE_BUFFER_PTS,
+            trail_atr_mult=settings.EMA_TRAIL_ATR_MULT,
+            trail_ema9_exit=settings.EMA_TRAIL_EMA9_EXIT,
+            time_stop_bars=settings.EMA_TIME_STOP_BARS,
+            time_stop_min_r=settings.EMA_TIME_STOP_MIN_R,
+            hard_sl_cushion=settings.EMA_HARD_SL_CUSHION,
+            max_sl_pct=_ema_max_sl_pct,
+        )
+        sl_pts     = round(ctx.entry_price - ctx.pivot_mgr.option_stop, 2)
+        target_pts = round(abs(_ema_plan["target"] - sensex_ltp) * _ema_delta, 2)
+        be_pts     = round(settings.EMA_BE_TRIGGER_R * ctx.pivot_mgr.risk * _ema_delta, 2)
+        trail_pts  = round(settings.EMA_TRAIL_ATR_MULT * _trail_atr * _ema_delta, 2)
+        log_event(
+            logger, "EMA_RISK_APPLIED",
+            side=_option_type, source=_ema_plan["source"],
+            sensex_entry=round(sensex_ltp, 2), index_stop=_ema_plan["stop"],
+            index_target=_ema_plan["target"], index_risk=_ema_plan["risk"],
+            risk_rupees=_ema_plan.get("risk_rupees"), delta=_ema_delta,
+            option_entry=ctx.entry_price, option_sl=ctx.pivot_mgr.option_stop,
+        )
+
     log_event(
         logger, "RISK_PARAMS_APPLIED",
         sl_mode=risk.sl_mode,
@@ -667,7 +963,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     )
 
     # ── MIN_RR gate: block entry if R:R is below the configured minimum ──
-    if settings.MIN_RR > 0 and sl_pts > 0:
+    if settings.MIN_RR > 0 and sl_pts > 0 and not _is_pivot and not _is_ema_idx:   # Pivot/EMA have their own room filter
         actual_rr = round(target_pts / sl_pts, 2)
         if actual_rr < settings.MIN_RR:
             log_event(
@@ -698,6 +994,10 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     _sx_sl    = round(sensex_ltp + _sl_index_pts,     2) if is_pe else round(sensex_ltp - _sl_index_pts,     2)
     _sx_t1    = round(sensex_ltp - _tgt_index_pts,    2) if is_pe else round(sensex_ltp + _tgt_index_pts,    2)
     _sx_t2    = round(sensex_ltp - 2 * _tgt_index_pts,2) if is_pe else round(sensex_ltp + 2 * _tgt_index_pts,2)
+    if _is_pivot:   # chart markers = the real Pivot levels
+        _sx_sl, _sx_t1, _sx_t2 = _pv_setup.stop, round(_pv_setup.t1, 2), round(_pv_setup.t2, 2)
+    elif _is_ema_idx:
+        _sx_sl, _sx_t1, _sx_t2 = _ema_plan["stop"], _ema_plan["target"], _ema_plan["target"]
 
     # Persist the new trade using the computed risk parameters rather than hardcoded ones
     upsert_trade({
@@ -725,6 +1025,8 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         "sensex_sl":    _sx_sl,
         "sensex_t1":    _sx_t1,
         "sensex_t2":    _sx_t2,
+        # Market regime at entry, for later per-regime P&L analysis
+        "smart_entry_flags": json.dumps({"regime": ctx.intraday_regime}) if ctx.intraday_regime else None,
     })
     record_action(action_id, ctx.trade_id, "ENTRY", fill["order_id"], "COMPLETE")
 
@@ -809,6 +1111,13 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     })
 
     ctx.sm.transition(State.POSITION_OPEN, reason="fill confirmed, SL placed")
+    if ctx.pivot_mgr is not None:
+        ctx.pivot_mgr.save(ctx.trade_id)
+    # FIX (Flaw 18): count the trade only after the fill is confirmed and the
+    # position is open — rejected orders no longer consume today's quota.
+    if signal_type and signal_type.endswith("_PIVOT"):
+        from strategies import signal_engine as _se_ref
+        _se_ref.note_pivot_trade(str(now_ist().date()))
     logger.info(
         "Position open | %s | entry=%.2f | sl=%.2f | target_ref=%.2f",
         ctx.tradingsymbol, ctx.entry_price, ctx.trailing.current_stop, ctx.target.target_reference,
@@ -816,6 +1125,53 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
 
 
 # ── Option LTP handler (trailing logic) ───────────────────────────────────────
+
+def on_pivot_index_price(ctx: BotContext, sensex_ltp: float) -> None:
+    """Pivot trades: SL/BE/TSL/T2 decisions are made on the SENSEX index price."""
+    mgr = ctx.pivot_mgr
+    if mgr is None or ctx.sm.state != State.POSITION_OPEN:
+        return
+    action = mgr.on_index_price(sensex_ltp)
+    if action is None:
+        return
+    kind, value = action
+    if kind == "EXIT":
+        log_event(logger, "PIVOT_EXIT", reason=value, sensex=round(sensex_ltp, 2),
+                  stage=mgr.stage, index_stop=mgr.stop_index, best=round(mgr.best_index, 2))
+        execute_exit(ctx, reason=str(value))
+        return
+    # STOP_MOVED → ratchet the broker protective SL (option premium)
+    new_opt_stop = float(value)
+    if ctx.stop_order_id and ctx.trailing and new_opt_stop > ctx.trailing.current_stop:
+        if not ctx.broker.modify_stop_order(ctx.stop_order_id, new_opt_stop):
+            logger.error("Pivot: failed to modify stop order; entering safety mode.")
+            ctx.sm.force_halt("pivot stop modification failed")
+            notify("BOT_HALTED", reason="pivot_stop_modification_failed")
+            return
+        ctx.trailing.current_stop = new_opt_stop
+        was_be = ctx.trailing.break_even_activated
+        ctx.trailing.break_even_activated = mgr.stage != "INITIAL"
+        # Count each stop-raise after BE as a trail step so the UI TSL-steps
+        # counter works correctly for CE_PIVOT / PE_PIVOT trades.
+        if was_be:
+            ctx.trailing.trail_steps_completed += 1
+    mgr.save(ctx.trade_id or "")
+    upsert_trade({
+        "trade_id": ctx.trade_id,
+        "strategy_type": ctx.strategy_type,
+        # Do NOT include signal_timestamp here — upsert_trade would overwrite
+        # the original signal time with the time of this stop modification.
+        "option_symbol": ctx.tradingsymbol,
+        "instrument_token": ctx.instrument_token,
+        "quantity": ctx.quantity,
+        "entry_price": ctx.entry_price,
+        "stop_order_id": ctx.stop_order_id,
+        "current_stop": mgr.option_stop,
+        "highest_ltp": ctx.trailing.highest_ltp if ctx.trailing else ctx.entry_price,
+        "target_reference": ctx.target.target_reference if ctx.target else None,
+        "status": "OPEN",
+    })
+
 
 def on_option_ltp(ctx: BotContext, ltp: float) -> None:
     if ctx.sm.state != State.POSITION_OPEN or ctx.trailing is None:
@@ -834,6 +1190,26 @@ def on_option_ltp(ctx: BotContext, ltp: float) -> None:
             logger.info("%s SL triggered for %s at ltp=%.2f", settings.TRADING_MODE, ctx.tradingsymbol, ltp)
             execute_exit(ctx, reason="STOP_HIT", exit_ltp=ltp)
             return
+
+    # Pivot trades: own engine (driven by SENSEX ticks) — only the broker SL
+    # backstop above applies here. Track the option high for reporting.
+    if ctx.pivot_mgr is not None:
+        ctx.trailing.highest_ltp = max(ctx.trailing.highest_ltp, ltp)
+        # EMA index engine: keep the daily-loss / time-decay smart exits active
+        # (profit lock is skipped for EMA unless EMA_PROFIT_LOCK=true).
+        if isinstance(ctx.pivot_mgr, EmaTradeManager) and ctx.smart_exit is not None:
+            daily_pnl = fetch_today_realised_pnl() + (ltp - ctx.entry_price) * ctx.quantity
+            smart_reason = ctx.smart_exit.check_on_tick(
+                strategy_type          = ctx.strategy_type,
+                entry_price            = ctx.entry_price,
+                option_ltp             = ltp,
+                qty                    = ctx.quantity,
+                daily_realised_pnl_pts = daily_pnl,
+                entry_atr              = ctx.entry_atr,
+            )
+            if smart_reason:
+                execute_exit(ctx, reason=smart_reason)
+        return
 
     # Trailing stop logic — pass latest candles for ATR-dynamic mode
     _candles_for_tsl = (
@@ -885,7 +1261,9 @@ def on_option_ltp(ctx: BotContext, ltp: float) -> None:
 
     # ── Smart Exit tick-level checks ──────────────────────────────────────────
     if ctx.smart_exit is not None and ctx.sm.state == State.POSITION_OPEN:
-        daily_pnl = fetch_today_realised_pnl()
+        # Daily loss kill switch counts realised P&L PLUS the open trade's
+        # unrealised P&L, so the open position is closed once the cap is hit.
+        daily_pnl = fetch_today_realised_pnl() + (ltp - ctx.entry_price) * ctx.quantity
         smart_reason = ctx.smart_exit.check_on_tick(
             strategy_type          = ctx.strategy_type,
             entry_price            = ctx.entry_price,
@@ -957,6 +1335,8 @@ def _resolve_sl_fill_price(ctx: BotContext) -> float:
 
 def _close_trade_context(ctx: BotContext) -> None:
     """Clear all active-trade fields on ctx after a confirmed exit."""
+    if getattr(ctx, "strategy_type", None) in ("CE_MOM", "PE_MOM"):
+        note_mom_exit(ctx.strategy_type[:2])
     # Unsubscribe option token from WebSocket so the stale monitor stops watching it.
     # Without this the option token stays in _option_tokens after trade close and the
     # stale alarm fires continuously after market hours with no ticks arriving.
@@ -968,6 +1348,9 @@ def _close_trade_context(ctx: BotContext) -> None:
     ctx.trailing = None
     ctx.target = None
     ctx.stop_order_id = None
+    if getattr(ctx, "pivot_mgr", None) is not None:
+        type(ctx.pivot_mgr).clear()
+    ctx.pivot_mgr = None
 
 
 def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = None) -> None:
@@ -1034,6 +1417,8 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
                       symbol=ctx.tradingsymbol, exit_price=exit_price,
                       pnl=pnl, original_reason=reason)
             ctx.smart_entry.on_trade_closed(pnl / max(ctx.quantity, 1))
+            if ctx.strategy_type in ("CE", "PE"):
+                note_ema_result(str(now_ist().date()), pnl)
             ctx.sm.transition(State.CLOSED, reason="SL filled at exchange")
             ctx.sm.transition(State.IDLE, reason="ready for next trade")
             _close_trade_context(ctx)
@@ -1068,6 +1453,9 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
     _SMART_EXITS = {
         "EMA_COLLAPSE", "REVERSAL_SIGNAL", "PROFIT_LOCK",
         "TIME_DECAY", "DAILY_LOSS_LIMIT",
+        "PIVOT_SL_HIT", "PIVOT_BE_STOP", "PIVOT_TSL_HIT", "PIVOT_TARGET_T2",
+        "EMA_SL_HIT", "EMA_BE_STOP", "EMA_TSL_HIT", "EMA_TARGET",
+        "EMA_TRAIL_EMA9", "EMA_TIME_STOP",
     }
     _smart_trigger = reason if reason in _SMART_EXITS else None
 
@@ -1081,6 +1469,8 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
 
     # Notify smart entry filter so cooldown starts on a loss
     ctx.smart_entry.on_trade_closed(pnl / max(filled_qty, 1))
+    if ctx.strategy_type in ("CE", "PE"):
+        note_ema_result(str(now_ist().date()), pnl)
 
     ctx.sm.transition(State.CLOSED, reason=reason)
     ctx.sm.transition(State.IDLE, reason="ready for next trade")
@@ -1171,6 +1561,37 @@ def recover_from_restart(ctx: BotContext) -> None:
         settings.TARGET_TRAIL_STEP_POINTS,
     )
     ctx.target.target_reference = active["target_reference"] or ctx.target.target_reference
+
+    # Restore in-memory paper SL order so trailing stop modifications succeed
+    if settings.TRADING_MODE in ("PAPER", "SHADOW") and ctx.stop_order_id:
+        if hasattr(ctx.broker, "_open_orders"):
+            ctx.broker._open_orders[ctx.stop_order_id] = {
+                "type": "SL",
+                "tradingsymbol": symbol,
+                "quantity": expected_qty,
+                "trigger_price": ctx.trailing.current_stop,
+                "status": "TRIGGER PENDING",
+            }
+
+    # EMA trades: restore the index-based engine (falls back to generic TSL if missing)
+    if ctx.strategy_type in ("CE", "PE"):
+        ctx.pivot_mgr = EmaTradeManager.load(ctx.trade_id)
+        if ctx.pivot_mgr is None:
+            logger.warning("EMA trade %s: manager state missing — falling back to generic TSL.", ctx.trade_id)
+            notify("EMA_STATE_MISSING", trade_id=ctx.trade_id,
+                   reason="ema_trade_manager_state_missing_after_restart")
+
+    # Pivot trades: restore their own SL/BE/TSL engine
+    if str(ctx.strategy_type or "").endswith("_PIVOT"):
+        ctx.pivot_mgr = PivotTradeManager.load(ctx.trade_id)
+        if ctx.pivot_mgr is None:
+            # FIX (Flaw 16): escalate to an operator notification so the trader
+            # knows the pivot engine is not running — the generic TSL will fire
+            # at the wrong levels and the trade will not be managed correctly.
+            logger.warning("Pivot trade %s: manager state missing — falling back to generic TSL.", ctx.trade_id)
+            notify("PIVOT_STATE_MISSING",
+                   trade_id=ctx.trade_id,
+                   reason="pivot_trade_manager_state_missing_after_restart")
 
     ctx.sm._state = State.POSITION_OPEN  # noqa: SLF001
 
@@ -1395,6 +1816,19 @@ def _write_state(ctx: BotContext) -> None:
             "vwap":        round(ctx.vwap.value, 2) if ctx.vwap.value else None,
             "prev_day_high": ctx.prev_day_high,
             "prev_day_low":  ctx.prev_day_low,
+            "market_regime": ctx.intraday_regime,
+            "pivot_levels": {
+                "pivot":      ctx.pivot_levels.pivot,
+                "r1":         ctx.pivot_levels.r1,
+                "r2":         ctx.pivot_levels.r2,
+                "s1":         ctx.pivot_levels.s1,
+                "s2":         ctx.pivot_levels.s2,
+                # Persist prev-day OHLC so an intraday restart that cannot reach
+                # the Kite API can still reconstruct PivotLevels with prev_close.
+                "prev_high":  ctx.pivot_levels.prev_high,
+                "prev_low":   ctx.pivot_levels.prev_low,
+                "prev_close": ctx.pivot_levels.prev_close,
+            } if ctx.pivot_levels else None,
             "natr_stop":     natr_stop_val,
             "atr_copilot_upper_band":   atr_copilot_upper,
             "atr_copilot_lower_band":   atr_copilot_lower,
@@ -1409,6 +1843,9 @@ def _write_state(ctx: BotContext) -> None:
                 "current_stop": ctx.trailing.current_stop if ctx.trailing else None,
                 "highest_ltp":  ctx.trailing.highest_ltp if ctx.trailing else None,
                 "target":       ctx.target.target_reference if ctx.target else None,
+                "break_even_activated": ctx.trailing.break_even_activated if ctx.trailing else False,
+                "trail_steps_completed": ctx.trailing.trail_steps_completed if ctx.trailing else 0,
+                "be_points":    ctx.trailing.break_even_trigger_points if ctx.trailing else None,
             } if ctx.trade_id else None,
             "updated_at": now_ist().isoformat(),
         }
@@ -1436,6 +1873,18 @@ _MARKET_OPEN_TIME  = parse_time_ist("09:15")
 _MARKET_CLOSE_TIME = parse_time_ist("15:30")
 
 
+# Single re-entrant lock shared by the WebSocket (Twisted reactor thread) and the
+# PaperFeed (daemon thread).  Both call the same tick_handler concurrently.
+# Without this lock, PivotTradeManager.on_index_price() — which mutates best_index,
+# stage, stop_index, and option_stop — can be entered from two threads simultaneously:
+#   Thread A reads best_index=72080, advances it to 72350, sets moved=True
+#   Thread B reads best_index=72080 (stale, before A's write) → returns None
+# The net result: moved=False, mgr.save() is never called, BE/TSL never fires.
+# A plain threading.Lock() is sufficient — the handler is non-recursive.
+import threading as _threading
+_tick_lock = _threading.Lock()
+
+
 def _make_tick_handler(ctx: BotContext):
     global _tick_counter
 
@@ -1447,34 +1896,67 @@ def _make_tick_handler(ctx: BotContext):
         # not pollute candle aggregators or trigger signal evaluation.
         if not is_after_or_equal(now_ist().time(), _MARKET_OPEN_TIME):
             return
-        if token == SENSEX_TOKEN:
-            ctx.sensex_ltp = ltp
-            # Feed into candle aggregators
-            ctx.agg_5m.on_tick(ltp)
-            ctx.agg_15m.on_tick(ltp)
-            # Feed VWAP (tick proxy — each tick = 1 volume unit)
-            if settings.ENABLE_VWAP_STRATEGY:
-                ctx.vwap.on_tick(ltp)
-            # In PAPER mode the option price IS the SENSEX spot price,
-            # so trail/SL checks run against the SENSEX LTP directly.
-            if settings.TRADING_MODE == "PAPER" and ctx.sm.state == State.POSITION_OPEN:
+        with _tick_lock:
+            if token == SENSEX_TOKEN:
+                ctx.sensex_ltp = ltp
+                # Feed into candle aggregators
+                ctx.agg_5m.on_tick(ltp)
+                ctx.agg_15m.on_tick(ltp)
+                # Feed VWAP (tick proxy — each tick = 1 volume unit)
+                if settings.ENABLE_VWAP_STRATEGY:
+                    ctx.vwap.on_tick(ltp)
+                # Pivot trades manage SL/BE/TSL/T2 on the SENSEX price
+                if ctx.pivot_mgr is not None and ctx.sm.state == State.POSITION_OPEN:
+                    on_pivot_index_price(ctx, ltp)
+                # In PAPER mode the option price IS the SENSEX spot price,
+                # so trail/SL checks run against the SENSEX LTP directly.
+                if settings.TRADING_MODE == "PAPER" and ctx.sm.state == State.POSITION_OPEN:
+                    on_option_ltp(ctx, ltp)
+                # After 15:30 only update the scalar LTP — never recompute bands/EMA
+                # from the candle buffer, which may contain post-market frozen candles.
+                _tick_counter += 1
+                _after_close = now_ist().time() >= _MARKET_CLOSE_TIME
+                if not _after_close and _tick_counter % _FULL_WRITE_INTERVAL == 0:
+                    _write_state(ctx)
+                else:
+                    _write_ltp(ctx)
+            elif ctx.instrument_token and token == ctx.instrument_token:
+                # LIVE/SHADOW: option token tick
                 on_option_ltp(ctx, ltp)
-            # After 15:30 only update the scalar LTP — never recompute bands/EMA
-            # from the candle buffer, which may contain post-market frozen candles.
-            _tick_counter += 1
-            _after_close = now_ist().time() >= _MARKET_CLOSE_TIME
-            if not _after_close and _tick_counter % _FULL_WRITE_INTERVAL == 0:
-                _write_state(ctx)
-            else:
-                _write_ltp(ctx)
-        elif ctx.instrument_token and token == ctx.instrument_token:
-            # LIVE/SHADOW: option token tick
-            on_option_ltp(ctx, ltp)
     return handler
+
+
+def _refresh_intraday_regime(ctx: BotContext, *, log: bool = True) -> None:
+    """Recompute ctx.intraday_regime from completed 5m candles. Never raises."""
+    if not settings.ENABLE_INTRADAY_REGIME:
+        return
+    try:
+        snap = classify_intraday(
+            ctx.agg_5m.get_completed(),
+            er_period=settings.INTRADAY_REGIME_ER_PERIOD,
+            adx_period=settings.INTRADAY_REGIME_ADX_PERIOD,
+            er_trending=settings.INTRADAY_REGIME_ER_TRENDING,
+            er_choppy=settings.INTRADAY_REGIME_ER_CHOPPY,
+            adx_trending=settings.INTRADAY_REGIME_ADX_TRENDING,
+            vol_ratio_threshold=settings.INTRADAY_REGIME_VOL_RATIO,
+        )
+        ctx.intraday_regime = {**snap.to_dict(), "label": snap.label}
+        if log:
+            log_event(
+                logger, "REGIME_INTRADAY",
+                regime=snap.regime, direction=snap.direction, volatile=snap.volatile,
+                er=snap.er, adx=snap.adx, vol_ratio=snap.vol_ratio,
+            )
+    except Exception as exc:
+        logger.debug("Intraday regime compute failed (non-critical): %s", exc)
 
 
 def _make_candle_handler_5m(ctx: BotContext):
     def handler(candle: Candle) -> None:
+        # Refresh the intraday regime first so the state file written just below
+        # (and any trade opened on this candle) carries the up-to-date value.
+        _refresh_intraday_regime(ctx)
+
         # Always write state on candle close so the chart updates immediately
         _write_state(ctx)
 
@@ -1490,8 +1972,10 @@ def _make_candle_handler_5m(ctx: BotContext):
         if settings.ENABLE_VWAP_STRATEGY:
             ctx.vwap.on_candle(candle)
 
-        # ── Smart Entry: tick down cooldown on every candle ────────────────────
+        # ── Smart Entry + EMA cooldowns: tick down on every candle ─────────────
         ctx.smart_entry.on_candle()
+        tick_ema_cooldown()
+        tick_mom_cooldown()
 
         # ── REST option LTP fallback when WebSocket option feed is dead ────────
         if (
@@ -1516,8 +2000,31 @@ def _make_candle_handler_5m(ctx: BotContext):
             except Exception as exc:
                 logger.warning("REST option LTP fallback failed: %s", exc)
 
+        # ── EMA index engine: trail ATR refresh, EMA9 trail exit, time stop, reversal ──
+        if isinstance(ctx.pivot_mgr, EmaTradeManager) and ctx.sm.state == State.POSITION_OPEN and candles_5m:
+            _emgr = ctx.pivot_mgr
+            _tatr = atr_at(candles_5m, period=settings.TSL_ATR_PERIOD)
+            if _tatr:
+                _emgr.update_atr(_tatr)
+            _e9 = calc_ema(candles_5m, 9)[-1] if len(candles_5m) >= 9 else None
+            _ema_reason = _emgr.on_candle(candles_5m[-1].close, _e9)
+            # Reversal: opposite EMA signal on this candle (side-effect free check)
+            if _ema_reason is None and settings.ENABLE_REVERSAL_EXIT and market_open():
+                from strategies.ce_strategy import is_ce_signal as _ce_sig
+                from strategies.pe_strategy import is_pe_signal as _pe_sig
+                _kw = dict(rsi_period=settings.EMA_RSI_PERIOD, pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS)
+                if ctx.strategy_type == "CE" and _pe_sig(candles_5m, candles_15m, rsi_max=settings.EMA_RSI_PE_MAX, **_kw):
+                    _ema_reason = "REVERSAL_SIGNAL"
+                elif ctx.strategy_type == "PE" and _ce_sig(candles_5m, candles_15m, rsi_min=settings.EMA_RSI_CE_MIN, **_kw):
+                    _ema_reason = "REVERSAL_SIGNAL"
+            if _ema_reason:
+                execute_exit(ctx, reason=_ema_reason)
+                return
+            _emgr.save(ctx.trade_id or "")
+
         # ── Smart Exit candle-level checks (EMA collapse) ──────────────────────
-        if ctx.smart_exit is not None and ctx.sm.state == State.POSITION_OPEN:
+        if (ctx.smart_exit is not None and ctx.sm.state == State.POSITION_OPEN
+                and (ctx.pivot_mgr is None or isinstance(ctx.pivot_mgr, EmaTradeManager))):
             smart_reason = ctx.smart_exit.check_on_candle(
                 strategy_type = ctx.strategy_type,
                 candles_5m    = candles_5m,
@@ -1540,6 +2047,29 @@ def _make_candle_handler_5m(ctx: BotContext):
         _ema9_val  = candles_5m[-1].ema9  if candles_5m and hasattr(candles_5m[-1], 'ema9')  else None
         _ema21_val = candles_5m[-1].ema21 if candles_5m and hasattr(candles_5m[-1], 'ema21') else None
         _atr_val   = atr_at(candles_5m, period=14) if len(candles_5m) >= 14 else None
+
+        # FIX (Flaw 9): refresh the pivot manager's ATR and delta on every candle
+        # close so the chandelier trail uses current-session volatility rather than
+        # the frozen entry-time ATR, and the option stop stays delta-accurate.
+        if (ctx.pivot_mgr is not None and ctx.sm.state == State.POSITION_OPEN
+                and not isinstance(ctx.pivot_mgr, EmaTradeManager)):
+            if _atr_val:
+                ctx.pivot_mgr.update_atr(_atr_val)
+            # FIX (Flaw 10): re-derive delta from SENSEX distance to Pivot t1.
+            # As price moves toward / past T1 the option becomes more ITM and
+            # delta rises toward 0.5-0.6.  Use a simple linear interpolation:
+            #   at entry  → PIVOT_OPTION_DELTA (configured, e.g. 0.4)
+            #   at T1     → 0.5
+            # beyond T1  → 0.6  (capped; we never reliably know actual greeks)
+            if settings.TRADING_MODE != "PAPER":
+                _mgr = ctx.pivot_mgr
+                _fav_now = _mgr._fav(ctx.sensex_ltp) if ctx.sensex_ltp > 0 else 0.0
+                _t1_dist = _mgr._fav(_mgr.t1)
+                if _t1_dist > 0:
+                    _ratio = min(_fav_now / _t1_dist, 1.5)  # cap at 1.5× T1
+                    _base = settings.PIVOT_OPTION_DELTA
+                    _new_delta = round(min(0.6, _base + (_ratio * (0.5 - _base))), 3)
+                    _mgr.update_delta(_new_delta)
 
         # Option premium context for AI confirmation — look up the ATM CE/PE option
         # that the bot would select right now (based on SENSEX LTP) and fetch its
@@ -1579,6 +2109,7 @@ def _make_candle_handler_5m(ctx: BotContext):
             vwap=ctx.vwap.value if settings.ENABLE_VWAP_STRATEGY else None,
             prev_day_high=ctx.prev_day_high if settings.ENABLE_PDHL_STRATEGY else None,
             prev_day_low=ctx.prev_day_low  if settings.ENABLE_PDHL_STRATEGY else None,
+            pivot_levels=ctx.pivot_levels if settings.ENABLE_PIVOT_LEVELS else None,
             ema9=_ema9_val,
             ema21=_ema21_val,
             atr=_atr_val,
@@ -1619,6 +2150,7 @@ def _make_candle_handler_5m(ctx: BotContext):
             ctx.smart_exit is not None
             and ctx.sm.state == State.POSITION_OPEN
             and signal is not None
+            and ctx.pivot_mgr is None   # Pivot trades: own exit engine only
         ):
             daily_pnl = fetch_today_realised_pnl()
             smart_reason = ctx.smart_exit.check_on_tick(
@@ -1650,6 +2182,12 @@ def _make_candle_handler_5m(ctx: BotContext):
 
 def main() -> None:
     configure_logging()
+
+    from utils.process_lock import acquire_process_lock
+    if not acquire_process_lock("bot"):
+        print("[FATAL] Another bot instance is already running. Exiting.", flush=True)
+        sys.exit(1)
+
     settings.validate()
     print_startup_summary()
 
@@ -1681,15 +2219,55 @@ def main() -> None:
         )
 
     # Fetch previous day High / Low for PDHL strategy.
-    if settings.ENABLE_PDHL_STRATEGY:
+    # Fetch previous day H/L/C — always done when PDHL or Pivot is enabled.
+    # fetch_previous_day_hl now returns a 3-tuple (H, L, C).
+    if settings.ENABLE_PDHL_STRATEGY or settings.ENABLE_PIVOT_LEVELS:
         try:
-            ctx.prev_day_high, ctx.prev_day_low = fetch_previous_day_hl(SENSEX_TOKEN)
+            ctx.prev_day_high, ctx.prev_day_low, ctx.prev_day_close = fetch_previous_day_hl(SENSEX_TOKEN)
             logger.info(
-                "PDHL levels loaded — PDH=%.2f  PDL=%.2f",
-                ctx.prev_day_high or 0, ctx.prev_day_low or 0,
+                "Prev-day levels loaded — PDH=%.2f  PDL=%.2f  PDC=%.2f",
+                ctx.prev_day_high or 0, ctx.prev_day_low or 0, ctx.prev_day_close or 0,
             )
         except Exception as exc:
-            logger.warning("PDHL fetch failed at startup (%s) — CE_PDHL/PE_PDHL disabled today.", exc)
+            logger.warning("Prev-day fetch failed at startup (%s) — trying state file fallback.", exc)
+            # Fallback: read prev-day H/L/C from the last saved state file.
+            # This keeps PivotLevels alive on an intraday restart when the API
+            # is temporarily unreachable.  Only used when the fetch truly fails.
+            try:
+                import json as _json
+                _saved = _json.loads(_STATE_FILE.read_text())
+                _pl = _saved.get("pivot_levels") or {}
+                if _pl.get("prev_high") and _pl.get("prev_low") and _pl.get("prev_close"):
+                    ctx.prev_day_high  = float(_pl["prev_high"])
+                    ctx.prev_day_low   = float(_pl["prev_low"])
+                    ctx.prev_day_close = float(_pl["prev_close"])
+                    logger.info(
+                        "Prev-day levels restored from state file — PDH=%.2f  PDL=%.2f  PDC=%.2f",
+                        ctx.prev_day_high, ctx.prev_day_low, ctx.prev_day_close,
+                    )
+                else:
+                    logger.warning("State file has no prev-day levels — PDHL/pivot disabled today.")
+            except Exception as exc2:
+                logger.warning("State file fallback also failed (%s) — PDHL/pivot disabled today.", exc2)
+
+    # Compute pivot levels from prev-day H/L/C (no extra API call needed).
+    # If ENABLE_PIVOT_LEVELS is true and we have the data, build PivotLevels directly.
+    if settings.ENABLE_PIVOT_LEVELS and ctx.prev_day_high and ctx.prev_day_low and ctx.prev_day_close:
+        ctx.pivot_levels = compute_pivot_levels(
+            ctx.prev_day_high,
+            ctx.prev_day_low,
+            ctx.prev_day_close,
+            formula=settings.PIVOT_FORMULA,
+        )
+        pl = ctx.pivot_levels
+        logger.info(
+            "Pivot levels computed (%s) — P=%.2f  R1=%.2f  R2=%.2f  R3=%.2f  S1=%.2f  S2=%.2f  S3=%.2f",
+            settings.PIVOT_FORMULA, pl.pivot, pl.r1, pl.r2, pl.r3, pl.s1, pl.s2, pl.s3,
+        )
+
+    # Seed the intraday regime from the historical candles so the dashboard has a
+    # value immediately after a restart instead of waiting for the next candle.
+    _refresh_intraday_regime(ctx, log=False)
 
     # Wire 5m candle handler (signal evaluation fires on every completed 5m candle)
     ctx.agg_5m.subscribe(_make_candle_handler_5m(ctx))

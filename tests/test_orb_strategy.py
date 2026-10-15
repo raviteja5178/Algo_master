@@ -541,6 +541,7 @@ class TestMondayFilter:
 
         with patch("strategies.signal_engine.settings") as ms, \
              patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
              patch("strategies.signal_engine.record_processed_signal"), \
              patch("strategies.orb_strategy.date") as mock_date:
 

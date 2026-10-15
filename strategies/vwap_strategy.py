@@ -18,20 +18,39 @@ PE_VWAP signal (bearish retest):
     Mirror of the above — dip above VWAP then close back below.
 
 Config knobs (all in settings.py):
-    ENABLE_VWAP_STRATEGY      bool   (default False — opt-in)
-    VWAP_RETEST_LOOKBACK      int    candles to look back for the retest (default 3)
-    VWAP_MIN_BOUNCE_PTS       float  minimum distance close must be above/below VWAP (default 0)
+    ENABLE_VWAP_STRATEGY        bool   (default False — opt-in)
+    VWAP_RETEST_LOOKBACK        int    candles to look back for the retest (default 3)
+    VWAP_MIN_BOUNCE_PTS         float  minimum distance close must be above/below VWAP (default 0)
+    VWAP_MAX_SUBMERGED_CANDLES  int    maximum consecutive candles on opposite side (default 3)
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime
 
 from market.candle_builder import Candle
 
 logger = logging.getLogger(__name__)
+
+
+def vwap_retest_ts(
+    candles_5m: Sequence[Candle],
+    vwap: float,
+    side: str,
+    retest_lookback: int = 3,
+) -> datetime | None:
+    """
+    Timestamp of the retest candle behind a VWAP signal on the latest candle:
+    the most recent candle in the lookback window (current candle excluded)
+    that closed below VWAP for CE, or above VWAP for PE.  None if there is none.
+    """
+    lookback = candles_5m[-(retest_lookback + 1):-1]
+    for c in reversed(lookback):
+        if (c.close < vwap) if side == "CE" else (c.close > vwap):
+            return c.timestamp
+    return None
 
 
 def is_vwap_ce_signal(
@@ -40,6 +59,7 @@ def is_vwap_ce_signal(
     *,
     retest_lookback: int = 3,
     min_bounce_pts: float = 0.0,
+    max_submerged_candles: int = 3,
 ) -> bool:
     """
     Return True when:
@@ -74,13 +94,28 @@ def is_vwap_ce_signal(
         return False
 
     # At least one candle in the lookback window must have closed below VWAP
-    lookback = candles_5m[-(retest_lookback + 1):-1]  # exclude current
-    if not any(c.close < vwap for c in lookback):
+    if vwap_retest_ts(candles_5m, vwap, "CE", retest_lookback) is None:
         logger.debug(
             "VWAP CE: no retest — none of last %d candles closed below VWAP %.2f",
             retest_lookback, vwap,
         )
         return False
+
+    # Excessive submerge check: price must not have spent too many consecutive
+    # candles below VWAP (prevents false breakouts from an extended downtrend).
+    if max_submerged_candles > 0:
+        submerged_count = 0
+        for c in reversed(candles_5m[:-1]):
+            if c.close < vwap:
+                submerged_count += 1
+            else:
+                break
+        if submerged_count > max_submerged_candles:
+            logger.debug(
+                "VWAP CE: excessive submerge — %d consecutive candles closed below VWAP > max %d",
+                submerged_count, max_submerged_candles,
+            )
+            return False
 
     return True
 
@@ -91,6 +126,7 @@ def is_vwap_pe_signal(
     *,
     retest_lookback: int = 3,
     min_bounce_pts: float = 0.0,
+    max_submerged_candles: int = 3,
 ) -> bool:
     """
     Return True when:
@@ -125,12 +161,27 @@ def is_vwap_pe_signal(
         return False
 
     # At least one candle in the lookback window must have closed above VWAP
-    lookback = candles_5m[-(retest_lookback + 1):-1]  # exclude current
-    if not any(c.close > vwap for c in lookback):
+    if vwap_retest_ts(candles_5m, vwap, "PE", retest_lookback) is None:
         logger.debug(
             "VWAP PE: no retest — none of last %d candles closed above VWAP %.2f",
             retest_lookback, vwap,
         )
         return False
+
+    # Excessive submerge check: price must not have spent too many consecutive
+    # candles above VWAP (prevents false breakdowns from an extended uptrend).
+    if max_submerged_candles > 0:
+        emerged_count = 0
+        for c in reversed(candles_5m[:-1]):
+            if c.close > vwap:
+                emerged_count += 1
+            else:
+                break
+        if emerged_count > max_submerged_candles:
+            logger.debug(
+                "VWAP PE: excessive submerge — %d consecutive candles closed above VWAP > max %d",
+                emerged_count, max_submerged_candles,
+            )
+            return False
 
     return True
