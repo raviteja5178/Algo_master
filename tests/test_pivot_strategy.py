@@ -338,6 +338,38 @@ class TestModeC:
                                 min_today_candles=0, enable_acceptance=True,
                                 min_room_r=50.0) is None
 
+    # ── Oct-19 guards: distance beyond Pivot, acceptance-only room, side block ──
+
+    def test_min_dist_atr_blocks_signal_hugging_pivot(self):
+        """Close 15 pts past P with ATR~6 → 2.5 ATR: passes 0.5, blocked by 5.0."""
+        candles = _series_rejection(_OCT9_PRE, [1012, 1015])
+        kw = dict(sustain_candles=2, pivot_mode="NONE", min_today_candles=0,
+                  enable_acceptance=True)
+        assert find_pivot_setup(candles, PV, acceptance_min_dist_atr=0.5, **kw) is not None
+        assert find_pivot_setup(candles, PV, acceptance_min_dist_atr=5.0, **kw) is None
+
+    def test_min_dist_atr_pe_side(self):
+        pre = [(1010, 1012, 996, 1005), (1005, 1010, 998, 1004), (1004, 1006, 990, 992)]
+        candles = _series_rejection(pre, [988, 985])
+        kw = dict(sustain_candles=2, pivot_mode="NONE", min_today_candles=0,
+                  enable_acceptance=True)
+        assert find_pivot_setup(candles, PV_PE, acceptance_min_dist_atr=0.5, **kw) is not None
+        assert find_pivot_setup(candles, PV_PE, acceptance_min_dist_atr=5.0, **kw) is None
+
+    def test_acceptance_min_room_r_overrides_only_when_larger(self):
+        candles = _series_rejection(_OCT9_PRE, [1012, 1015])
+        kw = dict(sustain_candles=2, pivot_mode="NONE", min_today_candles=0,
+                  enable_acceptance=True, min_room_r=1.0)
+        assert find_pivot_setup(candles, PV, acceptance_min_room_r=0.5, **kw) is not None
+        assert find_pivot_setup(candles, PV, acceptance_min_room_r=50.0, **kw) is None
+
+    def test_blocked_side_skips_acceptance(self):
+        candles = _series_rejection(_OCT9_PRE, [1012, 1015])
+        kw = dict(sustain_candles=2, pivot_mode="NONE", min_today_candles=0,
+                  enable_acceptance=True)
+        assert find_pivot_setup(candles, PV, acceptance_blocked_sides=frozenset({"CE"}), **kw) is None
+        assert find_pivot_setup(candles, PV, acceptance_blocked_sides=frozenset({"PE"}), **kw) is not None
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Level Bounce / Rejection (S/R)

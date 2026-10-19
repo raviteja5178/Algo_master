@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+{% include "_dashboard_auth.html" %}
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:," />
@@ -222,6 +223,14 @@
       </label>
     </div>
     <div class="card-desc">Fires CE_VWAP / PE_VWAP when price pulls back to VWAP and a 5-minute candle closes back on the right side with momentum. Institutions use VWAP as a benchmark — large orders cluster around it.</div>
+    <div style="display:flex;gap:20px;margin-bottom:12px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:6px;border:1px solid rgba(255,255,255,0.08)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+        <input type="checkbox" id="chk-ENABLE_CE_VWAP" onchange="toggleStrategy('ENABLE_CE_VWAP', this.checked)"> Enable CE_VWAP
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+        <input type="checkbox" id="chk-ENABLE_PE_VWAP" onchange="toggleStrategy('ENABLE_PE_VWAP', this.checked)"> Enable PE_VWAP
+      </label>
+    </div>
     <ul class="feature-list">
       <li>CE_VWAP: At least one of the last <span id="vwap-lookback">3</span> candles closed BELOW VWAP (retest dip)</li>
       <li>CE_VWAP: Current 5m close &gt; VWAP</li>
@@ -340,6 +349,8 @@
       document.getElementById('chk-ENABLE_MOMENTUM_PHASE').checked  = (_config.ENABLE_MOMENTUM_PHASE  === 'true');
       document.getElementById('chk-ENABLE_TRB_STRATEGY').checked    = (_config.ENABLE_TRB_STRATEGY    === 'true');
       document.getElementById('chk-ENABLE_VWAP_STRATEGY').checked   = (_config.ENABLE_VWAP_STRATEGY   === 'true');
+      document.getElementById('chk-ENABLE_CE_VWAP').checked         = (_config.ENABLE_CE_VWAP         !== 'false');
+      document.getElementById('chk-ENABLE_PE_VWAP').checked         = (_config.ENABLE_PE_VWAP         !== 'false');
       document.getElementById('chk-ENABLE_PDHL_STRATEGY').checked   = (_config.ENABLE_PDHL_STRATEGY   === 'true');
       document.getElementById('chk-ENABLE_NATR_STRATEGY').checked          = (_config.ENABLE_NATR_STRATEGY          === 'true');
       document.getElementById('chk-ENABLE_ATR_COPILOT_STRATEGY').checked   = (_config.ENABLE_ATR_COPILOT_STRATEGY   === 'true');
@@ -410,6 +421,8 @@
       ENABLE_MOMENTUM_PHASE: document.getElementById('chk-ENABLE_MOMENTUM_PHASE').checked ? 'true' : 'false',
       ENABLE_TRB_STRATEGY:   document.getElementById('chk-ENABLE_TRB_STRATEGY').checked   ? 'true' : 'false',
       ENABLE_VWAP_STRATEGY:  document.getElementById('chk-ENABLE_VWAP_STRATEGY').checked  ? 'true' : 'false',
+      ENABLE_CE_VWAP:        document.getElementById('chk-ENABLE_CE_VWAP').checked        ? 'true' : 'false',
+      ENABLE_PE_VWAP:        document.getElementById('chk-ENABLE_PE_VWAP').checked        ? 'true' : 'false',
       ENABLE_PDHL_STRATEGY:  document.getElementById('chk-ENABLE_PDHL_STRATEGY').checked  ? 'true' : 'false',
       ENABLE_NATR_STRATEGY:         document.getElementById('chk-ENABLE_NATR_STRATEGY').checked         ? 'true' : 'false',
       ENABLE_ATR_COPILOT_STRATEGY:  document.getElementById('chk-ENABLE_ATR_COPILOT_STRATEGY').checked  ? 'true' : 'false',

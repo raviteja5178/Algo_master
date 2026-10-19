@@ -387,6 +387,7 @@ class TestSignalEngineWithMomentum:
             mock_settings.ENABLE_OB_STRATEGY    = False
             mock_settings.ENABLE_ORB_STRATEGY   = False
             mock_settings.ENABLE_EMA_STRATEGY   = False
+            mock_settings.ENABLE_VWAP_STRATEGY  = False
             mock_settings.ENABLE_MOMENTUM_PHASE = False
 
             # Use neutral candles so standard phase definitely returns None

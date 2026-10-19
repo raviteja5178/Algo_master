@@ -1,0 +1,287 @@
+time,event,fields
+2026-09-02 10:05:00,PE_SIGNAL,candle=2026-09-02 10:00:00+05:30 | close=76373.64
+2026-09-02 10:05:00,SMART_ENTRY_BLOCKED_BODY,direction=PE | body=9.66 | atr=95.22 | min_ratio=0.35 | required=33.33 | squeeze_relaxed=False
+2026-09-02 10:40:00,PE_SIGNAL,candle=2026-09-02 10:35:00+05:30 | close=76410.14
+2026-09-02 10:40:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-43.64 | gap_prev=-46.83 | reason=EMA gap not widening
+2026-09-02 12:00:00,PE_SIGNAL,candle=2026-09-02 11:55:00+05:30 | close=76263.83
+2026-09-02 12:00:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-47.42 | gap_prev=-49.21 | reason=EMA gap not widening
+2026-09-03 10:20:00,CE_SIGNAL,candle=2026-09-03 10:15:00+05:30 | close=76847.41
+2026-09-03 10:20:00,TREND_GATE_BLOCKED,signal=CE | side=CE | reason=against daily trend (DOWN) | daily_trend=DOWN
+2026-09-07 11:50:00,PE_SIGNAL,candle=2026-09-07 11:45:00+05:30 | close=76101.36
+2026-09-07 11:50:00,SMART_ENTRY_BLOCKED_BODY,direction=PE | body=11.57 | atr=38.02 | min_ratio=0.35 | required=13.31 | squeeze_relaxed=False
+2026-09-08 09:30:00,PE_ORB_SIGNAL,candle=2026-09-08 09:25:00+05:30 | close=75727.07
+2026-09-08 09:30:00,SMART_ENTRY_BLOCKED_BODY,direction=PE_ORB | body=20.79 | atr=60.49 | min_ratio=0.35 | required=21.17 | squeeze_relaxed=False
+2026-09-08 09:35:00,PE_ORB_SIGNAL,candle=2026-09-08 09:30:00+05:30 | close=75730.44
+2026-09-08 09:35:00,SMART_ENTRY_BLOCKED_BODY,direction=PE_ORB | body=3.2 | atr=58.29 | min_ratio=0.35 | required=20.4 | squeeze_relaxed=False
+2026-09-08 10:30:00,PE_SIGNAL,candle=2026-09-08 10:25:00+05:30 | close=75788.94
+2026-09-08 10:30:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-46.43 | gap_prev=-49.38 | reason=EMA gap not widening
+2026-09-08 10:55:00,PE_SIGNAL,candle=2026-09-08 10:50:00+05:30 | close=75756.59
+2026-09-08 10:55:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-42.11 | gap_prev=-44.57 | reason=EMA gap not widening
+2026-09-08 11:25:00,PE_SIGNAL,candle=2026-09-08 11:20:00+05:30 | close=75710.86
+2026-09-08 11:25:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-37.66 | gap_prev=-38.27 | reason=EMA gap not widening
+2026-09-09 10:40:00,PE_SIGNAL,candle=2026-09-09 10:35:00+05:30 | close=75038.65
+2026-09-09 10:40:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-92.14 | gap_prev=-96.73 | reason=EMA gap not widening
+2026-09-09 11:25:00,PE_SIGNAL,candle=2026-09-09 11:20:00+05:30 | close=75066.35
+2026-09-09 11:25:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-33.49 | gap_prev=-34.22 | reason=EMA gap not widening
+2026-09-09 11:50:00,PE_SIGNAL,candle=2026-09-09 11:45:00+05:30 | close=75056.5
+2026-09-09 11:50:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26091075100PE | first_ltp=209.45
+2026-09-09 11:50:00,ENTRY_SENT,symbol=SENSEX26091075100PE | qty=20 | signal=PE
+2026-09-09 11:50:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26091075100PE | qty=20 | fill=209.45 | order_id=PAPER_B645BDC3
+2026-09-09 11:50:00,ENTRY_FILLED,symbol=SENSEX26091075100PE | fill=209.45 | qty=20
+2026-09-09 11:50:00,EMA_RISK_APPLIED,side=PE | source=swing | sensex_entry=75058.74 | index_stop=75132.33 | index_target=74837.97 | index_risk=73.59 | risk_rupees=735.9 | delta=0.5 | option_entry=209.45 | option_sl=169.0
+2026-09-09 11:59:30,PIVOT_STOP_MOVED,side=PE | stage=BE | old=75132.33 | new=75054.74 | option_stop=211.25 | locked_idx_pts=4.0
+2026-09-09 11:59:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=75054.74 | new=75018.6 | option_stop=227.7 | locked_idx_pts=40.14
+2026-09-09 11:59:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_44BBDA63 | old_sl=169.0 | new_sl=227.7
+2026-09-09 11:59:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=75018.6 | new=75018.6 | option_stop=227.7 | locked_idx_pts=40.14
+2026-09-09 12:00:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=75018.6 | new=75018.52 | option_stop=227.75 | locked_idx_pts=40.22
+2026-09-09 12:00:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_44BBDA63 | old_sl=227.7 | new_sl=227.75
+2026-09-09 12:01:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=75018.52 | new=74998.96 | option_stop=236.6 | locked_idx_pts=59.78
+2026-09-09 12:01:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_44BBDA63 | old_sl=227.75 | new_sl=236.6
+2026-09-09 12:02:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74998.96 | new=74992.93 | option_stop=239.35 | locked_idx_pts=65.81
+2026-09-09 12:02:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_44BBDA63 | old_sl=236.6 | new_sl=239.35
+2026-09-09 12:03:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74992.93 | new=74985.86 | option_stop=242.6 | locked_idx_pts=72.88
+2026-09-09 12:03:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_44BBDA63 | old_sl=239.35 | new_sl=242.6
+2026-09-09 12:06:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74985.86 | new=74979.83 | option_stop=245.3 | locked_idx_pts=78.91
+2026-09-09 12:06:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_44BBDA63 | old_sl=242.6 | new_sl=245.3
+2026-09-09 12:07:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74979.83 | new=74970.24 | option_stop=249.7 | locked_idx_pts=88.5
+2026-09-09 12:07:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_44BBDA63 | old_sl=245.3 | new_sl=249.7
+2026-09-09 12:08:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74970.24 | new=74963.69 | option_stop=252.65 | locked_idx_pts=95.05
+2026-09-09 12:08:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_44BBDA63 | old_sl=249.7 | new_sl=252.65
+2026-09-09 12:10:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.69 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:10:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_44BBDA63 | old_sl=252.65 | new_sl=252.9
+2026-09-09 12:10:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:10:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:10:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:11:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:11:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:11:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:11:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:12:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:12:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:12:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:12:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:13:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:13:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:13:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:13:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:14:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=74963.19 | new=74963.19 | option_stop=252.9 | locked_idx_pts=95.55
+2026-09-09 12:14:15,PIVOT_EXIT,reason=EMA_TSL_HIT | sensex=74966.26 | stage=TRAIL | index_stop=74963.19 | best=74914.79
+2026-09-09 12:14:15,EXIT_FILLED,mode=PAPER | symbol=SENSEX26091075100PE | qty=20 | fill=260.65 | order_id=PAPER_D657DA83 | tag=EMA_TSL_HIT
+2026-09-09 12:14:15,EXIT_FILLED,symbol=SENSEX26091075100PE | exit_price=260.65 | pnl=1023.9999999999998 | reason=EMA_TSL_HIT
+2026-09-10 10:00:00,PE_SIGNAL,candle=2026-09-10 09:55:00+05:30 | close=74781.83
+2026-09-10 10:00:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-65.66 | gap_prev=-69.65 | reason=EMA gap not widening
+2026-09-10 10:50:00,PE_SIGNAL,candle=2026-09-10 10:45:00+05:30 | close=74742.88
+2026-09-10 10:50:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-32.7 | gap_prev=-32.79 | reason=EMA gap not widening
+2026-09-11 10:30:00,PE_SIGNAL,candle=2026-09-11 10:25:00+05:30 | close=74313.78
+2026-09-11 10:30:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-65.48 | gap_prev=-67.46 | reason=EMA gap not widening
+2026-09-11 10:55:00,PE_SIGNAL,candle=2026-09-11 10:50:00+05:30 | close=74333.62
+2026-09-11 10:55:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-36.63 | gap_prev=-37.06 | reason=EMA gap not widening
+2026-09-15 11:45:00,CE_PIVOT_SIGNAL,candle=2026-09-15 11:40:00+05:30 | mode=ACCEPTANCE | entry=74679.59 | stop=74602.05 | risk=77.54 | t1=74908.86 | t2=75087.51 | t3=75376.68 | atr=68.46
+2026-09-15 11:45:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26091774700CE | first_ltp=297.2
+2026-09-15 11:45:00,ENTRY_SENT,symbol=SENSEX26091774700CE | qty=20 | signal=CE_PIVOT
+2026-09-15 11:45:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26091774700CE | qty=20 | fill=297.2 | order_id=PAPER_10C2CE34
+2026-09-15 11:45:00,ENTRY_FILLED,symbol=SENSEX26091774700CE | fill=297.2 | qty=20
+2026-09-15 11:45:00,PIVOT_RISK_APPLIED,side=CE | mode=ACCEPTANCE | sensex_entry=74679.02 | index_stop=74602.05 | index_risk=77.54 | t1=74908.86 | t2=75087.51 | t3=75376.68 | option_entry=297.2 | option_sl=243.3
+2026-09-15 12:10:00,CE_PIVOT_SIGNAL,candle=2026-09-15 12:05:00+05:30 | mode=ACCEPTANCE | entry=74690.75 | stop=74642.03 | risk=48.72 | t1=74908.86 | t2=75087.51 | t3=75376.68 | atr=62.33
+2026-09-15 12:58:30,PIVOT_EXIT,reason=PIVOT_SL_HIT | sensex=74577.37 | stage=INITIAL | index_stop=74602.05 | best=74724.91
+2026-09-15 12:58:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX26091774700CE | qty=20 | fill=244.75 | order_id=PAPER_61322D31 | tag=PIVOT_SL_HIT
+2026-09-15 12:58:30,EXIT_FILLED,symbol=SENSEX26091774700CE | exit_price=244.75 | pnl=-1048.9999999999998 | reason=PIVOT_SL_HIT
+2026-09-15 12:58:30,SMART_ENTRY_COOLDOWN_STARTED,pnl_pts=-52.45 | cooldown_candles=1
+2026-09-15 13:00:00,SMART_ENTRY_COOLDOWN_EXPIRED,
+2026-09-15 13:10:00,PE_PIVOT_SIGNAL,candle=2026-09-15 13:05:00+05:30 | mode=ACCEPTANCE | entry=74569.74 | stop=74626.09 | risk=56.35 | t1=74330.52 | t2=74151.87 | t3=73862.7 | atr=52.12
+2026-09-15 13:10:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26091774600PE | first_ltp=290.35
+2026-09-15 13:10:00,ENTRY_SENT,symbol=SENSEX26091774600PE | qty=20 | signal=PE_PIVOT
+2026-09-15 13:10:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26091774600PE | qty=20 | fill=290.35 | order_id=PAPER_D2700B58
+2026-09-15 13:10:00,ENTRY_FILLED,symbol=SENSEX26091774600PE | fill=290.35 | qty=20
+2026-09-15 13:10:00,PIVOT_RISK_APPLIED,side=PE | mode=ACCEPTANCE | sensex_entry=74571.03 | index_stop=74626.09 | index_risk=56.35 | t1=74330.52 | t2=74151.87 | t3=73862.7 | option_entry=290.35 | option_sl=251.8
+2026-09-15 13:11:30,PIVOT_STOP_MOVED,side=PE | stage=BE | old=74626.09 | new=74559.03 | option_stop=293.1 | locked_idx_pts=12.0
+2026-09-15 13:11:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_90FF31FE | old_sl=251.8 | new_sl=293.1
+2026-09-15 14:12:30,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74559.03 | new=74450.77 | option_stop=322.15 | locked_idx_pts=120.26
+2026-09-15 14:12:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_90FF31FE | old_sl=293.1 | new_sl=322.15
+2026-09-15 14:12:45,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74450.77 | new=74367.68 | option_stop=344.15 | locked_idx_pts=203.35
+2026-09-15 14:12:45,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_90FF31FE | old_sl=322.15 | new_sl=344.15
+2026-09-15 14:13:00,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74367.68 | new=74367.68 | option_stop=344.15 | locked_idx_pts=203.35
+2026-09-15 14:13:15,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74367.68 | new=74367.68 | option_stop=344.15 | locked_idx_pts=203.35
+2026-09-15 14:13:30,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74367.68 | new=74367.68 | option_stop=344.15 | locked_idx_pts=203.35
+2026-09-15 14:13:45,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74367.68 | new=74367.68 | option_stop=344.15 | locked_idx_pts=203.35
+2026-09-15 14:14:00,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74367.68 | new=74367.68 | option_stop=344.15 | locked_idx_pts=203.35
+2026-09-15 14:14:15,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74367.68 | new=74367.68 | option_stop=344.15 | locked_idx_pts=203.35
+2026-09-15 14:14:30,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74367.68 | new=74367.68 | option_stop=344.15 | locked_idx_pts=203.35
+2026-09-15 14:14:45,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74367.68 | new=74367.68 | option_stop=344.15 | locked_idx_pts=203.35
+2026-09-15 14:15:30,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74367.68 | new=74301.02 | option_stop=367.8 | locked_idx_pts=270.01
+2026-09-15 14:15:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_90FF31FE | old_sl=344.15 | new_sl=367.8
+2026-09-15 14:15:45,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74301.02 | new=74301.02 | option_stop=367.8 | locked_idx_pts=270.01
+2026-09-15 14:16:00,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74301.02 | new=74301.02 | option_stop=367.8 | locked_idx_pts=270.01
+2026-09-15 14:16:15,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74301.02 | new=74298.91 | option_stop=368.4 | locked_idx_pts=272.12
+2026-09-15 14:16:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_90FF31FE | old_sl=367.8 | new_sl=368.4
+2026-09-15 14:16:30,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74298.91 | new=74298.91 | option_stop=368.4 | locked_idx_pts=272.12
+2026-09-15 14:16:45,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74298.91 | new=74298.91 | option_stop=368.4 | locked_idx_pts=272.12
+2026-09-15 14:17:00,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74298.91 | new=74298.91 | option_stop=368.4 | locked_idx_pts=272.12
+2026-09-15 14:17:15,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74298.91 | new=74289.51 | option_stop=371.1 | locked_idx_pts=281.52
+2026-09-15 14:17:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_90FF31FE | old_sl=368.4 | new_sl=371.1
+2026-09-15 14:17:30,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74289.51 | new=74289.51 | option_stop=371.1 | locked_idx_pts=281.52
+2026-09-15 14:17:45,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74289.51 | new=74289.51 | option_stop=371.1 | locked_idx_pts=281.52
+2026-09-15 14:18:00,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74289.51 | new=74289.51 | option_stop=371.1 | locked_idx_pts=281.52
+2026-09-15 14:18:15,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74289.51 | new=74289.51 | option_stop=371.1 | locked_idx_pts=281.52
+2026-09-15 14:18:30,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74289.51 | new=74281.25 | option_stop=373.5 | locked_idx_pts=289.78
+2026-09-15 14:18:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_90FF31FE | old_sl=371.1 | new_sl=373.5
+2026-09-15 14:18:45,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74281.25 | new=74281.25 | option_stop=373.5 | locked_idx_pts=289.78
+2026-09-15 14:19:00,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74281.25 | new=74281.25 | option_stop=373.5 | locked_idx_pts=289.78
+2026-09-15 14:19:15,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74281.25 | new=74281.25 | option_stop=373.5 | locked_idx_pts=289.78
+2026-09-15 14:19:30,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74281.25 | new=74263.93 | option_stop=378.45 | locked_idx_pts=307.1
+2026-09-15 14:19:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_90FF31FE | old_sl=373.5 | new_sl=378.45
+2026-09-15 14:19:45,PIVOT_STOP_MOVED,side=PE | stage=T1 | old=74263.93 | new=74263.93 | option_stop=378.45 | locked_idx_pts=307.1
+2026-09-15 14:21:30,PIVOT_EXIT,reason=PIVOT_TSL_HIT | sensex=74267.42 | stage=T1 | index_stop=74263.93 | best=74211.54
+2026-09-15 14:21:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX26091774600PE | qty=20 | fill=471.95 | order_id=PAPER_F987DBB8 | tag=PIVOT_TSL_HIT
+2026-09-15 14:21:30,EXIT_FILLED,symbol=SENSEX26091774600PE | exit_price=471.95 | pnl=3631.999999999999 | reason=PIVOT_TSL_HIT
+2026-09-16 09:40:00,PE_SIGNAL,candle=2026-09-16 09:35:00+05:30 | close=74090.13
+2026-09-16 09:40:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26091774100PE | first_ltp=228.0
+2026-09-16 09:40:00,EMA_ENTRY_BLOCKED,signal=PE | symbol=SENSEX26091774100PE | reason=room 97.6 < 1.5R (242.8)
+2026-09-17 09:30:00,CE_PIVOT_SIGNAL,candle=2026-09-17 09:25:00+05:30 | mode=ACCEPTANCE | entry=74352.44 | stop=74272.59 | risk=79.85 | t1=74474.92 | t2=74598.71 | t3=74799.08 | atr=66.13
+2026-09-17 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26091774400CE | first_ltp=81.2
+2026-09-17 09:30:00,ENTRY_SENT,symbol=SENSEX26091774400CE | qty=20 | signal=CE_PIVOT
+2026-09-17 09:30:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26091774400CE | qty=20 | fill=81.2 | order_id=PAPER_08169912
+2026-09-17 09:30:00,ENTRY_FILLED,symbol=SENSEX26091774400CE | fill=81.2 | qty=20
+2026-09-17 09:30:00,PIVOT_RISK_APPLIED,side=CE | mode=ACCEPTANCE | sensex_entry=74358.73 | index_stop=74272.59 | index_risk=79.85 | t1=74474.92 | t2=74598.71 | t3=74799.08 | option_entry=81.2 | option_sl=40.6
+2026-09-17 09:32:00,PIVOT_STOP_MOVED,side=CE | stage=BE | old=74272.59 | new=74370.73 | option_stop=83.95 | locked_idx_pts=12.0
+2026-09-17 09:32:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_7B77FF22 | old_sl=40.6 | new_sl=83.95
+2026-09-17 09:32:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74370.73 | new=74416.82 | option_stop=94.5 | locked_idx_pts=58.09
+2026-09-17 09:32:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_7B77FF22 | old_sl=83.95 | new_sl=94.5
+2026-09-17 09:33:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74416.82 | new=74435.73 | option_stop=98.8 | locked_idx_pts=77.0
+2026-09-17 09:33:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_7B77FF22 | old_sl=94.5 | new_sl=98.8
+2026-09-17 09:35:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74435.73 | new=74460.96 | option_stop=110.8 | locked_idx_pts=102.23
+2026-09-17 09:35:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_7B77FF22 | old_sl=98.8 | new_sl=110.8
+2026-09-17 09:35:45,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74460.96 | new=74460.96 | option_stop=110.8 | locked_idx_pts=102.23
+2026-09-17 09:36:00,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74460.96 | new=74461.87 | option_stop=111.1 | locked_idx_pts=103.14
+2026-09-17 09:36:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_7B77FF22 | old_sl=110.8 | new_sl=111.1
+2026-09-17 09:36:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74461.87 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:36:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_7B77FF22 | old_sl=111.1 | new_sl=112.05
+2026-09-17 09:36:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:36:45,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:37:00,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:37:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:37:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:37:45,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:38:00,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:38:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:38:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:38:45,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:39:00,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:39:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74465.2 | new=74465.2 | option_stop=112.05 | locked_idx_pts=106.47
+2026-09-17 09:39:30,PIVOT_EXIT,reason=PIVOT_TSL_HIT | sensex=74436.04 | stage=T1 | index_stop=74465.2 | best=74537.6
+2026-09-17 09:39:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX26091774400CE | qty=20 | fill=117.65 | order_id=PAPER_56101B63 | tag=PIVOT_TSL_HIT
+2026-09-17 09:39:30,EXIT_FILLED,symbol=SENSEX26091774400CE | exit_price=117.65 | pnl=729.0 | reason=PIVOT_TSL_HIT
+2026-09-17 11:30:00,CE_PIVOT_SIGNAL,candle=2026-09-17 11:25:00+05:30 | mode=ACCEPTANCE | entry=74317.9 | stop=74285.55 | risk=32.35 | t1=74474.92 | t2=74598.71 | t3=74799.08 | atr=70.6
+2026-09-17 11:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26091774300CE | first_ltp=88.35
+2026-09-17 11:30:00,ENTRY_SENT,symbol=SENSEX26091774300CE | qty=20 | signal=CE_PIVOT
+2026-09-17 11:30:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26091774300CE | qty=20 | fill=88.35 | order_id=PAPER_ECF83BA4
+2026-09-17 11:30:00,ENTRY_FILLED,symbol=SENSEX26091774300CE | fill=88.35 | qty=20
+2026-09-17 11:30:00,PIVOT_RISK_APPLIED,side=CE | mode=ACCEPTANCE | sensex_entry=74313.72 | index_stop=74285.55 | index_risk=32.35 | t1=74474.92 | t2=74598.71 | t3=74799.08 | option_entry=88.35 | option_sl=68.65
+2026-09-17 11:32:30,PIVOT_STOP_MOVED,side=CE | stage=BE | old=74285.55 | new=74325.72 | option_stop=91.1 | locked_idx_pts=12.0
+2026-09-17 11:32:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_CF25832F | old_sl=68.65 | new_sl=91.1
+2026-09-17 11:33:30,PIVOT_EXIT,reason=PIVOT_BE_STOP | sensex=74320.32 | stage=BE | index_stop=74325.72 | best=74356.86
+2026-09-17 11:33:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX26091774300CE | qty=20 | fill=90.95 | order_id=PAPER_BF54881F | tag=PIVOT_BE_STOP
+2026-09-17 11:33:30,EXIT_FILLED,symbol=SENSEX26091774300CE | exit_price=90.95 | pnl=52.00000000000017 | reason=PIVOT_BE_STOP
+2026-09-22 09:40:00,CE_SIGNAL,candle=2026-09-22 09:35:00+05:30 | close=74967.15
+2026-09-22 09:40:00,TREND_GATE_BLOCKED,signal=CE | side=CE | reason=against daily trend (DOWN) | daily_trend=DOWN
+2026-09-22 10:05:00,CE_PIVOT_SIGNAL,candle=2026-09-22 10:00:00+05:30 | mode=BOUNCE | entry=74992.01 | stop=74947.19 | risk=44.82 | t1=75096.39 | t2=75300.08 | t3=75300.08 | atr=44.6
+2026-09-22 10:05:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26092475000CE | first_ltp=267.75
+2026-09-22 10:05:00,ENTRY_SENT,symbol=SENSEX26092475000CE | qty=20 | signal=CE_PIVOT
+2026-09-22 10:05:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26092475000CE | qty=20 | fill=267.75 | order_id=PAPER_38739EC5
+2026-09-22 10:05:00,ENTRY_FILLED,symbol=SENSEX26092475000CE | fill=267.75 | qty=20
+2026-09-22 10:05:00,PIVOT_RISK_APPLIED,side=CE | mode=BOUNCE | sensex_entry=74995.24 | index_stop=74947.19 | index_risk=44.82 | t1=75096.39 | t2=75300.08 | t3=75300.08 | option_entry=267.75 | option_sl=234.1
+2026-09-22 10:11:30,PIVOT_STOP_MOVED,side=CE | stage=BE | old=74947.19 | new=75007.24 | option_stop=270.65 | locked_idx_pts=12.0
+2026-09-22 10:11:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_8EBCAB01 | old_sl=234.1 | new_sl=270.65
+2026-09-22 10:12:30,PIVOT_EXIT,reason=PIVOT_BE_STOP | sensex=74992.88 | stage=BE | index_stop=75007.24 | best=75032.37
+2026-09-22 10:12:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX26092475000CE | qty=20 | fill=265.5 | order_id=PAPER_7D6D184B | tag=PIVOT_BE_STOP
+2026-09-22 10:12:30,EXIT_FILLED,symbol=SENSEX26092475000CE | exit_price=265.5 | pnl=-45.0 | reason=PIVOT_BE_STOP
+2026-09-22 10:12:30,SMART_ENTRY_COOLDOWN_STARTED,pnl_pts=-2.25 | cooldown_candles=1
+2026-09-22 10:15:00,SMART_ENTRY_COOLDOWN_EXPIRED,
+2026-09-22 10:55:00,PE_PIVOT_SIGNAL,candle=2026-09-22 10:50:00+05:30 | mode=ACCEPTANCE | entry=74703.91 | stop=74757.39 | risk=53.48 | t1=74563.17 | t2=74437.33 | t3=74233.64 | atr=58.54
+2026-09-22 10:55:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26092474700PE | first_ltp=242.2
+2026-09-22 10:55:00,ENTRY_SENT,symbol=SENSEX26092474700PE | qty=20 | signal=PE_PIVOT
+2026-09-22 10:55:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26092474700PE | qty=20 | fill=242.2 | order_id=PAPER_77D54C57
+2026-09-22 10:55:00,ENTRY_FILLED,symbol=SENSEX26092474700PE | fill=242.2 | qty=20
+2026-09-22 10:55:00,PIVOT_RISK_APPLIED,side=PE | mode=ACCEPTANCE | sensex_entry=74705.68 | index_stop=74757.39 | index_risk=53.48 | t1=74563.17 | t2=74437.33 | t3=74233.64 | option_entry=242.2 | option_sl=206.0
+2026-09-22 10:59:30,PIVOT_EXIT,reason=PIVOT_SL_HIT | sensex=74757.72 | stage=INITIAL | index_stop=74757.39 | best=74700.61
+2026-09-22 10:59:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX26092474700PE | qty=20 | fill=217.8 | order_id=PAPER_5E2E8321 | tag=PIVOT_SL_HIT
+2026-09-22 10:59:30,EXIT_FILLED,symbol=SENSEX26092474700PE | exit_price=217.8 | pnl=-487.99999999999955 | reason=PIVOT_SL_HIT
+2026-09-22 10:59:30,SMART_ENTRY_COOLDOWN_STARTED,pnl_pts=-24.4 | cooldown_candles=1
+2026-09-22 11:00:00,SMART_ENTRY_COOLDOWN_EXPIRED,
+2026-09-22 11:30:00,PE_SIGNAL,candle=2026-09-22 11:25:00+05:30 | close=74760.57
+2026-09-22 11:30:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-48.62 | gap_prev=-53.02 | reason=EMA gap not widening
+2026-09-23 10:30:00,CE_PIVOT_SIGNAL,candle=2026-09-23 10:25:00+05:30 | mode=ACCEPTANCE | entry=74760.17 | stop=74701.53 | risk=58.64 | t1=74898.92 | t2=75044.11 | t3=75279.13 | atr=58.58
+2026-09-23 10:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26092474800CE | first_ltp=166.5
+2026-09-23 10:30:00,ENTRY_SENT,symbol=SENSEX26092474800CE | qty=20 | signal=CE_PIVOT
+2026-09-23 10:30:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26092474800CE | qty=20 | fill=166.5 | order_id=PAPER_019235A0
+2026-09-23 10:30:00,ENTRY_FILLED,symbol=SENSEX26092474800CE | fill=166.5 | qty=20
+2026-09-23 10:30:00,PIVOT_RISK_APPLIED,side=CE | mode=ACCEPTANCE | sensex_entry=74759.71 | index_stop=74701.53 | index_risk=58.64 | t1=74898.92 | t2=75044.11 | t3=75279.13 | option_entry=166.5 | option_sl=125.75
+2026-09-23 10:45:30,PIVOT_STOP_MOVED,side=CE | stage=BE | old=74701.53 | new=74771.71 | option_stop=169.4 | locked_idx_pts=12.0
+2026-09-23 10:45:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_B0A27C40 | old_sl=125.75 | new_sl=169.4
+2026-09-23 11:32:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74771.71 | new=74829.32 | option_stop=185.05 | locked_idx_pts=69.61
+2026-09-23 11:32:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_B0A27C40 | old_sl=169.4 | new_sl=185.05
+2026-09-23 11:32:45,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74829.32 | new=74858.37 | option_stop=192.75 | locked_idx_pts=98.66
+2026-09-23 11:32:45,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_B0A27C40 | old_sl=185.05 | new_sl=192.75
+2026-09-23 11:33:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74858.37 | new=74863.67 | option_stop=194.2 | locked_idx_pts=103.96
+2026-09-23 11:33:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_B0A27C40 | old_sl=192.75 | new_sl=194.2
+2026-09-23 11:34:00,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74863.67 | new=74865.42 | option_stop=194.65 | locked_idx_pts=105.71
+2026-09-23 11:34:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_B0A27C40 | old_sl=194.2 | new_sl=194.65
+2026-09-23 11:34:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74865.42 | new=74869.25 | option_stop=195.65 | locked_idx_pts=109.54
+2026-09-23 11:34:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_B0A27C40 | old_sl=194.65 | new_sl=195.65
+2026-09-23 11:45:00,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74869.25 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:45:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_B0A27C40 | old_sl=195.65 | new_sl=197.85
+2026-09-23 11:45:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:45:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:45:45,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:46:00,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:46:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:46:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:46:45,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:47:00,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:47:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:47:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:47:45,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:48:00,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:48:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:48:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:48:45,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:49:00,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:49:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:49:30,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:49:45,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74871.17 | option_stop=197.85 | locked_idx_pts=111.46
+2026-09-23 11:50:00,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74871.17 | new=74872.53 | option_stop=197.85 | locked_idx_pts=112.82
+2026-09-23 11:50:15,PIVOT_STOP_MOVED,side=CE | stage=T1 | old=74872.53 | new=74872.53 | option_stop=197.85 | locked_idx_pts=112.82
+2026-09-23 11:50:30,PIVOT_EXIT,reason=PIVOT_TSL_HIT | sensex=74854.88 | stage=T1 | index_stop=74872.53 | best=74917.5
+2026-09-23 11:50:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX26092474800CE | qty=20 | fill=211.15 | order_id=PAPER_0E3AFCFB | tag=PIVOT_TSL_HIT
+2026-09-23 11:50:30,EXIT_FILLED,symbol=SENSEX26092474800CE | exit_price=211.15 | pnl=893.0000000000001 | reason=PIVOT_TSL_HIT
+2026-09-24 10:45:00,PE_SIGNAL,candle=2026-09-24 10:40:00+05:30 | close=74114.34
+2026-09-24 10:45:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-125.98 | gap_prev=-132.79 | reason=EMA gap not widening
+2026-09-24 11:10:00,PE_SIGNAL,candle=2026-09-24 11:05:00+05:30 | close=74134.75
+2026-09-24 11:10:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-73.85 | gap_prev=-76.71 | reason=EMA gap not widening
+2026-09-24 11:25:00,PE_SIGNAL,candle=2026-09-24 11:20:00+05:30 | close=74157.23
+2026-09-24 11:25:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-52.37 | gap_prev=-55.58 | reason=EMA gap not widening
+2026-09-25 15:25:00,CE_PIVOT_SIGNAL,candle=2026-09-25 15:20:00+05:30 | mode=ACCEPTANCE | entry=73881.44 | stop=73866.82 | risk=14.62 | t1=74140.56 | t2=74328.98 | t3=74633.95 | atr=48.74
+2026-09-28 11:35:00,PE_SIGNAL,candle=2026-09-28 11:30:00+05:30 | close=72893.51
+2026-09-28 11:35:00,SMART_ENTRY_BLOCKED_BODY,direction=PE | body=18.44 | atr=59.51 | min_ratio=0.35 | required=20.83 | squeeze_relaxed=False
+2026-09-28 12:00:00,PE_SIGNAL,candle=2026-09-28 11:55:00+05:30 | close=72907.28
+2026-09-28 12:00:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-42.41 | gap_prev=-44.25 | reason=EMA gap not widening
+2026-09-29 09:30:00,PE_ORB_SIGNAL,candle=2026-09-29 09:25:00+05:30 | close=72253.76
+2026-09-29 09:30:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-09-29 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26100172200PE | first_ltp=283.25
+2026-09-29 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=141.6 | qty=20 | risk_rupees=2832.0 | max_rupees=2000.0
+2026-09-29 09:35:00,PE_ORB_SIGNAL,candle=2026-09-29 09:30:00+05:30 | close=72228.85
+2026-09-29 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-09-29 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=149.2 | qty=20 | risk_rupees=2984.0 | max_rupees=2000.0
+2026-09-29 09:40:00,PE_ORB_SIGNAL,candle=2026-09-29 09:35:00+05:30 | close=72073.19
+2026-09-29 09:40:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-09-29 09:40:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26100172100PE | first_ltp=327.25
+2026-09-29 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=163.6 | qty=20 | risk_rupees=3272.0 | max_rupees=2000.0
+2026-09-29 10:35:00,PE_SIGNAL,candle=2026-09-29 10:30:00+05:30 | close=72156.01
+2026-09-29 10:35:00,SMART_ENTRY_BLOCKED_BODY,direction=PE | body=21.5 | atr=69.03 | min_ratio=0.35 | required=24.16 | squeeze_relaxed=False
+2026-09-29 10:50:00,PE_SIGNAL,candle=2026-09-29 10:45:00+05:30 | close=72187.7
+2026-09-29 10:50:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-98.46 | gap_prev=-108.08 | reason=EMA gap not widening
+2026-09-29 11:05:00,PE_SIGNAL,candle=2026-09-29 11:00:00+05:30 | close=72182.23
+2026-09-29 11:05:00,SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING,direction=PE | gap_now=-68.92 | gap_prev=-73.1 | reason=EMA gap not widening
+2026-09-30 09:30:00,CE_ORB_SIGNAL,candle=2026-09-30 09:25:00+05:30 | close=72705.03
+2026-09-30 09:30:00,SMART_ENTRY_BLOCKED_BODY,direction=CE_ORB | body=17.5 | atr=68.53 | min_ratio=0.35 | required=23.99 | squeeze_relaxed=False
+2026-09-30 15:00:00,CE_PIVOT_SIGNAL,candle=2026-09-30 14:55:00+05:30 | mode=ACCEPTANCE | entry=72494.06 | stop=72466.47 | risk=27.59 | t1=72663.17 | t2=72809.71 | t3=73046.89 | atr=71.01

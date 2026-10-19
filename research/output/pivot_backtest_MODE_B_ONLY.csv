@@ -1,0 +1,2 @@
+date,mode,side,entry,stop,risk,t1,exit,reason,r,pts,bars,stage
+2025-11-28,REJECTION,CE,85777.06,85748.56,28.5,85972.36,85748.56,PIVOT_SL_HIT,-1.0,-28.5,4,INITIAL

@@ -76,6 +76,11 @@ def main():
 
     _acquire_launcher_lock()
 
+    # Running the launcher is an explicit start: lift any manual-Stop pause.
+    from utils.process_control import is_paused, resume_bot
+    from utils.process_lock import is_lock_held
+    resume_bot()
+
     print("=" * 60)
     print("  SENSEX Auto-Trader — Persistent Launcher")
     print("  Bot restarts automatically on any unexpected exit.")
@@ -86,6 +91,19 @@ def main():
     restart_count = 0
 
     while not _stop_launcher:
+        # Paused by the dashboard Stop button: wait for its Start button.
+        if is_paused():
+            print(f"[{_ts()}] [Launcher] Bot paused by a manual Stop — "
+                  "waiting for Start on the dashboard...", flush=True)
+            while is_paused() and not _stop_launcher:
+                time.sleep(2)
+            continue
+        # Bot already running (e.g. the dashboard's Start launched it): watch
+        # it instead of starting a second copy that would fail on the lock.
+        if is_lock_held("bot"):
+            while is_lock_held("bot") and not is_paused() and not _stop_launcher:
+                time.sleep(2)
+            continue
         restart_count += 1
         print(f"\n[{_ts()}] [Launcher] Starting bot (run #{restart_count})...", flush=True)
 

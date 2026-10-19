@@ -1,0 +1,87 @@
+﻿  LIVE: 201 trades
+  LIVE_NO_BOUNCE: 156 trades
+  LEGACY_AB: 62 trades
+  MODE_A_ONLY: 4 trades
+  MODE_B_ONLY: 1 trades
+  ACCEPTANCE_ONLY: 152 trades
+  BOUNCE_ONLY: 54 trades
+
+=== Overall by variant (R = pts / signal risk, before costs) ===
+                     n  win%   avgR   totR    PF  ci_lo  ci_hi  pts/trade   days
+LIVE             201.0  57.7  0.395   79.4  1.93  0.140  0.687       23.2  121.0
+LIVE_NO_BOUNCE   156.0  55.8  0.347   54.1  1.78  0.048  0.684       15.9   95.0
+LEGACY_AB         62.0  32.3  1.845  114.4  3.67 -0.277  4.935       16.1   62.0
+MODE_A_ONLY        4.0  50.0  1.485    5.9  3.97    NaN    NaN       53.4    4.0
+MODE_B_ONLY        1.0   0.0 -1.000   -1.0  0.00    NaN    NaN      -28.5    1.0
+ACCEPTANCE_ONLY  152.0  55.9  0.317   48.2  1.72  0.011  0.642       14.9   92.0
+BOUNCE_ONLY       54.0  63.0  0.455   24.6  2.23  0.005  0.945       43.2   48.0
+
+=== LIVE config ù by entry mode ===
+                    n  win%   avgR  totR    PF
+ACCEPTANCE      144.0  56.9  0.367  52.8  1.85
+BOUNCE           52.0  61.5  0.417  21.7  2.08
+OPEN_DIRECTION    4.0  50.0  1.485   5.9  3.97
+REJECTION         1.0   0.0 -1.000  -1.0  0.00
+
+=== LIVE config ù by side ===
+        n  win%   avgR  totR    PF
+CE  106.0  51.9  0.149  15.8  1.31
+PE   95.0  64.2  0.670  63.7  2.87
+
+=== LIVE config ù exit reason (count / avgR) ===
+                 count   mean
+reason                       
+EOD                  3  1.330
+PIVOT_BE_STOP       60  0.139
+PIVOT_SL_HIT        85 -1.000
+PIVOT_TARGET_T3      7  2.970
+PIVOT_TSL_HIT       46  2.855
+
+=== LIVE config ù final stage reached (count / avgR) ===
+         count   mean
+stage                
+BE          67  0.306
+INITIAL     86 -0.987
+T1          38  2.292
+T2          10  5.677
+
+=== LIVE config ù by day type ===
+          n  win%   avgR  totR    PF
+MIXED  52.0  53.8  0.411  21.4  1.89
+RANGE  50.0  54.0  0.047   2.4  1.10
+TREND  90.0  60.0  0.618  55.6  2.54
+
+=== LIVE config ù by open vs CPR ===
+             n  win%   avgR  totR    PF
+ABOVE_TC  88.0  58.0  0.447  39.4  2.06
+BELOW_BC  73.0  57.5  0.461  33.7  2.09
+INSIDE    31.0  51.6  0.202   6.2  1.42
+
+=== LIVE config ù by CPR width bucket ===
+           n  win%   avgR  totR    PF
+NARROW  66.0  56.1  0.634  41.8  2.44
+NORMAL  58.0  63.8  0.012   0.7  1.03
+WIDE    59.0  52.5  0.613  36.2  2.29
+
+=== LIVE config ù by volatility class ===
+           n  win%   avgR  totR    PF
+HIGH    38.0  60.5  0.802  30.5  3.03
+LOW     81.0  54.3  0.141  11.5  1.31
+NORMAL  73.0  57.5  0.512  37.4  2.21
+
+=== LIVE config ù stability by half-sample ===
+        n  win%   avgR  totR    PF
+H1   98.0  56.1  0.361  35.3  1.82
+H2  103.0  59.2  0.428  44.1  2.05
+
+=== Stability ù avgR by half-sample, all variants ===
+                 avgR_H1  avgR_H2
+LIVE               0.372    0.418
+LIVE_NO_BOUNCE     0.274    0.418
+LEGACY_AB          0.725    2.965
+MODE_A_ONLY       -1.000    3.970
+MODE_B_ONLY          NaN   -1.000
+ACCEPTANCE_ONLY    0.308    0.326
+BOUNCE_ONLY        0.507    0.402
+
+Trade logs written to D:\Algo_master\research\output

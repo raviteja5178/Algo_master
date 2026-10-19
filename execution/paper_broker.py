@@ -176,6 +176,23 @@ class PaperBroker:
         )
         return False
 
+    def cancel_unfilled_order(
+        self,
+        order_id: str,
+        tradingsymbol: str,
+        expected_qty: int,
+        max_polls: int = 20,
+    ) -> FillResult:
+        """Paper BUY/SELL orders fill instantly, so there is never a live
+        order left to cancel — mirror OrderManager's interface only."""
+        self.cancel_order(order_id)
+        return {
+            "order_id": order_id,
+            "status": "CANCELLED",
+            "filled_qty": 0,
+            "average_price": 0.0,
+        }
+
     def get_position_qty(self, tradingsymbol: str) -> int:
         return self._positions.get(tradingsymbol, 0)
 

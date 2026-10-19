@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{% include "_dashboard_auth.html" %}
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Live Bot Orders</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #fbf7f0; --surface: #fff; --surface2: #fdf8f0;
+    --border: #e8ddd0; --text: #1a0f00; --muted: #8b7355;
+    --green: #1a7a4a; --red: #c0392b; --amber: #d4870a;
+    --blue: #f5a623; --purple: #7c3aed; --cyan: #0d9488;
+    --radius: 10px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system,"Segoe UI",system-ui,sans-serif; font-size:14px; line-height:1.6; min-height:100vh; }
+  .nav { background:#24160a; border-bottom:2px solid #f5a623; padding:0 24px; display:flex; align-items:stretch; gap:24px; height:52px; }
+  .nav a { color:#d9c4a3; text-decoration:none; font-size:13px; font-weight:500; display:flex; align-items:center; border-bottom:2px solid transparent; margin-bottom:-2px; }
+  .nav a:hover { color:#fff3dc; }
+  .nav a.active { color:#f5a623; border-bottom-color:#f5a623; font-weight:600; }
+  .nav .nav-brand { font-weight:700; font-size:15px; color:#f5a623; margin-right:12px; border-bottom:none; }
+  .page { max-width:1200px; margin:0 auto; padding:24px 20px; }
+  h1 { font-size:20px; font-weight:700; margin-bottom:4px; }
+  h2 { font-size:16px; font-weight:700; margin:24px 0 12px; }
+  .subtitle { color:var(--muted); font-size:13px; margin-bottom:24px; }
+  .mono { font-family:"Cascadia Code","Fira Code",monospace; }
+
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:24px; overflow:hidden; }
+  .card-head { display:flex; align-items:center; gap:10px; padding:14px 20px; border-bottom:1px solid var(--border); background:var(--surface2); }
+  .card-head .htitle { font-weight:700; font-size:15px; flex:1; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--muted); }
+  .dot.on { background:var(--green); }
+  .idle { padding:36px 20px; text-align:center; color:var(--muted); }
+  .body { padding:18px 20px; }
+
+  .metrics { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; }
+  .metric { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; }
+  .metric .ml { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+  .metric .mv { font-size:18px; font-weight:700; }
+  .green { color:var(--green); } .red { color:var(--red); } .amber { color:var(--amber); } .muted { color:var(--muted); }
+
+  .filter-bar { display:flex; align-items:center; flex-wrap:wrap; gap:12px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:20px; }
+  .filter-bar label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .filter-bar input[type=date] { background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 10px; font-size:13px; }
+  .btn { background:var(--blue); color:#fff; border:none; border-radius:6px; padding:7px 16px; font-size:13px; font-weight:600; cursor:pointer; }
+
+  .summary { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-bottom:24px; }
+  .stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 16px; }
+  .stat .label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+  .stat .value { font-size:22px; font-weight:700; }
+
+  .table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow-x:auto; margin-bottom:24px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  thead th { background:var(--surface2); color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; padding:10px 12px; text-align:left; white-space:nowrap; border-bottom:1px solid var(--border); }
+  tbody tr { border-bottom:1px solid var(--border); }
+  tbody tr:last-child { border-bottom:none; }
+  td { padding:8px 12px; vertical-align:middle; white-space:nowrap; }
+  tr.rejected { background:rgba(192,57,43,.08); }
+  td.wrap { white-space:normal; min-width:260px; max-width:420px; font-size:12px; }
+  .badge { display:inline-block; border-radius:4px; padding:2px 8px; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+  .b-green { background:rgba(26,122,74,.15); color:var(--green); }
+  .b-red { background:rgba(192,57,43,.15); color:var(--red); }
+  .b-amber { background:rgba(212,135,10,.15); color:var(--amber); }
+  .b-purple { background:rgba(124,58,237,.15); color:var(--purple); }
+  .b-gray { background:rgba(139,115,85,.15); color:var(--muted); }
+  .empty { text-align:center; padding:36px 20px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-brand">📈 Surya Arjun</a>
+  <a href="/">Dashboard</a>
+  <a href="/strategies">Strategies</a>
+  <a href="/shadow">Shadow Results</a>
+  <a href="/live" class="active">Live Orders</a>
+</nav>
+
+<div class="page">
+  <h1>Live Bot Orders</h1>
+  <p class="subtitle">Real-money orders placed by the bot (TRADING_MODE=LIVE) with ATR, SL, Break-even, TSL and Target. Rejected orders and every SL change are logged in the event history. Active tracker updates every 2 s.</p>
+
+  <!-- Active tracker -->
+  <div class="card">
+    <div class="card-head">
+      <div class="dot" id="dot"></div>
+      <span class="htitle">Active Live Order</span>
+      <span id="stateLabel" class="muted" style="font-size:12px">Waiting for active trade…</span>
+    </div>
+    <div class="idle" id="activeIdle">No open LIVE order right now.</div>
+    <div class="body" id="activeBody" style="display:none">
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px">
+        <span class="mono" style="font-size:17px;font-weight:700" id="aSymbol"></span>
+        <span class="badge b-purple" id="aStrat"></span>
+        <span class="muted" style="margin-left:auto;font-size:12px" id="aEntryTime"></span>
+      </div>
+      <div class="metrics" id="aMetrics"></div>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="filter-bar">
+    <label for="datePicker">Date</label>
+    <input type="date" id="datePicker"/>
+    <select id="dateList" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px"></select>
+    <button class="btn" onclick="loadAll()">Refresh</button>
+    <label style="margin-left:auto"><input type="checkbox" id="rejOnly" onchange="renderEvents()"/> Rejected / failed only</label>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <h2>Live Trades</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Strategy</th><th>Symbol</th><th>Entry Time</th><th>Entry</th>
+        <th>Exit Time</th><th>Exit</th>
+        <th>ATR</th><th>SL pts</th><th>BE pts</th><th>TSL pts</th><th>Target pts</th>
+        <th>Initial SL</th><th>Final SL</th><th>Peak LTP</th><th>Target Px</th>
+        <th>Exit Reason</th><th>P&amp;L</th><th>Status</th>
+      </tr></thead>
+      <tbody id="tradeBody"></tbody>
+    </table>
+    <div class="empty" id="tradeEmpty" style="display:none">No LIVE trades for this date.</div>
+  </div>
+
+  <h2>Order Event History (incl. Rejected)</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Time</th><th>Event</th><th>Symbol</th><th>Order ID</th><th>Price</th><th>Qty</th>
+        <th>Status</th><th>Reason / Details</th>
+        <th>ATR</th><th>SL</th><th>BE</th><th>TSL</th><th>Target</th>
+      </tr></thead>
+      <tbody id="eventBody"></tbody>
+    </table>
+    <div class="empty" id="eventEmpty" style="display:none">No order events logged for this date.</div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let EVENTS = [];
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function n(v, d=2) { return (v === null || v === undefined || v === '') ? '—' : Number(v).toFixed(d); }
+// Always render in IST regardless of the stored offset (handles legacy UTC exit_time rows).
+function ist(ts, withDate=false) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (isNaN(d)) return esc(ts);
+  const o = {timeZone:'Asia/Kolkata', hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'};
+  if (withDate) { o.day = '2-digit'; o.month = 'short'; }
+  return d.toLocaleString('en-GB', o);
+}
+function todayIST() { return new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'}); }
+function metric(l, v, cls='') { return `<div class="metric"><div class="ml">${l}</div><div class="mv ${cls}">${v}</div></div>`; }
+
+// ── Active tracker ──────────────────────────────────────────────────────────
+async function pollActive() {
+  try {
+    const t = await (await fetch('/api/live/active')).json();
+    if (!t) {
+      $('dot').classList.remove('on'); $('stateLabel').textContent = 'Waiting for active trade…';
+      $('activeIdle').style.display = ''; $('activeBody').style.display = 'none';
+      return;
+    }
+    $('dot').classList.add('on');
+    $('stateLabel').textContent = t.bot_state || 'OPEN';
+    $('activeIdle').style.display = 'none'; $('activeBody').style.display = '';
+    $('aSymbol').textContent = t.option_symbol;
+    $('aStrat').textContent = t.strategy_type;
+    $('aEntryTime').textContent = 'Entered ' + ist(t.entry_time);
+    const entry = +t.entry_price, ltp = t.option_ltp, qty = +t.quantity;
+    const pnl = (ltp != null) ? (ltp - entry) * qty : null;
+    const be = t.be_points, beTrig = (be != null) ? entry + (+be) : null;
+    $('aMetrics').innerHTML = [
+      metric('Entry', n(entry)),
+      metric('Option LTP', n(ltp), 'amber'),
+      metric('Unrealised P&L', pnl == null ? '—' : '₹' + pnl.toFixed(0), pnl == null ? 'muted' : pnl >= 0 ? 'green' : 'red'),
+      metric('Current SL', n(t.current_stop), 'red'),
+      metric('Initial SL', n(entry - t.sl_points)),
+      metric('Break-even @', beTrig == null ? '—' : n(beTrig)),
+      metric('BE active', t.break_even_activated ? 'YES' : 'no', t.break_even_activated ? 'green' : 'muted'),
+      metric('TSL steps', t.trail_steps_completed ?? 0),
+      metric('Peak LTP', n(t.highest_ltp)),
+      metric('Target', n(t.target_reference), 'green'),
+      metric('ATR', n(t.atr_value)),
+      metric('SL / BE / TSL / T pts', `${n(t.sl_points,1)} / ${n(be,1)} / ${n(t.tsl_points,1)} / ${n(t.target_points,1)}`),
+      metric('Qty', qty),
+    ].join('');
+  } catch (e) { /* server unreachable — keep last view */ }
+}
+
+// ── History ─────────────────────────────────────────────────────────────────
+function pnlCell(p) {
+  if (p === null || p === undefined) return '<span class="muted">—</span>';
+  return `<b class="${p > 0 ? 'green' : p < 0 ? 'red' : 'muted'}">₹${Number(p).toFixed(0)}</b>`;
+}
+
+function renderTrades(rows) {
+  $('tradeBody').innerHTML = rows.map(t => {
+    const st = t.status === 'OPEN' ? 'b-amber' : (t.realized_pnl > 0 ? 'b-green' : 'b-red');
+    const initSL = (t.entry_price != null && t.sl_points != null) ? t.entry_price - t.sl_points : null;
+    return `<tr>
+      <td><span class="badge b-purple">${esc(t.strategy_type)}</span></td>
+      <td class="mono">${esc(t.option_symbol)}</td>
+      <td class="mono">${ist(t.entry_time)}</td><td class="mono">${n(t.entry_price)}</td>
+      <td class="mono">${ist(t.exit_time)}</td><td class="mono">${n(t.exit_price)}</td>
+      <td class="mono">${n(t.atr_value)}</td><td class="mono">${n(t.sl_points)}</td>
+      <td class="mono">${n(t.be_points)}</td><td class="mono">${n(t.tsl_points)}</td>
+      <td class="mono">${n(t.target_points)}</td>
+      <td class="mono">${n(initSL)}</td><td class="mono">${n(t.current_stop)}</td>
+      <td class="mono">${n(t.highest_ltp)}</td><td class="mono">${n(t.target_reference)}</td>
+      <td>${esc(t.exit_reason || '—')}</td><td>${pnlCell(t.realized_pnl)}</td>
+      <td><span class="badge ${st}">${esc(t.status)}</span></td></tr>`;
+  }).join('');
+  $('tradeEmpty').style.display = rows.length ? 'none' : '';
+}
+
+const EV_CLASS = {
+  ENTRY_REJECTED:'b-red', ENTRY_SENT:'b-gray', ENTRY_FILLED:'b-green', SL_PLACED:'b-purple',
+  SL_MODIFIED:'b-amber', BREAK_EVEN:'b-amber', EXIT_FILLED:'b-green', SL_FILLED_AT_EXCHANGE:'b-red',
+};
+
+function details(e) {
+  const x = (e.extra && typeof e.extra === 'object') ? e.extra : {};
+  const parts = [];
+  if (e.reason) parts.push(esc(e.reason));
+  for (const k of Object.keys(x)) {
+    if (x[k] !== null && x[k] !== undefined && x[k] !== '') parts.push(`${esc(k)}=${esc(typeof x[k] === 'number' ? +x[k].toFixed(2) : x[k])}`);
+  }
+  return parts.join(' · ');
+}
+
+function renderEvents() {
+  const only = $('rejOnly').checked;
+  const rows = EVENTS.filter(e => !only || e.event_type === 'ENTRY_REJECTED' || /REJECT|CANCEL|FAIL|EXCEPTION|TIMEOUT/i.test(e.status || ''));
+  $('eventBody').innerHTML = rows.map(e => `<tr class="${e.event_type === 'ENTRY_REJECTED' ? 'rejected' : ''}">
+      <td class="mono">${ist(e.ts)}</td>
+      <td><span class="badge ${EV_CLASS[e.event_type] || 'b-gray'}">${esc(e.event_type)}</span></td>
+      <td class="mono">${esc(e.symbol)}</td><td class="mono">${esc(e.order_id || '—')}</td>
+      <td class="mono">${n(e.price)}</td><td>${e.qty ?? '—'}</td><td>${esc(e.status || '—')}</td>
+      <td class="wrap">${details(e)}</td>
+      <td class="mono">${n(e.atr)}</td><td class="mono">${n(e.sl_points)}</td><td class="mono">${n(e.be_points)}</td>
+      <td class="mono">${n(e.tsl_points)}</td><td class="mono">${n(e.target_points)}</td></tr>`).join('');
+  $('eventEmpty').style.display = rows.length ? 'none' : '';
+}
+
+function renderSummary(trades, events) {
+  const closed = trades.filter(t => t.status === 'CLOSED');
+  const pnl = closed.reduce((s, t) => s + (t.realized_pnl || 0), 0);
+  const wins = closed.filter(t => t.realized_pnl > 0).length;
+  const rej = events.filter(e => e.event_type === 'ENTRY_REJECTED').length;
+  const sl = closed.filter(t => /STOP|SL/i.test(t.exit_reason || '')).length;
+  const card = (l, v, c='') => `<div class="stat"><div class="label">${l}</div><div class="value ${c}">${v}</div></div>`;
+  $('summary').innerHTML = [
+    card('Filled trades', trades.length),
+    card('Net P&L', '₹' + pnl.toFixed(0), pnl >= 0 ? 'green' : 'red'),
+    card('Win rate', closed.length ? Math.round(100 * wins / closed.length) + '%' : '—'),
+    card('SL exits', sl, sl ? 'red' : ''),
+    card('Rejected entries', rej, rej ? 'red' : ''),
+  ].join('');
+}
+
+async function loadAll() {
+  const date = $('datePicker').value;
+  const q = date ? `?date=${date}` : '';
+  const [trades, events] = await Promise.all([
+    fetch('/api/live/trades' + q).then(r => r.json()).catch(() => []),
+    fetch('/api/live/events' + q).then(r => r.json()).catch(() => []),
+  ]);
+  EVENTS = events;
+  renderSummary(trades, events);
+  renderTrades(trades);
+  renderEvents();
+}
+
+async function init() {
+  let dates = [];
+  try { dates = await (await fetch('/api/live/dates')).json(); } catch (e) {}
+  const sel = $('dateList');
+  sel.innerHTML = '<option value="">Jump to date…</option>' + dates.map(d => `<option>${d}</option>`).join('');
+  sel.onchange = () => { if (sel.value) { $('datePicker').value = sel.value; loadAll(); } };
+  $('datePicker').value = dates.includes(todayIST()) || !dates.length ? todayIST() : dates[0];
+  $('datePicker').onchange = loadAll;
+  await loadAll();
+  pollActive();
+  setInterval(pollActive, 2000);
+  setInterval(loadAll, 10000);
+}
+init();
+</script>
+</body>
+</html>

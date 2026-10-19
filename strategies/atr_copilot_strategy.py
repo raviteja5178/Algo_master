@@ -49,7 +49,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import date
+from utils.time_utils import today_ist
 
 from market.candle_builder import Candle
 from market.indicators import atr as calc_atr, ema as calc_ema
@@ -124,7 +124,7 @@ def is_atr_copilot_ce_signal(
     if len(candles_5m) < min_candles:
         return False
 
-    if candles_5m[-1].timestamp.date() != date.today():
+    if candles_5m[-1].timestamp.date() != today_ist():
         return False
 
     upper, _ = _compute_bands(candles_5m, atr_period, ema_period, band_mult)
@@ -203,7 +203,7 @@ def is_atr_copilot_pe_signal(
     if len(candles_5m) < min_candles:
         return False
 
-    if candles_5m[-1].timestamp.date() != date.today():
+    if candles_5m[-1].timestamp.date() != today_ist():
         return False
 
     _, lower = _compute_bands(candles_5m, atr_period, ema_period, band_mult)

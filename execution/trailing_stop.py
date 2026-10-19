@@ -74,6 +74,7 @@ class TrailingStopManager:
         trail_step_points: float = 10.0,
         tsl_atr_trail_mult: float = 0.0,
         tsl_atr_period: int = 5,
+        atm_delta: float = _ATM_DELTA,
     ) -> None:
         self.entry_price = entry_price
         self.initial_sl_points = initial_sl_points
@@ -81,6 +82,9 @@ class TrailingStopManager:
         self.trail_step_points = trail_step_points
         self.tsl_atr_trail_mult = tsl_atr_trail_mult
         self.tsl_atr_period = tsl_atr_period
+        # Must match the delta used to size the SL (settings.ATM_DELTA), or the
+        # trail and the initial SL describe different index distances.
+        self.atm_delta = atm_delta
 
         # Mutable state (persisted to DB)
         self.current_stop: float = round_to_tick(entry_price - initial_sl_points)
@@ -198,7 +202,7 @@ class TrailingStopManager:
             atr_val = self._current_atr(candles_5m)
             if atr_val and atr_val > 0:
                 trail_dist = round_to_tick(
-                    atr_val * self.tsl_atr_trail_mult * _ATM_DELTA
+                    atr_val * self.tsl_atr_trail_mult * self.atm_delta
                 )
                 desired = round_to_tick(self.highest_ltp - trail_dist)
                 # Never let the dynamic stop fall below entry (break-even floor)

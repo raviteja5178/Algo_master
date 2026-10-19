@@ -56,7 +56,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from utils.time_utils import today_ist
 
 from market.candle_builder import Candle
 from market.indicators import atr_at
@@ -284,7 +284,7 @@ def is_ob_ce_signal(
         return False
 
     latest = candles_5m[-1]
-    if latest.timestamp.date() != date.today():
+    if latest.timestamp.date() != today_ist():
         return False
 
     bull_obs, _ = detect_order_blocks(
@@ -352,7 +352,7 @@ def is_ob_pe_signal(
         return False
 
     latest = candles_5m[-1]
-    if latest.timestamp.date() != date.today():
+    if latest.timestamp.date() != today_ist():
         return False
 
     _, bear_obs = detect_order_blocks(

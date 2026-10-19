@@ -51,6 +51,26 @@ CREATE TABLE IF NOT EXISTS processed_signals (
     processed_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 
+CREATE TABLE IF NOT EXISTS live_order_events (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts                  TEXT NOT NULL,           -- IST ISO timestamp
+    trade_id            TEXT,
+    symbol              TEXT,
+    event_type          TEXT NOT NULL,           -- ENTRY_SENT | ENTRY_FILLED | ENTRY_REJECTED | SL_PLACED | SL_MODIFIED | EXIT_FILLED ...
+    order_id            TEXT,
+    price               REAL,
+    qty                 INTEGER,
+    status              TEXT,
+    reason              TEXT,
+    atr                 REAL,
+    sl_points           REAL,
+    be_points           REAL,
+    tsl_points          REAL,
+    target_points       REAL,
+    extra               TEXT                     -- JSON blob with any additional fields
+);
+CREATE INDEX IF NOT EXISTS idx_live_events_ts ON live_order_events(ts);
+
 CREATE TABLE IF NOT EXISTS order_actions (
     action_id           TEXT PRIMARY KEY,        -- idempotency key
     trade_id            TEXT,
@@ -93,6 +113,8 @@ _MIGRATIONS = [
     "ALTER TABLE trades ADD COLUMN sensex_sl          REAL",
     "ALTER TABLE trades ADD COLUMN sensex_t1          REAL",
     "ALTER TABLE trades ADD COLUMN sensex_t2          REAL",
+    # Break-even trigger pts at entry (for LIVE order panel)
+    "ALTER TABLE trades ADD COLUMN be_points          REAL",
 ]
 
 
@@ -272,6 +294,91 @@ def fetch_shadow_trade_dates() -> list[str]:
             "SELECT DISTINCT substr(entry_time,1,10) AS d FROM trades "
             "WHERE entry_order_id LIKE 'PAPER_%' AND entry_time IS NOT NULL "
             "ORDER BY d DESC"
+        ).fetchall()
+    return [r["d"] for r in rows if r["d"]]
+
+
+# ── LIVE order-event log ───────────────────────────────────────────────────────
+
+_EVENT_COLS = (
+    "ts", "trade_id", "symbol", "event_type", "order_id", "price", "qty",
+    "status", "reason", "atr", "sl_points", "be_points", "tsl_points",
+    "target_points",
+)
+
+
+def add_live_order_event(event_type: str, ts: str, **fields) -> None:
+    """Append one row to live_order_events.  Never raises (logging must not break trading).
+
+    Known columns (trade_id, symbol, order_id, price, qty, status, reason, atr,
+    sl_points, be_points, tsl_points, target_points) are stored directly; any other
+    keyword is stored in the JSON ``extra`` column.
+    """
+    try:
+        import json
+        known = {k: fields.pop(k, None) for k in _EVENT_COLS if k not in ("ts", "event_type")}
+        extra = json.dumps(fields, default=str) if fields else None
+        with _conn() as con:
+            con.execute(
+                "INSERT INTO live_order_events "
+                "(ts, trade_id, symbol, event_type, order_id, price, qty, status, reason, "
+                " atr, sl_points, be_points, tsl_points, target_points, extra) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (ts, known["trade_id"], known["symbol"], event_type, known["order_id"],
+                 known["price"], known["qty"], known["status"], known["reason"],
+                 known["atr"], known["sl_points"], known["be_points"],
+                 known["tsl_points"], known["target_points"], extra),
+            )
+    except Exception:
+        pass
+
+
+def fetch_live_order_events(date: str | None = None, trade_id: str | None = None,
+                            limit: int = 1000) -> list[dict]:
+    """Return LIVE order events newest-first, optionally filtered by date or trade_id."""
+    sql = "SELECT * FROM live_order_events"
+    where, params = [], []
+    if date:
+        where.append("ts LIKE ?")
+        params.append(f"{date}%")
+    if trade_id:
+        where.append("trade_id = ?")
+        params.append(trade_id)
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+    with _conn() as con:
+        rows = con.execute(sql, params).fetchall()
+    return [dict(r) for r in rows]
+
+
+def fetch_live_trades(date: str | None = None, limit: int = 500) -> list[dict]:
+    """Return LIVE (non-paper) trades newest-first, optionally for one entry date."""
+    base = ("SELECT * FROM trades WHERE trade_mode = 'LIVE' "
+            "AND (entry_order_id IS NULL OR entry_order_id NOT LIKE 'PAPER_%')")
+    with _conn() as con:
+        if date:
+            rows = con.execute(
+                base + " AND entry_time LIKE ? ORDER BY created_at DESC LIMIT ?",
+                (f"{date}%", limit),
+            ).fetchall()
+        else:
+            rows = con.execute(
+                base + " ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def fetch_live_dates() -> list[str]:
+    """Distinct dates (YYYY-MM-DD) that have LIVE trades or LIVE order events, newest first."""
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT d FROM ("
+            " SELECT substr(entry_time,1,10) AS d FROM trades "
+            "  WHERE trade_mode='LIVE' AND entry_time IS NOT NULL "
+            " UNION SELECT substr(ts,1,10) AS d FROM live_order_events"
+            ") WHERE d IS NOT NULL ORDER BY d DESC"
         ).fetchall()
     return [r["d"] for r in rows if r["d"]]
 

@@ -14,6 +14,7 @@ from typing import Literal
 from kiteconnect import KiteConnect  # type: ignore
 
 from broker.kite_client import get_kite
+from config import settings
 from utils.logging_config import log_event
 from utils.price_utils import round_to_tick
 
@@ -87,6 +88,26 @@ class OrderManager:
         buffer_pts = max(1.0, ltp * 0.005)
         limit_price = max(_MIN_LIMIT_PRICE, round_to_tick(ltp + buffer_pts))
 
+        # ── Pre-entry margin check ─────────────────────────────────────────────
+        # Skip the order when Kite says it needs more margin than is available,
+        # instead of sending it and having the broker reject it.
+        if settings.ENTRY_MARGIN_CHECK:
+            shortfall = self._margin_shortfall(tradingsymbol, quantity, exchange, limit_price)
+            if shortfall is not None:
+                required, available = shortfall
+                reason = (f"PRE_ENTRY_MARGIN_CHECK: required {required:.2f} > "
+                          f"available {available:.2f}")
+                log_event(logger, "ENTRY_BLOCKED_MARGIN", symbol=tradingsymbol,
+                          required=round(required, 2), available=round(available, 2),
+                          qty=quantity, limit_price=limit_price)
+                return {
+                    "order_id": None,
+                    "status": "REJECTED",
+                    "filled_qty": 0,
+                    "average_price": 0.0,
+                    "reason": reason,
+                }
+
         log_event(logger, "ENTRY_SENT", symbol=tradingsymbol, qty=quantity,
                   exchange=exchange, ltp=ltp, limit_price=limit_price)
         order_id = self._kite.place_order(
@@ -99,7 +120,12 @@ class OrderManager:
             product=self._kite.PRODUCT_MIS,
             variety=self._kite.VARIETY_REGULAR,
         )
-        return self._wait_for_fill(order_id, tradingsymbol, quantity)
+        result = self._wait_for_fill(order_id, tradingsymbol, quantity)
+        # The limit price is an upper bound on the BUY fill price — the caller
+        # uses it as a conservative entry estimate when the exchange never
+        # reports average_price (PRICE_UNCONFIRMED / partial fill on cancel).
+        result["limit_price"] = limit_price
+        return result
 
     # ── Exit ───────────────────────────────────────────────────────────────────
 
@@ -227,6 +253,70 @@ class OrderManager:
             logger.warning("Failed to cancel order %s: %s", order_id, exc)
             return False
 
+    def cancel_unfilled_order(
+        self,
+        order_id: str,
+        tradingsymbol: str,
+        expected_qty: int,
+        max_polls: int = 20,
+    ) -> dict:
+        """
+        Cancel an order that timed out in _wait_for_fill and confirm its final state.
+
+        The order may have filled (fully or partly) while we were waiting, so the
+        cancel request alone proves nothing.  Poll until the broker reports a
+        terminal status and return a fill-result dict with the real filled_qty.
+
+        status is COMPLETE / CANCELLED / REJECTED when confirmed, or
+        UNCONFIRMED when the order never reached a terminal state — the caller
+        must then assume it can still fill.
+        """
+        cancel_ok = self.cancel_order(order_id)
+        filled_qty = 0
+        avg_price = 0.0
+        last_status = None
+        for _ in range(max_polls):
+            try:
+                orders = self._kite.orders()
+            except Exception as exc:
+                logger.warning("Cancel-confirm poll error: %s", exc)
+                time.sleep(_POLL_INTERVAL)
+                continue
+            for o in orders:
+                if str(o["order_id"]) == str(order_id):
+                    last_status = o["status"]
+                    filled_qty = int(o.get("filled_quantity", 0))
+                    avg_price = float(o.get("average_price", 0.0))
+                    break
+            if last_status in _TERMINAL:
+                log_event(
+                    logger, "ORDER_CANCEL_CONFIRMED",
+                    symbol=tradingsymbol, order_id=order_id, status=last_status,
+                    filled_qty=filled_qty, expected_qty=expected_qty,
+                    avg_price=avg_price, cancel_accepted=cancel_ok,
+                )
+                return {
+                    "order_id": order_id,
+                    "status": last_status,
+                    "filled_qty": filled_qty,
+                    "average_price": avg_price,
+                }
+            time.sleep(_POLL_INTERVAL)
+
+        log_event(
+            logger, "ORDER_CANCEL_UNCONFIRMED",
+            symbol=tradingsymbol, order_id=order_id, last_status=last_status,
+            filled_qty=filled_qty, expected_qty=expected_qty,
+            cancel_accepted=cancel_ok,
+            message="Order still not terminal after cancel — it may still fill.",
+        )
+        return {
+            "order_id": order_id,
+            "status": "UNCONFIRMED",
+            "filled_qty": filled_qty,
+            "average_price": avg_price,
+        }
+
     def get_order_status(self, order_id: str) -> str | None:
         try:
             orders = self._kite.orders()
@@ -260,6 +350,37 @@ class OrderManager:
             ) from exc
 
     # ── Private ────────────────────────────────────────────────────────────────
+
+    def _margin_shortfall(
+        self, tradingsymbol: str, quantity: int, exchange: str, price: float,
+    ) -> tuple[float, float] | None:
+        """
+        Return (required, available) when required margin exceeds available cash,
+        else None.  Fails open (returns None) if the margin APIs error out, so a
+        transient API problem never blocks a trade the broker would accept.
+        """
+        try:
+            res = self._kite.order_margins([{
+                "exchange": exchange,
+                "tradingsymbol": tradingsymbol,
+                "transaction_type": self._kite.TRANSACTION_TYPE_BUY,
+                "variety": self._kite.VARIETY_REGULAR,
+                "product": self._kite.PRODUCT_MIS,
+                "order_type": self._kite.ORDER_TYPE_LIMIT,
+                "quantity": quantity,
+                "price": price,
+            }])
+            required = float(res[0]["total"])
+            funds = self._kite.margins("equity")
+            available = float(
+                funds.get("available", {}).get("live_balance", funds.get("net", 0.0))
+            )
+        except Exception as exc:
+            logger.warning("Margin pre-check unavailable (%s) — proceeding with order.", exc)
+            return None
+        if required > available:
+            return required, available
+        return None
 
     def _fetch_ltp(self, tradingsymbol: str, exchange: str, retries: int = 3) -> float:
         """
@@ -377,6 +498,7 @@ class OrderManager:
                             "status": "REJECTED",
                             "filled_qty": 0,
                             "average_price": 0.0,
+                            "reason": o.get("status_message", "") or "",
                         }
 
                     if status == "CANCELLED":

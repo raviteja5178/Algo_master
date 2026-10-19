@@ -97,6 +97,10 @@ def compute_risk_params(
     # Mode D adequacy guard: reject swing SL when index distance < ATR × this mult
     # 0.0 = disabled (always trust the swing level). Recommended: 0.6
     swing_sl_min_atr_mult: float = 0.0,
+    # Index-pts -> option-premium-pts conversion factor (settings.ATM_DELTA)
+    atm_delta: float = 0.4,
+    # Break-even trigger as a multiple of the SL distance (settings.BE_TRIGGER_RR)
+    be_trigger_rr: float = 0.5,
 ) -> RiskParams:
     """
     Compute risk parameters for the current trade.
@@ -122,7 +126,7 @@ def compute_risk_params(
     # ATM delta ≈ 0.4: converts SENSEX index pts → option premium pts.
     # At-the-money SENSEX options have delta ≈ 0.4, meaning a 1-pt move in the
     # SENSEX index changes the option premium by ~0.4 pts.
-    _ATM_DELTA = 0.4
+    _ATM_DELTA = atm_delta
 
     # ── MODE D: swing high/low as SL (structure-first) ───────────────────────
     # SL is placed at the nearest structural pivot: the level where the trade
@@ -168,7 +172,7 @@ def compute_risk_params(
                     sl = sl_ceiling
             tgt   = max(min_target_pts, round_to_tick(sl * target_rr))
             trail = max(min_trail_pts,  round_to_tick(sl * trail_rr))
-            be    = max(min_sl_pts * 0.5, round_to_tick(sl * 0.5))
+            be    = max(min_sl_pts * 0.5, round_to_tick(sl * be_trigger_rr))
             log_event(
                 logger, "RISK_COMPUTED_SWING_SL",
                 mode="swing_sl",
@@ -218,7 +222,7 @@ def compute_risk_params(
                     sl = sl_ceiling
             tgt   = max(min_target_pts, round_to_tick(sl * target_rr))
             trail = max(min_trail_pts,  round_to_tick(sl * trail_rr))
-            be    = max(min_sl_pts * 0.5, round_to_tick(sl * 0.5))
+            be    = max(min_sl_pts * 0.5, round_to_tick(sl * be_trigger_rr))
             log_event(
                 logger, "RISK_COMPUTED_SPOT_ATR",
                 mode="spot_atr_mult",
@@ -242,7 +246,7 @@ def compute_risk_params(
                        spot_atr_period, len(candles_5m))
 
     # ── Fixed fallback — ATR unavailable ──────────────────────────────────────
-    be_fixed = round_to_tick(fixed_sl * 0.5)
+    be_fixed = round_to_tick(fixed_sl * be_trigger_rr)
     logger.info(
         "ATR unavailable — using fixed risk params SL=%.0f BE=%.0f TARGET=%.0f TRAIL=%.0f",
         fixed_sl, be_fixed, fixed_target, fixed_trail,

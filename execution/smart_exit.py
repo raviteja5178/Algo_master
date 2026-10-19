@@ -9,7 +9,11 @@ Triggers (evaluated in priority order):
   2. EMA_COLLAPSE      — entry-side EMA condition reversed on 5m candle close
   3. PROFIT_LOCK       — option LTP reached PROFIT_LOCK_MULTIPLIER × entry price
   4. TIME_DECAY        — after TIME_DECAY_EXIT_AFTER IST with small unrealised P&L
-  5. DAILY_LOSS_LIMIT  — cumulative daily realised loss exceeds DAILY_LOSS_LIMIT pts
+  5. DAILY_LOSS_LIMIT  — cumulative daily realised loss exceeds DAILY_LOSS_LIMIT_RUPEES.
+                         UNITS ARE RUPEES (sum of (exit - entry) x qty), not points
+                         (the constructor arg is still named daily_loss_limit_pts).
+                         Only EMA trades are closed by this trigger;
+                         Pivot trades are only blocked from NEW entries.
 
 Each trigger logs a structured event and returns the exit reason string,
 or None if no exit is warranted.
@@ -51,7 +55,7 @@ class SmartExitEngine:
         profit_lock_min_pct: float = 0.0,
         time_decay_after: str = "14:45",
         time_decay_min_pnl_pts: float = 20.0,
-        daily_loss_limit_pts: float = 200.0,
+        daily_loss_limit_pts: float = 200.0,   # Rs, compared with realised P&L in Rs (see module doc)
         enable_reversal_exit: bool = True,
         enable_ema_collapse: bool = True,
         enable_profit_lock: bool = True,
@@ -217,6 +221,9 @@ class SmartExitEngine:
         """
         Returns True if the daily loss limit is hit — blocks new entries.
         Call from BotContext.can_create_entry().
+
+        NOTE: the parameter is named ``..._pts`` for history, but callers pass the
+        day's realised P&L in RUPEES and the limit is in rupees too.
         """
         if not self._en_daily_loss:
             return False

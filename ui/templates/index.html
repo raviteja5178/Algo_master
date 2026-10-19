@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+{% include "_dashboard_auth.html" %}
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>☀️</text></svg>"/>
@@ -477,6 +478,7 @@
         <button class="tab" onclick="showTab('settings',this)">Settings</button>
         <button class="tab" onclick="showTab('strategies',this);loadStrategies()">⚙ Strategies</button>
         <a class="tab" href="/shadow" style="text-decoration:none;">📋 Shadow Results</a>
+        <a class="tab" href="/live" style="text-decoration:none;">🔴 Live Orders</a>
       </div>
 
       <div id="panels">
@@ -956,6 +958,14 @@
                   <span class="pill p-teal" style="font-size:9px">Mean Reversion</span>
                 </div>
                 <div style="font-size:11px;color:var(--muted);margin-bottom:6px">CE_VWAP / PE_VWAP on pullback to VWAP with momentum confirmation.</div>
+                <div style="display:flex;gap:16px;margin-top:6px;font-size:12px;color:var(--muted)">
+                  <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+                    <input type="checkbox" id="st-ENABLE_CE_VWAP" onchange="stToggle('ENABLE_CE_VWAP',this.checked)"> CE_VWAP
+                  </label>
+                  <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+                    <input type="checkbox" id="st-ENABLE_PE_VWAP" onchange="stToggle('ENABLE_PE_VWAP',this.checked)"> PE_VWAP
+                  </label>
+                </div>
               </div>
               <label class="st-switch">
                 <input type="checkbox" id="st-ENABLE_VWAP_STRATEGY" onchange="stToggle('ENABLE_VWAP_STRATEGY',this.checked)">
@@ -1621,7 +1631,7 @@ function calcSignalConds(state,candles,ema9,ema21){
   // g() reads the cfg- form element if Settings tab has been opened, otherwise
   // falls back to _envCache which is loaded on every page poll from /api/env.
   const g=id=>{const el=document.getElementById('cfg-'+id);if(el)return el.value;return(_envCache&&_envCache[id])||'';};
-  const emaOn=g('ENABLE_EMA_STRATEGY')!=='false',orbOn=g('ENABLE_ORB_STRATEGY')==='true',obOn=g('ENABLE_OB_STRATEGY')==='true',momOn=g('ENABLE_MOMENTUM_PHASE')==='true',trbOn=g('ENABLE_TRB_STRATEGY')==='true',vwapOn=g('ENABLE_VWAP_STRATEGY')==='true',pdhlOn=g('ENABLE_PDHL_STRATEGY')==='true',natrOn=g('ENABLE_NATR_STRATEGY')==='true',atrCopilotOn=g('ENABLE_ATR_COPILOT_STRATEGY')==='true';
+  const emaOn=g('ENABLE_EMA_STRATEGY')!=='false',orbOn=g('ENABLE_ORB_STRATEGY')==='true',obOn=g('ENABLE_OB_STRATEGY')==='true',momOn=g('ENABLE_MOMENTUM_PHASE')==='true',trbOn=g('ENABLE_TRB_STRATEGY')==='true',vwapOn=g('ENABLE_VWAP_STRATEGY')==='true',ceVwapOn=g('ENABLE_CE_VWAP')!=='false',peVwapOn=g('ENABLE_PE_VWAP')!=='false',pdhlOn=g('ENABLE_PDHL_STRATEGY')==='true',natrOn=g('ENABLE_NATR_STRATEGY')==='true',atrCopilotOn=g('ENABLE_ATR_COPILOT_STRATEGY')==='true';
   const pivotOn=g('ENABLE_PIVOT_LEVELS')==='true';
   const pivotStratOn=g('ENABLE_PIVOT_STRATEGY')==='true';
 
@@ -1706,7 +1716,7 @@ function calcSignalConds(state,candles,ema9,ema21){
   if(obOn&&state.ob_zones){const b=state.ob_zones.bull||[],be=state.ob_zones.bear||[];const bA=b.length>0,beA=be.length>0,bV=bA&&!b[0].breaker,beV=beA&&!be[0].breaker;const bZ=bA?`${b[0].bottom.toFixed(1)}–${b[0].top.toFixed(1)}`:'—',eZ=beA?`${be[0].bottom.toFixed(1)}–${be[0].top.toFixed(1)}`:'—';renderConds('ce-ob-conds',[bA,bV],[`Bullish OB (${bZ})`,'Not a breaker']);renderConds('pe-ob-conds',[beA,beV],[`Bearish OB (${eZ})`,'Not a breaker']);if(bV)ceSig=true;if(beV)peSig=true;}
   if(momOn){const mb=parseFloat(g('MOMENTUM_MIN_BODY_PTS')||40);const body=c0.c-c0.o;let inW=false;try{const ct=new Date(c0.t),hm=ct.getHours()*60+ct.getMinutes();inW=hm>=13*60+30&&hm<14*60+30;}catch(e){}const h15=close15!==null&&ema21_15!==null;const cm=[body>=mb,c0.c>e9,e9>e21,h15?close15>ema21_15:false],pm=[(-body)>=mb,c0.c<e9,e9<e21,h15?close15<ema21_15:false];renderConds('ce-mom-conds',inW?cm:cm.map(()=>null),[`Body ≥ ${mb} pts`,'close > EMA9','EMA9 > EMA21','15m > EMA21']);renderConds('pe-mom-conds',inW?pm:pm.map(()=>null),[`Body ≥ ${mb} pts`,'close < EMA9','EMA9 < EMA21','15m < EMA21']);if(inW&&cm.every(Boolean))ceSig=true;if(inW&&pm.every(Boolean))peSig=true;}
   if(trbOn&&state.candles_15m){let tH=null,tL=null;const ld=new Date(state.candles_15m[state.candles_15m.length-1].t).toDateString();for(const c of state.candles_15m){const d=new Date(c.t);if(d.toDateString()===ld&&d.getHours()===9&&d.getMinutes()===45){tH=c.h;tL=c.l;break;}}const hm=new Date(c0.t).getHours()*60+new Date(c0.t).getMinutes(),anc=hm>=10*60;const ct=[anc&&tH?c0.c>tH:null,anc&&tH?c1.c<=tH:null],pt=[anc&&tL?c0.c<tL:null,anc&&tL?c1.c>=tL:null];renderConds('ce-trb-conds',ct,[`close > TRB High (${tH?tH.toFixed(2):'—'})`,`Prev ≤ TRB High`]);renderConds('pe-trb-conds',pt,[`close < TRB Low (${tL?tL.toFixed(2):'—'})`,`Prev ≥ TRB Low`]);if(anc&&ct.every(Boolean))ceSig=true;if(anc&&pt.every(Boolean))peSig=true;}
-  if(vwapOn&&vwapVal){const lb=parseInt(g('VWAP_RETEST_LOOKBACK')||3);const allC=state.candles_5m||[];const pN=allC.length>=lb+1?allC.slice(-(lb+1),-1):[];const cv=[c0.c>vwapVal,c0.c>c1.h,pN.length>0?pN.some(c=>c.c<vwapVal):null];const pv=[c0.c<vwapVal,c0.c<c1.l,pN.length>0?pN.some(c=>c.c>vwapVal):null];renderConds('ce-vwap-conds',cv,[`close > VWAP (${vwapVal.toFixed(2)})`,`close > prev high`,`Retest (${lb} prev)`]);renderConds('pe-vwap-conds',pv,[`close < VWAP (${vwapVal.toFixed(2)})`,`close < prev low`,`Retest (${lb} prev)`]);if(cv.every(v=>v===true))ceSig=true;if(pv.every(v=>v===true))peSig=true;}
+  if(vwapOn&&vwapVal){const lb=parseInt(g('VWAP_RETEST_LOOKBACK')||3);const allC=state.candles_5m||[];const pN=allC.length>=lb+1?allC.slice(-(lb+1),-1):[];const cv=[c0.c>vwapVal,c0.c>c1.h,pN.length>0?pN.some(c=>c.c<vwapVal):null];const pv=[c0.c<vwapVal,c0.c<c1.l,pN.length>0?pN.some(c=>c.c>vwapVal):null];renderConds('ce-vwap-conds',cv,[`close > VWAP (${vwapVal.toFixed(2)})`,`close > prev high`,`Retest (${lb} prev)`]);renderConds('pe-vwap-conds',pv,[`close < VWAP (${vwapVal.toFixed(2)})`,`close < prev low`,`Retest (${lb} prev)`]);if(ceVwapOn&&cv.every(v=>v===true))ceSig=true;if(peVwapOn&&pv.every(v=>v===true))peSig=true;}
   if(pdhlOn&&(pdhVal||pdlVal)){const buf=parseFloat(g('PDHL_BUFFER_PTS')||0);const ceL=pdhVal?pdhVal+buf:null,peL=pdlVal?pdlVal-buf:null;const cp=pdhVal?[c1.c<=pdhVal,c0.c>ceL,c0.c>c1.h]:[null,null,null],pp=pdlVal?[c1.c>=pdlVal,c0.c<peL,c0.c<c1.l]:[null,null,null];renderConds('ce-pdhl-conds',cp,[`Prev <= PDH (${pdhVal?pdhVal.toFixed(2):'-'})`,`close > PDH+buf`,`close > prev high`]);renderConds('pe-pdhl-conds',pp,[`Prev >= PDL (${pdlVal?pdlVal.toFixed(2):'-'})`,`close < PDL-buf`,`close < prev low`]);if(cp.every(v=>v===true))ceSig=true;if(pp.every(v=>v===true))peSig=true;}
   if(natrOn){const natrStop=state.natr_stop!==undefined?state.natr_stop:null;const stopStr=natrStop!==null?natrStop.toFixed(2):'-';const cn=natrStop!==null?[c1.c<=natrStop,c0.c>natrStop]:[null,null];const pn=natrStop!==null?[c1.c>=natrStop,c0.c<natrStop]:[null,null];renderConds('ce-natr-conds',cn,[`Prev close <= ATR stop (${stopStr})`,`close > ATR stop (${stopStr})`]);renderConds('pe-natr-conds',pn,[`Prev close >= ATR stop (${stopStr})`,`close < ATR stop (${stopStr})`]);if(cn.every(v=>v===true))ceSig=true;if(pn.every(v=>v===true))peSig=true;}
   if(atrCopilotOn){
@@ -1990,8 +2000,13 @@ const FIELDS=[
   {key:'TRB_MIN_BODY_RATIO',label:'TRB Min Body Ratio',type:'number'},
   {key:'TRB_BUFFER_ATR_MULT',label:'TRB Buffer ATR Mult',type:'number'},
   {key:'ENABLE_VWAP_STRATEGY',label:'VWAP Retest',type:'select',options:['false','true']},
+  {key:'ENABLE_CE_VWAP',label:'VWAP Enable CE',type:'select',options:['false','true']},
+  {key:'ENABLE_PE_VWAP',label:'VWAP Enable PE',type:'select',options:['false','true']},
   {key:'VWAP_RETEST_LOOKBACK',label:'VWAP Lookback',type:'number'},
   {key:'VWAP_MIN_BOUNCE_PTS',label:'VWAP Min Bounce Pts',type:'number'},
+  {key:'VWAP_MAX_SUBMERGED_CANDLES',label:'VWAP Max Submerged Candles',type:'number'},
+  {key:'ENABLE_VWAP_LEVEL_FILTER',label:'VWAP Level Filter',type:'select',options:['false','true']},
+  {key:'VWAP_LEVEL_MIN_ROOM_ATR',label:'VWAP Level Min Room (ATR)',type:'number'},
   {key:'ENABLE_PDHL_STRATEGY',label:'PDHL Breakout',type:'select',options:['false','true']},
   {key:'PDHL_BUFFER_PTS',label:'PDHL Buffer Pts',type:'number'},
   {key:'ENABLE_NATR_STRATEGY',label:'NATR Trailing Stop',type:'select',options:['false','true']},
@@ -2029,7 +2044,7 @@ const FIELDS=[
   {key:'TIME_DECAY_EXIT_AFTER',label:'Time Decay After',type:'text'},
   {key:'TIME_DECAY_MIN_PNL_PTS',label:'Time Decay Min PnL',type:'number'},
   {key:'ENABLE_DAILY_LOSS_LIMIT',label:'Daily Loss Limit',type:'select',options:['false','true']},
-  {key:'DAILY_LOSS_LIMIT_PTS',label:'Daily Loss Limit Pts',type:'number'},
+  {key:'DAILY_LOSS_LIMIT_RUPEES',label:'Daily Loss Limit (₹ rupees)',type:'number'},
   {key:'LOG_LEVEL',label:'Log Level',type:'select',options:['DEBUG','INFO','WARNING','ERROR']},
   {key:'KITE_TOTP_SECRET',label:'Kite TOTP Secret',type:'password'},
 ];
@@ -2153,9 +2168,9 @@ pollOptLtp();setInterval(pollOptLtp,2000);
 poll();setInterval(poll,3000);
 
 // ── Strategies panel ─────────────────────────────────────────
-const ST_KEYS=['ENABLE_EMA_STRATEGY','ENABLE_ORB_STRATEGY','ENABLE_TRB_STRATEGY','ENABLE_OB_STRATEGY','ENABLE_MOMENTUM_PHASE','ENABLE_VWAP_STRATEGY','ENABLE_PDHL_STRATEGY','ENABLE_NATR_STRATEGY','ENABLE_ATR_COPILOT_STRATEGY','ENABLE_PIVOT_STRATEGY'];
+const ST_KEYS=['ENABLE_EMA_STRATEGY','ENABLE_ORB_STRATEGY','ENABLE_TRB_STRATEGY','ENABLE_OB_STRATEGY','ENABLE_MOMENTUM_PHASE','ENABLE_VWAP_STRATEGY','ENABLE_CE_VWAP','ENABLE_PE_VWAP','ENABLE_PDHL_STRATEGY','ENABLE_NATR_STRATEGY','ENABLE_ATR_COPILOT_STRATEGY','ENABLE_PIVOT_STRATEGY'];
 let _stLoaded=false;
-async function loadStrategies(){if(_stLoaded)return;try{const env=await fetch('/api/env').then(r=>r.json());_envCache=env;ST_KEYS.forEach(k=>{const el=document.getElementById('st-'+k);if(el)el.checked=(env[k]==='true');});_stLoaded=true;}catch(e){console.error('loadStrategies:',e);}}
+async function loadStrategies(){if(_stLoaded)return;try{const env=await fetch('/api/env').then(r=>r.json());_envCache=env;ST_KEYS.forEach(k=>{const el=document.getElementById('st-'+k);if(el)el.checked=(k==='ENABLE_CE_VWAP'||k==='ENABLE_PE_VWAP'||k==='ENABLE_EMA_STRATEGY')?(env[k]!=='false'):(env[k]==='true');});_stLoaded=true;}catch(e){console.error('loadStrategies:',e);}}
 function stToggle(key,val){/* state held in checkbox — no extra cache needed */}
 async function stSaveAll(){const p={};ST_KEYS.forEach(k=>{const el=document.getElementById('st-'+k);if(el)p[k]=el.checked?'true':'false';});try{const d=await fetch('/api/env',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}).then(r=>r.json());if(d.ok){_envCache=Object.assign({},_envCache,p);const m=document.getElementById('st-save-msg');m.style.display='inline';setTimeout(()=>m.style.display='none',2500);_stLoaded=false;}}catch(e){alert('Save failed: '+e);}}
 </script>

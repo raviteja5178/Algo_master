@@ -180,3 +180,170 @@ class TestVWAPPESignal:
         assert is_vwap_pe_signal(candles, vwap, max_submerged_candles=5) is True
 
 
+# ── Signal Engine Integration (ENABLE_CE_VWAP / ENABLE_PE_VWAP) ───────────────
+
+class TestVWAPSignalEngineIntegration:
+
+    def _make_bullish_vwap_candles(self) -> tuple[list[Candle], list[Candle]]:
+        # 5m candles: 3 below VWAP (73600), last one breaking above
+        c5 = [
+            _candle(10, 0, 73580, 73590, 73570, 73580),
+            _candle(10, 5, 73580, 73595, 73575, 73590),
+            _candle(10, 10, 73590, 73600, 73580, 73595),
+            _candle(10, 15, 73600, 73660, 73598, 73650),
+        ]
+        c15 = [
+            _candle(10, 0, 73580, 73660, 73570, 73650),
+        ]
+        return c5, c15
+
+    def _make_bearish_vwap_candles(self) -> tuple[list[Candle], list[Candle]]:
+        # 5m candles: 3 above VWAP (73600), last one breaking below
+        c5 = [
+            _candle(10, 0, 73620, 73630, 73615, 73620),
+            _candle(10, 5, 73620, 73625, 73605, 73615),
+            _candle(10, 10, 73615, 73620, 73600, 73610),
+            _candle(10, 15, 73610, 73612, 73545, 73550),
+        ]
+        c15 = [
+            _candle(10, 0, 73620, 73630, 73545, 73550),
+        ]
+        return c5, c15
+
+    def test_ce_vwap_disabled_blocks_signal(self):
+        from unittest.mock import patch
+        from strategies.signal_engine import evaluate_signals
+
+        c5, c15 = self._make_bullish_vwap_candles()
+        with patch("strategies.signal_engine.settings") as ms, \
+             patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
+             patch("strategies.signal_engine.record_processed_signal"):
+
+            ms.ENABLE_OB_STRATEGY = False
+            ms.ENABLE_ORB_STRATEGY = False
+            ms.ENABLE_PIVOT_STRATEGY = False
+            ms.ENABLE_VWAP_STRATEGY = True
+            ms.ENABLE_CE_VWAP = False
+            ms.ENABLE_PE_VWAP = True
+            ms.ENABLE_PDHL_STRATEGY = False
+            ms.ENABLE_NATR_STRATEGY = False
+            ms.ENABLE_ATR_COPILOT_STRATEGY = False
+            ms.ENABLE_TRB_STRATEGY = False
+            ms.ENABLE_EMA_STRATEGY = False
+            ms.ENABLE_MOMENTUM_PHASE = False
+            ms.ENABLE_VWAP_LEVEL_FILTER = False
+            ms.ORB_SESSION_QUALIFIER = False
+            ms.MAX_TRADES_PER_SIDE = 0
+            ms.VWAP_RETEST_LOOKBACK = 3
+            ms.VWAP_MIN_BOUNCE_PTS = 0.0
+            ms.VWAP_MAX_SUBMERGED_CANDLES = 3
+            ms.VWAP_SLOPE_LOOKBACK = 0
+            ms.VWAP_NO_NEW_ENTRY_AFTER = ""
+
+            sig = evaluate_signals(c5, c15, vwap=73600.0)
+            assert sig is None
+
+    def test_ce_vwap_enabled_fires_signal(self):
+        from unittest.mock import patch
+        from strategies.signal_engine import evaluate_signals
+
+        c5, c15 = self._make_bullish_vwap_candles()
+        with patch("strategies.signal_engine.settings") as ms, \
+             patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
+             patch("strategies.signal_engine.record_processed_signal"):
+
+            ms.ENABLE_OB_STRATEGY = False
+            ms.ENABLE_ORB_STRATEGY = False
+            ms.ENABLE_PIVOT_STRATEGY = False
+            ms.ENABLE_VWAP_STRATEGY = True
+            ms.ENABLE_CE_VWAP = True
+            ms.ENABLE_PE_VWAP = True
+            ms.ENABLE_PDHL_STRATEGY = False
+            ms.ENABLE_NATR_STRATEGY = False
+            ms.ENABLE_ATR_COPILOT_STRATEGY = False
+            ms.ENABLE_TRB_STRATEGY = False
+            ms.ENABLE_EMA_STRATEGY = False
+            ms.ENABLE_MOMENTUM_PHASE = False
+            ms.ENABLE_VWAP_LEVEL_FILTER = False
+            ms.ORB_SESSION_QUALIFIER = False
+            ms.MAX_TRADES_PER_SIDE = 0
+            ms.VWAP_RETEST_LOOKBACK = 3
+            ms.VWAP_MIN_BOUNCE_PTS = 0.0
+            ms.VWAP_MAX_SUBMERGED_CANDLES = 3
+            ms.VWAP_SLOPE_LOOKBACK = 0
+            ms.VWAP_NO_NEW_ENTRY_AFTER = ""
+
+            sig = evaluate_signals(c5, c15, vwap=73600.0)
+            assert sig == "CE_VWAP"
+
+    def test_pe_vwap_disabled_blocks_signal(self):
+        from unittest.mock import patch
+        from strategies.signal_engine import evaluate_signals
+
+        c5, c15 = self._make_bearish_vwap_candles()
+        with patch("strategies.signal_engine.settings") as ms, \
+             patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
+             patch("strategies.signal_engine.record_processed_signal"):
+
+            ms.ENABLE_OB_STRATEGY = False
+            ms.ENABLE_ORB_STRATEGY = False
+            ms.ENABLE_PIVOT_STRATEGY = False
+            ms.ENABLE_VWAP_STRATEGY = True
+            ms.ENABLE_CE_VWAP = True
+            ms.ENABLE_PE_VWAP = False
+            ms.ENABLE_PDHL_STRATEGY = False
+            ms.ENABLE_NATR_STRATEGY = False
+            ms.ENABLE_ATR_COPILOT_STRATEGY = False
+            ms.ENABLE_TRB_STRATEGY = False
+            ms.ENABLE_EMA_STRATEGY = False
+            ms.ENABLE_MOMENTUM_PHASE = False
+            ms.ENABLE_VWAP_LEVEL_FILTER = False
+            ms.ORB_SESSION_QUALIFIER = False
+            ms.MAX_TRADES_PER_SIDE = 0
+            ms.VWAP_RETEST_LOOKBACK = 3
+            ms.VWAP_MIN_BOUNCE_PTS = 0.0
+            ms.VWAP_MAX_SUBMERGED_CANDLES = 3
+            ms.VWAP_SLOPE_LOOKBACK = 0
+            ms.VWAP_NO_NEW_ENTRY_AFTER = ""
+
+            sig = evaluate_signals(c5, c15, vwap=73600.0)
+            assert sig is None
+
+    def test_pe_vwap_enabled_fires_signal(self):
+        from unittest.mock import patch
+        from strategies.signal_engine import evaluate_signals
+
+        c5, c15 = self._make_bearish_vwap_candles()
+        with patch("strategies.signal_engine.settings") as ms, \
+             patch("strategies.signal_engine.has_processed_signal", return_value=False), \
+             patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
+             patch("strategies.signal_engine.record_processed_signal"):
+
+            ms.ENABLE_OB_STRATEGY = False
+            ms.ENABLE_ORB_STRATEGY = False
+            ms.ENABLE_PIVOT_STRATEGY = False
+            ms.ENABLE_VWAP_STRATEGY = True
+            ms.ENABLE_CE_VWAP = True
+            ms.ENABLE_PE_VWAP = True
+            ms.ENABLE_PDHL_STRATEGY = False
+            ms.ENABLE_NATR_STRATEGY = False
+            ms.ENABLE_ATR_COPILOT_STRATEGY = False
+            ms.ENABLE_TRB_STRATEGY = False
+            ms.ENABLE_EMA_STRATEGY = False
+            ms.ENABLE_MOMENTUM_PHASE = False
+            ms.ENABLE_VWAP_LEVEL_FILTER = False
+            ms.ORB_SESSION_QUALIFIER = False
+            ms.MAX_TRADES_PER_SIDE = 0
+            ms.VWAP_RETEST_LOOKBACK = 3
+            ms.VWAP_MIN_BOUNCE_PTS = 0.0
+            ms.VWAP_MAX_SUBMERGED_CANDLES = 3
+            ms.VWAP_SLOPE_LOOKBACK = 0
+            ms.VWAP_NO_NEW_ENTRY_AFTER = ""
+
+            sig = evaluate_signals(c5, c15, vwap=73600.0)
+            assert sig == "PE_VWAP"
+
+
