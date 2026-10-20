@@ -370,7 +370,7 @@ def _coerce(cur, raw: str):
     return raw
 
 
-def install(md: MarketData, tmp: Path, overrides: dict[str, str]):
+def install(md: MarketData, tmp: Path, overrides: dict[str, str], mode: str = "SHADOW"):
     """Import the bot with every outside-world dependency simulated. Returns (main, kite, chain)."""
     from config import settings
 
@@ -380,7 +380,7 @@ def install(md: MarketData, tmp: Path, overrides: dict[str, str]):
         if not hasattr(settings, key):
             sys.exit(f"--set {key}: unknown setting")
         setattr(settings, key, _coerce(getattr(settings, key), raw))
-    settings.TRADING_MODE = "SHADOW"
+    settings.TRADING_MODE = mode
     settings.ENABLE_LIVE_TRADING = False
     settings.ENABLE_AI_CONFIRMATION = False
     settings.ENABLE_AI_EXIT = False
@@ -485,14 +485,14 @@ def _install_entry_filters(main, windows: list[tuple[dtime, dtime]], skip: set[s
 
 def run(md: MarketData, start: date, end: date, overrides: dict[str, str], out_dir: Path,
         block_windows: list[tuple[dtime, dtime]] | None = None,
-        skip_signals: set[str] | None = None) -> dict:
+        skip_signals: set[str] | None = None, mode: str = "SHADOW") -> dict:
     tmp = Path(tempfile.mkdtemp(prefix="sysbt_"))
     cap = EventCapture()
     root = logging.getLogger()
     root.handlers[:] = [cap]
     root.setLevel(logging.INFO)
 
-    main, kite, chain = install(md, tmp, overrides)
+    main, kite, chain = install(md, tmp, overrides, mode)
     _install_entry_filters(main, block_windows or [], skip_signals or set())
     from config import settings
     from market.historical_data import SENSEX_TOKEN
@@ -522,7 +522,8 @@ def run(md: MarketData, start: date, end: date, overrides: dict[str, str], out_d
                 _CLOCK[0] = base + timedelta(seconds=15 * k)
                 kite.spot = float(px)
                 handler(SENSEX_TOKEN, float(px))
-                if ctx.instrument_token and ctx.tradingsymbol in chain.by_symbol:
+                # PAPER has no option feed: the bot prices the option off the index itself.
+                if mode != "PAPER" and ctx.instrument_token and ctx.tradingsymbol in chain.by_symbol:
                     prem = chain.premium(chain.by_symbol[ctx.tradingsymbol], kite.spot,
                                          _CLOCK[0].replace(tzinfo=None))
                     handler(ctx.instrument_token, prem)
@@ -550,7 +551,7 @@ def run(md: MarketData, start: date, end: date, overrides: dict[str, str], out_d
                        and not any(s in k for s in ("KEY", "SECRET", "TOKEN", "PASSWORD", "USER")))
     meta = {
         "start": str(days[0]) if days else None, "end": str(days[-1]) if days else None,
-        "sessions": len(days), "overrides": overrides, "halted_days": halted_days,
+        "sessions": len(days), "overrides": overrides, "halted_days": halted_days, "mode": mode,
         "experiments": {
             "block_entry_windows": [f"{a:%H:%M}-{b:%H:%M}" for a, b in (block_windows or [])],
             "skip_signals": sorted(skip_signals or []),
@@ -576,6 +577,9 @@ def main_cli() -> None:
                     help="backtest-only: no new entries in this window (repeatable)")
     ap.add_argument("--skip-signals", default="", metavar="SIG,SIG",
                     help="backtest-only: never enter these signal types, e.g. CE_PIVOT")
+    ap.add_argument("--mode", choices=["SHADOW", "PAPER"], default="SHADOW",
+                    help="SHADOW = modelled option premiums (default); PAPER = the bot's "
+                         "PAPER mode, which prices the option as the index (delta 1)")
     ap.add_argument("--no-report", action="store_true")
     a = ap.parse_args()
 
@@ -592,7 +596,7 @@ def main_cli() -> None:
     skip = {x.strip() for x in a.skip_signals.split(",") if x.strip()}
     out_dir = OUT_ROOT / a.label
     print(f"System backtest {start} -> {end}  label={a.label}  overrides={overrides or 'none'}")
-    meta = run(md, start, end, overrides, out_dir, windows, skip)
+    meta = run(md, start, end, overrides, out_dir, windows, skip, a.mode)
     print(f"Done: {meta['sessions']} sessions in {meta['runtime_s']}s -> {out_dir}")
     if not a.no_report:
         from research.backtest_report import build_report

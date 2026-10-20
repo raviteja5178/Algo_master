@@ -1,6 +1,6 @@
 # Full-system backtest: 2024-01-15 to 2026-10-16
 
-Run label `current_config`, 683 trading sessions, generated 2026-10-20 02:20.  Overrides: none (current .env).
+Run label `current_config`, 683 trading sessions, generated 2026-10-20 02:26.  Overrides: none (current .env).
 
 ## Headline
 

@@ -122,6 +122,8 @@ class BotContext:
         self.instrument_token: int | None = None
         self.quantity: int = settings.QUANTITY
         self.entry_price: float = 0.0
+        # Last option premium seen by on_option_ltp (0 when flat)
+        self.last_option_ltp: float = 0.0
         self.entry_atr: float | None = None    # ATR(14) at trade entry — for dynamic profit lock
         self.stop_order_id: str | None = None
         self.trailing: TrailingStopManager | None = None
@@ -1416,9 +1418,25 @@ def on_pivot_index_price(ctx: BotContext, sensex_ltp: float) -> None:
     })
 
 
+def _paper_option_price(ctx: BotContext, index_price: float) -> float:
+    """
+    PAPER has no option feed, so the SENSEX index stands in for the option
+    premium (delta 1).  A PE gains when the index falls, so its price is the
+    index mirrored around the entry: entry + (entry - index).  Without this a
+    PE's stop sat below entry and fired on the profitable move, and P&L had
+    the wrong sign.
+    """
+    if (index_price > 0 and ctx.entry_price > 0
+            and (ctx.strategy_type or "").startswith("PE")
+            and ctx.sm.state in (State.POSITION_OPEN, State.EXIT_PENDING)):
+        return round(2 * ctx.entry_price - index_price, 2)
+    return index_price
+
+
 def on_option_ltp(ctx: BotContext, ltp: float) -> None:
     if ctx.sm.state != State.POSITION_OPEN or ctx.trailing is None:
         return
+    ctx.last_option_ltp = ltp
 
     # PAPER mode: option "LTP" here is the SENSEX spot price (option token never
     # subscribed in pure-paper mode).
@@ -1602,6 +1620,7 @@ def _close_trade_context(ctx: BotContext) -> None:
     ctx.trailing = None
     ctx.target = None
     ctx.stop_order_id = None
+    ctx.last_option_ltp = 0.0
     if getattr(ctx, "pivot_mgr", None) is not None:
         type(ctx.pivot_mgr).clear()
     ctx.pivot_mgr = None
@@ -1762,7 +1781,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
     # Priority:
     #   1. Caller-supplied exit_ltp (already the correct option price when passed)
     #   2. SHADOW: fetch real option LTP from Zerodha REST
-    #   3. PAPER: ctx.sensex_ltp (best available proxy)
+    #   3. PAPER: the index as the option price (mirrored for PE, see _paper_option_price)
     _sell_ltp_hint: float | None = None
     if settings.TRADING_MODE in ("PAPER", "SHADOW"):
         if exit_ltp and exit_ltp > 0:
@@ -1775,10 +1794,12 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
                 _sell_ltp_hint = float(_q[_quote_key]["last_price"])
                 logger.info("SHADOW exit ltp_hint: %.2f for %s", _sell_ltp_hint, ctx.tradingsymbol)
             except Exception as _exc:
-                logger.warning("SHADOW exit ltp_hint: REST fetch failed (%s) — using sensex_ltp.", _exc)
-                _sell_ltp_hint = ctx.sensex_ltp if ctx.sensex_ltp > 0 else None
+                # Never the SENSEX level: that would book the index as the option price.
+                logger.warning("SHADOW exit ltp_hint: REST fetch failed (%s) — using last option tick.", _exc)
+                _sell_ltp_hint = getattr(ctx, "last_option_ltp", 0.0) or None
         else:
-            _sell_ltp_hint = ctx.sensex_ltp if ctx.sensex_ltp > 0 else None
+            _paper_px = _paper_option_price(ctx, ctx.sensex_ltp)
+            _sell_ltp_hint = _paper_px if _paper_px > 0 else None
 
     try:
         fill = ctx.broker.place_sell_order(ctx.tradingsymbol, ctx.quantity, tag=reason, ltp_hint=_sell_ltp_hint)
@@ -2337,7 +2358,7 @@ def _make_tick_handler(ctx: BotContext):
                 # In PAPER mode the option price IS the SENSEX spot price,
                 # so trail/SL checks run against the SENSEX LTP directly.
                 if settings.TRADING_MODE == "PAPER" and ctx.sm.state == State.POSITION_OPEN:
-                    on_option_ltp(ctx, ltp)
+                    on_option_ltp(ctx, _paper_option_price(ctx, ltp))
                 # After 15:30 only update the scalar LTP — never recompute bands/EMA
                 # from the candle buffer, which may contain post-market frozen candles.
                 _tick_counter += 1
@@ -2592,7 +2613,7 @@ def _make_candle_handler_5m(ctx: BotContext):
             and signal is None   # don't double-exit on reversal candle
             and ctx.strategy_type
         ):
-            _opt_ltp = ctx.sensex_ltp if ctx.sensex_ltp > 0 else candle.close
+            _opt_ltp = getattr(ctx, "last_option_ltp", 0.0) or ctx.entry_price
             _unreal = (_opt_ltp - ctx.entry_price) * ctx.quantity
             ai_exit = ctx.ai_confirmation.confirm_exit(
                 signal              = ctx.strategy_type,
@@ -2620,7 +2641,7 @@ def _make_candle_handler_5m(ctx: BotContext):
             smart_reason = ctx.smart_exit.check_on_tick(
                 strategy_type          = ctx.strategy_type,
                 entry_price            = ctx.entry_price,
-                option_ltp             = ctx.sensex_ltp if ctx.sensex_ltp > 0 else candle.close,
+                option_ltp             = getattr(ctx, "last_option_ltp", 0.0) or ctx.entry_price,
                 qty                    = ctx.quantity,
                 daily_realised_pnl_pts = daily_pnl,
                 pending_signal         = signal,
