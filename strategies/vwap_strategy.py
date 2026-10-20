@@ -19,16 +19,20 @@ PE_VWAP signal (bearish retest):
 
 Config knobs (all in settings.py):
     ENABLE_VWAP_STRATEGY        bool   (default False — opt-in)
+    ENABLE_CE_VWAP              bool   (default True — set False to disable CE signals)
+    ENABLE_PE_VWAP              bool   (default True — set False to disable PE signals)
     VWAP_RETEST_LOOKBACK        int    candles to look back for the retest (default 3)
     VWAP_MIN_BOUNCE_PTS         float  minimum distance close must be above/below VWAP (default 0)
     VWAP_MAX_SUBMERGED_CANDLES  int    maximum consecutive candles on opposite side (default 3)
+    VWAP_SLOPE_LOOKBACK         int    candles back for the VWAP-slope check in rule 4 (0 = off)
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import datetime
+from utils.time_utils import today_ist
 
 from market.candle_builder import Candle
 
@@ -53,6 +57,37 @@ def vwap_retest_ts(
     return None
 
 
+def vwap_slope_ok(candles_5m: Sequence[Candle], side: str, lookback: int) -> bool:
+    """
+    Rule 4: CE needs VWAP rising (or flat), PE falling (or flat), comparing the
+    VWAP of today's candles now against *lookback* candles ago.  Uses the same
+    weighting as VWAPCalculator.on_candle (typical price x volume, volume
+    floored at 1 for the volume-less index).  Passes when disabled or when
+    today has too few candles to measure a slope.
+    """
+    if lookback <= 0 or not candles_5m:
+        return True
+    day = candles_5m[-1].timestamp.date()
+    today = [c for c in candles_5m if c.timestamp.date() == day]
+    if len(today) <= lookback:
+        return True
+
+    def _vwap(cs: Sequence[Candle]) -> float:
+        num = den = 0.0
+        for c in cs:
+            vol = c.volume if c.volume > 0 else 1
+            num += (c.high + c.low + c.close) / 3.0 * vol
+            den += vol
+        return num / den
+
+    now, before = _vwap(today), _vwap(today[:-lookback])
+    ok = now >= before if side == "CE" else now <= before
+    if not ok:
+        logger.debug("VWAP %s: slope against signal — VWAP %.2f vs %.2f %d candles ago",
+                     side, now, before, lookback)
+    return ok
+
+
 def is_vwap_ce_signal(
     candles_5m: Sequence[Candle],
     vwap: float | None,
@@ -60,6 +95,7 @@ def is_vwap_ce_signal(
     retest_lookback: int = 3,
     min_bounce_pts: float = 0.0,
     max_submerged_candles: int = 3,
+    slope_lookback: int = 0,
 ) -> bool:
     """
     Return True when:
@@ -69,6 +105,7 @@ def is_vwap_ce_signal(
       3. The current (latest) candle closes ABOVE VWAP.
       4. Current close > previous candle high (momentum confirmation).
       5. Close is at least min_bounce_pts above VWAP.
+      6. VWAP is rising or flat (slope_lookback > 0).
     """
     if vwap is None or vwap <= 0:
         return False
@@ -78,7 +115,7 @@ def is_vwap_ce_signal(
     c0 = candles_5m[-1]
     c1 = candles_5m[-2]
 
-    if c0.timestamp.date() != date.today():
+    if c0.timestamp.date() != today_ist():
         return False
 
     # Current candle must close above VWAP
@@ -93,6 +130,8 @@ def is_vwap_ce_signal(
     if min_bounce_pts > 0 and (c0.close - vwap) < min_bounce_pts:
         return False
 
+    if not vwap_slope_ok(candles_5m, "CE", slope_lookback):
+        return False
     # At least one candle in the lookback window must have closed below VWAP
     if vwap_retest_ts(candles_5m, vwap, "CE", retest_lookback) is None:
         logger.debug(
@@ -127,6 +166,7 @@ def is_vwap_pe_signal(
     retest_lookback: int = 3,
     min_bounce_pts: float = 0.0,
     max_submerged_candles: int = 3,
+    slope_lookback: int = 0,
 ) -> bool:
     """
     Return True when:
@@ -136,6 +176,7 @@ def is_vwap_pe_signal(
       3. The current (latest) candle closes BELOW VWAP.
       4. Current close < previous candle low (momentum confirmation).
       5. Close is at least min_bounce_pts below VWAP.
+      6. VWAP is falling or flat (slope_lookback > 0).
     """
     if vwap is None or vwap <= 0:
         return False
@@ -145,7 +186,7 @@ def is_vwap_pe_signal(
     c0 = candles_5m[-1]
     c1 = candles_5m[-2]
 
-    if c0.timestamp.date() != date.today():
+    if c0.timestamp.date() != today_ist():
         return False
 
     # Current candle must close below VWAP
@@ -160,6 +201,8 @@ def is_vwap_pe_signal(
     if min_bounce_pts > 0 and (vwap - c0.close) < min_bounce_pts:
         return False
 
+    if not vwap_slope_ok(candles_5m, "PE", slope_lookback):
+        return False
     # At least one candle in the lookback window must have closed above VWAP
     if vwap_retest_ts(candles_5m, vwap, "PE", retest_lookback) is None:
         logger.debug(

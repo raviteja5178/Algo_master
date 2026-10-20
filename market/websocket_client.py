@@ -56,6 +56,11 @@ class WebSocketClient:
         self._ticker: KiteTicker | None = None
         self._tokens: set[int] = set()          # ALL subscribed tokens (including index)
         self._option_tokens: set[int] = set()   # tradable option tokens only (position guard)
+        # Research-only tick feed (order-flow recorder).  Deliberately kept OUT of
+        # _tokens/_option_tokens so it can never influence stale-feed detection,
+        # position guards or the LTP callbacks the trading path uses.
+        self._flow_tokens: set[int] = set()
+        self._flow_sink: Callable[[dict], None] | None = None
         self._ltp_callbacks: list[Callable[[int, float], None]] = []
         self._order_update_callbacks: list[Callable[[dict], None]] = []
         self._stale_callbacks: list[Callable[[], None]] = []
@@ -118,6 +123,26 @@ class WebSocketClient:
                 mode = self._ticker.MODE_FULL if token in _INDEX_TOKENS else self._ticker.MODE_LTP
                 self._ticker.set_mode(mode, [token])
             # If ws is not ready, _on_connect will subscribe all _tokens on connect.
+
+    def add_flow_token(self, token: int, sink: Callable[[dict], None]) -> None:
+        """
+        Subscribe *token* in MODE_FULL and hand every raw tick to *sink*.
+
+        Flow ticks are consumed here and never reach the LTP callbacks, the stale
+        monitor's option clock or the trading handlers.  *sink* runs on the
+        WebSocket thread and must not block (the recorder only enqueues).
+        """
+        self._flow_sink = sink
+        self._flow_tokens.add(token)
+        if self._ticker and self._running:
+            ws_ready = getattr(self._ticker, "ws", None) is not None
+            if ws_ready:
+                try:
+                    self._ticker.subscribe([token])
+                    self._ticker.set_mode(self._ticker.MODE_FULL, [token])
+                except Exception as exc:
+                    logger.warning("Order-flow token subscribe failed (non-critical): %s", exc)
+            # If ws is not ready, _on_connect subscribes it on connect.
 
     def remove_token(self, token: int) -> None:
         self._tokens.discard(token)
@@ -234,6 +259,14 @@ class WebSocketClient:
             if other_tokens:
                 ws.set_mode(ws.MODE_LTP, other_tokens)
                 logger.info("WebSocket MODE_LTP re-subscribed for option tokens: %s", other_tokens)
+        if self._flow_tokens:
+            try:
+                flow = list(self._flow_tokens)
+                ws.subscribe(flow)
+                ws.set_mode(ws.MODE_FULL, flow)
+                logger.info("WebSocket MODE_FULL set for order-flow tokens: %s", flow)
+            except Exception as exc:
+                logger.warning("Order-flow token subscribe failed (non-critical): %s", exc)
         # Restore option-token tracking set so stale monitor and tick handler
         # know which tokens belong to open positions.  This MUST run after
         # subscribe/set_mode so the set is populated before the first tick.
@@ -281,6 +314,15 @@ class WebSocketClient:
             token = tick.get("instrument_token")
             ltp = tick.get("last_price")
             if token is None or ltp is None:
+                continue
+            # Order-flow research feed: hand off and skip all trading-path handling.
+            if token in self._flow_tokens:
+                sink = self._flow_sink
+                if sink is not None:
+                    try:
+                        sink(tick)
+                    except Exception:
+                        pass
                 continue
             # Track option-token ticks separately so SENSEX index ticks do not
             # mask a stale option feed while a position is open.

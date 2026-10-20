@@ -5,7 +5,10 @@ The target reference is a bot-side tracking value.
 It does NOT automatically place a live limit sell order (USE_LIVE_TARGET_ORDER=false default).
 
 Initial reference = entry_price + INITIAL_TARGET_OFFSET_POINTS
-After each trailing step: reference += TARGET_TRAIL_STEP_POINTS
+With ratchet_with_stop=True: after each trailing step, reference += trail step.
+By default the reference stays fixed — ratcheting it alongside the stop keeps
+it permanently out of reach (in ATR-trail mode every tick-level stop update
+counts as a step), so TARGET_HIT could never fire.
 """
 
 from __future__ import annotations
@@ -23,9 +26,11 @@ class DynamicTargetManager:
         entry_price: float,
         initial_offset_points: float = 50.0,
         trail_step_points: float = 10.0,
+        ratchet_with_stop: bool = False,
     ) -> None:
         self.entry_price = entry_price
         self.trail_step_points = trail_step_points
+        self.ratchet_with_stop = ratchet_with_stop
         self.target_reference: float = entry_price + initial_offset_points
         self._last_trail_steps: int = 0
 
@@ -34,6 +39,9 @@ class DynamicTargetManager:
         Called after the trailing stop manager updates its step count.
         Advances the target reference by one trail_step for each new step.
         """
+        if not self.ratchet_with_stop:
+            self._last_trail_steps = trail_steps_completed
+            return
         new_steps = trail_steps_completed - self._last_trail_steps
         if new_steps > 0:
             old_ref = self.target_reference

@@ -7,6 +7,11 @@ Once the 10:00 AM window completes, it monitors 5-minute candle closes for break
     CE_TRB: 5m close crosses ABOVE the 15m high boundary.
     PE_TRB: 5m close crosses BELOW the 15m low boundary.
 
+Only the FIRST breakout per side per day counts (first_breakout_only, default
+on): once a 5m candle has closed beyond the level and price came back, later
+re-crosses of the same level are range whipsaw, not a fresh breakout.
+Signals stop at window_end (TRB_WINDOW_END, default 11:30).
+
 Optional filters (opt-in):
     - Body ratio: breakout candle body / range >= min_body_ratio.
     - Buffer: close must exceed level by ATR(14) * mult.
@@ -16,7 +21,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import date
+from datetime import time
+from utils.time_utils import today_ist
 
 from market.candle_builder import Candle
 from market.indicators import atr_at
@@ -51,6 +57,22 @@ def get_trb_range(candles_15m: Sequence[Candle]) -> tuple[float | None, float | 
 
 
 # ── Internal filter helpers ───────────────────────────────────────────────────
+
+def _is_first_breakout(candles_5m: Sequence[Candle], level: float, direction: int) -> bool:
+    """True when no earlier 5m candle today (from 10:00, before the latest one)
+    already closed beyond *level* in *direction* (+1 above, −1 below)."""
+    day = candles_5m[-1].timestamp.date()
+    for c in candles_5m[:-1]:
+        if c.timestamp.date() != day or (c.timestamp.hour, c.timestamp.minute) < (10, 0):
+            continue
+        if (c.close > level) if direction > 0 else (c.close < level):
+            return False
+    return True
+
+
+def _in_window(c0: Candle, window_end: time | None) -> bool:
+    return window_end is None or c0.timestamp.time() < window_end
+
 
 def _passes_body_filter(c0: Candle, min_body_ratio: float) -> bool:
     """
@@ -106,6 +128,8 @@ def is_trb_ce_signal(
     *,
     min_body_ratio: float = 0.0,
     buffer_atr_mult: float = 0.0,
+    window_end: time | None = None,
+    first_breakout_only: bool = True,
 ) -> bool:
     """
     Return True if the 5m close crosses ABOVE the 9:45 AM 15m candle high.
@@ -117,7 +141,7 @@ def is_trb_ce_signal(
     c1 = candles_5m[-2]
 
     # ── Date guard ─────────────────────────────────────────────────────────────
-    if c0.timestamp.date() != date.today():
+    if c0.timestamp.date() != today_ist():
         return False
 
     # ── Time guard: No trades before or during the 09:45–10:00 anchor candle itself ──
@@ -125,7 +149,7 @@ def is_trb_ce_signal(
     # Therefore, the first 5m candle that can breakout is the 10:00–10:05 candle,
     # which has a timestamp of 10:00 (representing start) or completed close at 10:05.
     ts = (c0.timestamp.hour, c0.timestamp.minute)
-    if ts < (10, 0):
+    if ts < (10, 0) or not _in_window(c0, window_end):
         return False
 
     trb_high, _ = get_trb_range(candles_15m)
@@ -134,6 +158,8 @@ def is_trb_ce_signal(
 
     # ── Crossover check ────────────────────────────────────────────────────────
     if not (c1.close <= trb_high and c0.close > trb_high):
+        return False
+    if first_breakout_only and not _is_first_breakout(candles_5m, trb_high, +1):
         return False
 
     # ── False-breakout filters ─────────────────────────────────────────────────
@@ -152,6 +178,8 @@ def is_trb_pe_signal(
     *,
     min_body_ratio: float = 0.0,
     buffer_atr_mult: float = 0.0,
+    window_end: time | None = None,
+    first_breakout_only: bool = True,
 ) -> bool:
     """
     Return True if the 5m close crosses BELOW the 9:45 AM 15m candle low.
@@ -163,12 +191,12 @@ def is_trb_pe_signal(
     c1 = candles_5m[-2]
 
     # ── Date guard ─────────────────────────────────────────────────────────────
-    if c0.timestamp.date() != date.today():
+    if c0.timestamp.date() != today_ist():
         return False
 
     # ── Time guard: No trades before or during the 09:45–10:00 anchor candle itself ──
     ts = (c0.timestamp.hour, c0.timestamp.minute)
-    if ts < (10, 0):
+    if ts < (10, 0) or not _in_window(c0, window_end):
         return False
 
     _, trb_low = get_trb_range(candles_15m)
@@ -177,6 +205,8 @@ def is_trb_pe_signal(
 
     # ── Crossover check ────────────────────────────────────────────────────────
     if not (c1.close >= trb_low and c0.close < trb_low):
+        return False
+    if first_breakout_only and not _is_first_breakout(candles_5m, trb_low, -1):
         return False
 
     # ── False-breakout filters ─────────────────────────────────────────────────

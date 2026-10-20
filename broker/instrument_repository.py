@@ -10,7 +10,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Literal
 
 from broker.kite_client import get_kite
@@ -61,6 +61,30 @@ def get_sensex_options(
     ]
     result.sort(key=lambda x: float(x.get("strike", 0)))
     return result
+
+
+def get_near_month_future(
+    underlying: str | None = None,
+    min_days_to_expiry: int = 0,
+) -> dict | None:
+    """
+    Nearest-expiry futures contract for *underlying* that is at least
+    *min_days_to_expiry* days from expiry (skips a contract whose liquidity is
+    already rolling to the next month).  Returns None when none is listed.
+    """
+    name = underlying or settings.UNDERLYING
+    earliest = date.today() + timedelta(days=max(0, min_days_to_expiry))
+    candidates = []
+    for i in load_instruments():
+        if i.get("name") != name or i.get("instrument_type") != "FUT":
+            continue
+        exp = _parse_expiry(i.get("expiry"))
+        if exp is not None and exp >= earliest:
+            candidates.append((exp, i))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0])
+    return candidates[0][1]
 
 
 def _parse_expiry(raw) -> date | None:

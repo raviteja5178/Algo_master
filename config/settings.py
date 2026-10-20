@@ -60,10 +60,21 @@ MIN_OPTION_ENTRY_PRICE: float = _getfloat("MIN_OPTION_ENTRY_PRICE", 0.0)
 # ── Risk parameters ───────────────────────────────────────────────────────────
 INITIAL_SL_POINTS: float = _getfloat("INITIAL_SL_POINTS", 30)
 BREAK_EVEN_TRIGGER_POINTS: float = _getfloat("BREAK_EVEN_TRIGGER_POINTS", 30)
+# BE_TRIGGER_RR: move the SL to break-even once the trade is up this many R
+#   (multiple of the SL distance).  Applies to the generic ATR/swing/fixed risk
+#   modes; Pivot and EMA trades use PIVOT_BE_TRIGGER_R / EMA_BE_TRIGGER_R.
+#   0.5 = previous hard-coded behaviour.  BREAK_EVEN_TRIGGER_POINTS is only a
+#   fallback for restarted trades that have no stored be_points.
+BE_TRIGGER_RR: float = _getfloat("BE_TRIGGER_RR", 0.5)
 TRAIL_STEP_POINTS: float = _getfloat("TRAIL_STEP_POINTS", 10)
 
 INITIAL_TARGET_OFFSET_POINTS: float = _getfloat("INITIAL_TARGET_OFFSET_POINTS", 50)
 TARGET_TRAIL_STEP_POINTS: float = _getfloat("TARGET_TRAIL_STEP_POINTS", 10)
+# TARGET_TRAIL_WITH_STOP: raise the target each time the trailing stop steps up.
+#   False (default) keeps the target fixed at entry + target points so it can
+#   actually be hit.  With True the target moves with the stop and, in ATR-trail
+#   mode (one "step" per tick-level stop update), runs away from price.
+TARGET_TRAIL_WITH_STOP: bool = _getbool("TARGET_TRAIL_WITH_STOP", False)
 USE_LIVE_TARGET_ORDER: bool = _getbool("USE_LIVE_TARGET_ORDER", False)
 
 USE_TRAILING_STOP_EXIT: bool = _getbool("USE_TRAILING_STOP_EXIT", True)
@@ -108,6 +119,10 @@ TSL_ATR_PERIOD: int             = _getint("TSL_ATR_PERIOD", 5)
 USE_SWING_SL: bool              = _getbool("USE_SWING_SL", False)
 SWING_SL_LENGTH: int            = _getint("SWING_SL_LENGTH", 10)
 MIN_RR: float                   = _getfloat("MIN_RR", 0.0)
+# MAX_RISK_RUPEES_PER_TRADE: skip an entry (before any order) when its expected
+# loss at the SL — option SL points × quantity (Pivot: index risk × delta × qty)
+# — exceeds this.  EMA CE/PE keep their own EMA_MAX_RISK_RUPEES.  0 = off.
+MAX_RISK_RUPEES_PER_TRADE: float = _getfloat("MAX_RISK_RUPEES_PER_TRADE", 0.0)
 # SWING_SL_MIN_ATR_MULT: Mode D adequacy guard.
 #   If the swing level is so close to entry that the resulting index-point SL
 #   is less than  ATR(SPOT_ATR_PERIOD) × this multiplier, Mode D is treated as
@@ -122,6 +137,14 @@ MIN_RR: float                   = _getfloat("MIN_RR", 0.0)
 #   0.6 = fall through when swing SL index pts < ATR × 0.6  (recommended for SENSEX 5m)
 #   1.0 = fall through unless swing is at least 1 full ATR away  (strict)
 SWING_SL_MIN_ATR_MULT: float    = _getfloat("SWING_SL_MIN_ATR_MULT", 0.0)
+# ATM_DELTA: converts SENSEX index pts -> option premium pts for Mode C/D SL sizing.
+#   0.4 under-sized the option SL (live ATM options moved ~0.5 per index pt), so
+#   trades stopped out on normal noise.  Higher delta = wider option SL/target.
+ATM_DELTA: float                = _getfloat("ATM_DELTA", 0.5)
+# ENTRY_MARGIN_CHECK: LIVE only. Before sending a BUY, ask Kite for the required
+#   margin and skip the entry (logged as ENTRY_REJECTED) when it exceeds the
+#   available balance, instead of letting the broker reject the order.
+ENTRY_MARGIN_CHECK: bool        = _getbool("ENTRY_MARGIN_CHECK", True)
 # MAX_SL_PCT: caps the initial SL at this fraction of the option entry price.
 #   Prevents the swing/ATR SL from being crushed on cheap OTM options.
 #   e.g. entry=128, max_sl_pct=0.50 → SL ceiling = 64 pts (was 35% = 44 pts)
@@ -154,7 +177,15 @@ PROFIT_LOCK_ATR_MULT: float       = _getfloat("PROFIT_LOCK_ATR_MULT", 0.0)
 PROFIT_LOCK_MIN_PCT: float        = _getfloat("PROFIT_LOCK_MIN_PCT", 0.0)
 TIME_DECAY_EXIT_AFTER: str        = _get("TIME_DECAY_EXIT_AFTER", "14:45")
 TIME_DECAY_MIN_PNL_PTS: float     = _getfloat("TIME_DECAY_MIN_PNL_PTS", 20.0)
-DAILY_LOSS_LIMIT_PTS: float       = _getfloat("DAILY_LOSS_LIMIT_PTS", 200.0)
+# UNITS: despite the "_PTS" name this is MONEY (Rs), not index/option points.  It is compared
+# with the sum of realized_pnl for today's closed trades, and realized_pnl is stored as
+# (exit_price - entry_price) x filled_qty.  E.g. 3000 = stop new entries after Rs 3000 of
+# realised loss.  Pivot trades: blocks NEW entries only (an open pivot trade is not closed
+# by it).  EMA trades: also closes an open position (needs ENABLE_SMART_EXIT).
+# Env key is DAILY_LOSS_LIMIT_RUPEES; the legacy key DAILY_LOSS_LIMIT_PTS is still read as a
+# fallback so existing .env files keep working.
+DAILY_LOSS_LIMIT_RUPEES: float    = _getfloat("DAILY_LOSS_LIMIT_RUPEES",
+                                              _getfloat("DAILY_LOSS_LIMIT_PTS", 200.0))
 
 # ── Session ───────────────────────────────────────────────────────────────────
 TIMEZONE: str = _get("TIMEZONE", "Asia/Kolkata")
@@ -519,17 +550,65 @@ TRB_CANDLE_START_TIME: str     = _get("TRB_CANDLE_START_TIME", "09:45")
 TRB_CANDLE_DURATION_MINS: int  = _getint("TRB_CANDLE_DURATION_MINS", 15)
 TRB_MIN_BODY_RATIO: float      = _getfloat("TRB_MIN_BODY_RATIO", 0.0)
 TRB_BUFFER_ATR_MULT: float     = _getfloat("TRB_BUFFER_ATR_MULT", 0.0)
+# Only the first breakout per side per day counts; re-crosses are range whipsaw
+# (a 270-day replay without this fired ~3 TRB signals/day at −0.20R net each).
+TRB_FIRST_BREAKOUT_ONLY: bool  = _getbool("TRB_FIRST_BREAKOUT_ONLY", True)
+# No TRB signals at/after this time ("" = no cut-off).
+TRB_WINDOW_END: str            = _get("TRB_WINDOW_END", "11:30")
 
 # ── VWAP Retest strategy ──────────────────────────────────────────────────────
 # Fires CE_VWAP/PE_VWAP when price retests VWAP and bounces back.
 # VWAP is calculated intraday from completed 5m candles (resets at 09:15).
 ENABLE_VWAP_STRATEGY: bool    = _getbool("ENABLE_VWAP_STRATEGY", False)
+# Enable / disable CE (Call) and PE (Put) VWAP entries independently (default True)
+ENABLE_CE_VWAP: bool          = _getbool("ENABLE_CE_VWAP", True)
+ENABLE_PE_VWAP: bool          = _getbool("ENABLE_PE_VWAP", True)
 # Candles to look back for the retest dip/pop (default 3 = 15 minutes)
 VWAP_RETEST_LOOKBACK: int     = _getint("VWAP_RETEST_LOOKBACK", 3)
 # Minimum distance close must be above/below VWAP to confirm bounce (0 = disabled)
 VWAP_MIN_BOUNCE_PTS: float    = _getfloat("VWAP_MIN_BOUNCE_PTS", 0.0)
 # Maximum consecutive candles price can stay on the opposite side of VWAP before bouncing (0 = disabled)
 VWAP_MAX_SUBMERGED_CANDLES: int = _getint("VWAP_MAX_SUBMERGED_CANDLES", 3)
+# VWAP slope guard: CE needs VWAP rising (or flat) and PE falling (or flat)
+# versus N completed candles ago, computed from today's candles.  0 = disabled.
+VWAP_SLOPE_LOOKBACK: int      = _getint("VWAP_SLOPE_LOOKBACK", 3)
+# No new VWAP entries on candles starting at/after this time ("" = no cut-off).
+VWAP_NO_NEW_ENTRY_AFTER: str  = _get("VWAP_NO_NEW_ENTRY_AFTER", "")
+
+# ── Higher-timeframe trend gate (strategies/trend_gate.py) ─────────────────────
+# Blocks signals that fight the 15m trend and/or the daily trend, for the
+# strategies listed in TREND_GATE_STRATEGIES only (keys: EMA, VWAP, TRB, NATR,
+# ATR, PDHL, OB, ORB, MOM).  Do NOT add PIVOT: its edge comes from level entries
+# taken against short-term momentum (backtest: gating would cut ~55% of its R).
+# ── Index-anchored exits for generic strategies ───────────────────────────────
+# GENERIC_INDEX_EXITS: manage VWAP/ORB/NATR/ATR/PDHL/TRB/OB/MOM trades on SENSEX
+#   levels (execution.ema_trade_manager.IndexTradeManager) like Pivot/EMA do:
+#   SL at the swing/ATR index stop, BE at BE_TRIGGER_RR, chandelier trail
+#   GENERIC_TRAIL_ATR_MULT × ATR(TSL_ATR_PERIOD), exit at the index target.
+#   The broker option SL is a GENERIC_HARD_SL_CUSHION-wider backstop.
+#   Off = previous behaviour (option-premium SL/TSL via an assumed delta).
+GENERIC_INDEX_EXITS: bool       = _getbool("GENERIC_INDEX_EXITS", False)
+GENERIC_TRAIL_ATR_MULT: float   = _getfloat("GENERIC_TRAIL_ATR_MULT", 2.0)
+# Break-even stop sits this many index pts beyond entry (≈ round-trip costs).
+GENERIC_BE_BUFFER_PTS: float    = _getfloat("GENERIC_BE_BUFFER_PTS", 12.0)
+GENERIC_HARD_SL_CUSHION: float  = _getfloat("GENERIC_HARD_SL_CUSHION", 1.5)
+
+TREND_GATE_15M: bool               = _getbool("TREND_GATE_15M", False)
+TREND_GATE_DAILY: bool             = _getbool("TREND_GATE_DAILY", False)
+TREND_GATE_DAILY_EMA: int          = _getint("TREND_GATE_DAILY_EMA", 20)
+TREND_GATE_STRATEGIES: frozenset[str] = frozenset(
+    s.strip().upper() for s in _get("TREND_GATE_STRATEGIES", "EMA,VWAP,TRB,NATR").split(",") if s.strip()
+)
+# Support/resistance room filter for VWAP entries (OFF by default).
+# A 193-day replay showed no robust edge (helps PE, hurts CE, unstable across
+# halves), so it ships opt-in only.  When on, a CE is blocked if the nearest
+# resistance above the close is < VWAP_LEVEL_MIN_ROOM_ATR x ATR(14) away
+# (PE: nearest support below).  VWAP_LEVEL_USE_PIVOTS / _DAY_EXTREMES choose
+# which levels count; prev-day high/low are always included.
+ENABLE_VWAP_LEVEL_FILTER: bool    = _getbool("ENABLE_VWAP_LEVEL_FILTER", False)
+VWAP_LEVEL_MIN_ROOM_ATR: float    = _getfloat("VWAP_LEVEL_MIN_ROOM_ATR", 1.0)
+VWAP_LEVEL_USE_PIVOTS: bool       = _getbool("VWAP_LEVEL_USE_PIVOTS", True)
+VWAP_LEVEL_USE_DAY_EXTREMES: bool = _getbool("VWAP_LEVEL_USE_DAY_EXTREMES", True)
 
 # ── Pivot Levels ─────────────────────────────────────────────────────────────
 # Pivot levels computed from previous day's H/L/C.
@@ -587,7 +666,9 @@ PIVOT_SUSTAIN_CANDLES: int      = _getint("PIVOT_SUSTAIN_CANDLES", 2)
 PIVOT_ATR_PERIOD: int           = _getint("PIVOT_ATR_PERIOD", 14)
 PIVOT_SL_MODE: str              = _get("PIVOT_SL_MODE", "SIGNAL_LOW").upper()   # SIGNAL_LOW | ATR
 PIVOT_SL_ATR_MULT: float        = _getfloat("PIVOT_SL_ATR_MULT", 1.0)          # ATR mode only
-PIVOT_SL_BUFFER_ATR: float      = _getfloat("PIVOT_SL_BUFFER_ATR", 0.05)       # SIGNAL_LOW padding
+# SIGNAL_LOW padding.  0.3 (was 0.05): a 1-year replay (research/pivot_sensitivity.py)
+# showed +14% total points and a better CE side; the stop is wider, so each loss is larger.
+PIVOT_SL_BUFFER_ATR: float      = _getfloat("PIVOT_SL_BUFFER_ATR", 0.3)
 PIVOT_MIN_ROOM_R: float         = _getfloat("PIVOT_MIN_ROOM_R", 1.0)           # T1 distance >= this × risk
 # Minimum today-candles before pivot signal is allowed.
 # For REJECTION mode: must be > PIVOT_SUSTAIN_CANDLES (at least 1 pre-window candle needed).
@@ -636,6 +717,23 @@ PIVOT_REJECTION_ZONE_ATR: float = _getfloat("PIVOT_REJECTION_ZONE_ATR", 0.3)
 #   Catches trend days where the cross candle wicks back through Pivot
 #   (Oct 9 2026).  false = disabled (legacy behaviour).
 PIVOT_ACCEPTANCE: bool          = _getbool("PIVOT_ACCEPTANCE", False)
+# Acceptance (Mode C) quality guards.  Two candles closing 1-2 pts beyond the Pivot
+# are noise when price is hovering on it (Oct 19 2026: both PE_PIVOT acceptance
+# entries were stopped out within 7 / 25 minutes).
+#   PIVOT_ACCEPT_MIN_DIST_ATR  : signal close must be >= this x ATR beyond the Pivot.
+#   PIVOT_ACCEPT_MIN_ROOM_R    : T1 room must be >= this x risk (acceptance only;
+#                                overrides PIVOT_MIN_ROOM_R when larger).
+#   PIVOT_ACCEPT_BLOCK_REGIMES : comma list of intraday regimes (market_regime.py)
+#                                in which acceptance is skipped.  Empty = no gate (default).
+#   PIVOT_ACCEPT_MAX_PER_SIDE  : max acceptance signals per side per day (0 = no cap, default).
+# The regime and per-side gates are OFF by default: a 400-day index backtest showed they
+# cut total R (CHOPPY block 54 -> 17.5R, 1-per-side 54 -> 35R); distance + room held up.
+PIVOT_ACCEPT_MIN_DIST_ATR: float = _getfloat("PIVOT_ACCEPT_MIN_DIST_ATR", 0.5)
+PIVOT_ACCEPT_MIN_ROOM_R: float   = _getfloat("PIVOT_ACCEPT_MIN_ROOM_R", 1.5)
+PIVOT_ACCEPT_BLOCK_REGIMES: frozenset[str] = frozenset(
+    s.strip().upper() for s in _get("PIVOT_ACCEPT_BLOCK_REGIMES", "").split(",") if s.strip()
+)
+PIVOT_ACCEPT_MAX_PER_SIDE: int   = _getint("PIVOT_ACCEPT_MAX_PER_SIDE", 0)
 # PIVOT_BOUNCE_ZONE_ATR: support-bounce (CE) / resistance-rejection (PE) at
 #   every pivot level S3..R3.  Zone half-width = this × ATR; the signal candle
 #   must wick into the zone and close back on its approach side with a
@@ -655,13 +753,15 @@ PIVOT_BOUNCE_MIN_RANGE_ATR: float = _getfloat("PIVOT_BOUNCE_MIN_RANGE_ATR", 0.0)
 PIVOT_BOUNCE_MIN_WICK_PCT: float  = _getfloat("PIVOT_BOUNCE_MIN_WICK_PCT", 0.0)
 PIVOT_BOUNCE_TREND_EMA: int       = _getint("PIVOT_BOUNCE_TREND_EMA", 0)
 PIVOT_BOUNCE_CONFIRM_NEXT: bool   = _getbool("PIVOT_BOUNCE_CONFIRM_NEXT", False)
-PIVOT_BE_TRIGGER_R: float       = _getfloat("PIVOT_BE_TRIGGER_R", 1.0)         # move to BE after +1R
+# Move to breakeven after +N R.  1.5 (was 1.0): replay showed +10% total points; win rate
+# drops (58% -> ~50%) because fewer trades are protected early.
+PIVOT_BE_TRIGGER_R: float       = _getfloat("PIVOT_BE_TRIGGER_R", 1.5)
 PIVOT_BE_BUFFER_PTS: float      = _getfloat("PIVOT_BE_BUFFER_PTS", 5.0)        # index pts above entry at BE
 PIVOT_T1_LOCK_PCT: float        = _getfloat("PIVOT_T1_LOCK_PCT", 0.5)          # lock 50% of T1 gain at T1
 PIVOT_T2_LOCK_PCT: float        = _getfloat("PIVOT_T2_LOCK_PCT", 0.5)          # lock 50% of T1→T2 range at T2
 PIVOT_TRAIL_ATR_MULT: float     = _getfloat("PIVOT_TRAIL_ATR_MULT", 1.0)       # chandelier after T1
 PIVOT_T2_TRAIL_ATR_MULT: float  = _getfloat("PIVOT_T2_TRAIL_ATR_MULT", 0.75)   # tighter trail after T2 (0=same)
-PIVOT_HARD_SL_CUSHION: float    = _getfloat("PIVOT_HARD_SL_CUSHION", 1.25)     # broker SL backstop width
+PIVOT_HARD_SL_CUSHION: float    = _getfloat("PIVOT_HARD_SL_CUSHION", 1.75)     # broker SL backstop width
 PIVOT_OPTION_DELTA: float       = _getfloat("PIVOT_OPTION_DELTA", 0.4)
 PIVOT_MAX_TRADES_PER_DAY: int   = _getint("PIVOT_MAX_TRADES_PER_DAY", 3)
 
@@ -770,6 +870,20 @@ INTRADAY_REGIME_ER_CHOPPY: float    = _getfloat("INTRADAY_REGIME_ER_CHOPPY", 0.3
 INTRADAY_REGIME_ADX_TRENDING: float = _getfloat("INTRADAY_REGIME_ADX_TRENDING", 25.0)
 INTRADAY_REGIME_VOL_RATIO: float    = _getfloat("INTRADAY_REGIME_VOL_RATIO", 1.5)  # ATR / baseline ATR
 
+# ── Order-flow tick recorder (research data collection, default OFF) ──────────
+# Subscribes the near-month SENSEX future in MODE_FULL (separate from the trading
+# tokens) and writes ticks + 5-level depth to daily CSVs for offline order-flow
+# research.  Never read by any entry/exit logic.  LIVE/SHADOW only (needs the
+# WebSocket); ignored in PAPER.
+#   ORDERFLOW_RECORD_DIR            : output folder ("" = research/data/orderflow)
+#   ORDERFLOW_DEPTH_SAMPLE_SECONDS  : also store a depth row after this much quiet time
+#   ORDERFLOW_FUT_MIN_DAYS_TO_EXPIRY: roll to the next-month contract this many days
+#                                     before expiry (liquidity migrates early)
+ENABLE_ORDERFLOW_RECORDER: bool            = _getbool("ENABLE_ORDERFLOW_RECORDER", False)
+ORDERFLOW_RECORD_DIR: str                  = _get("ORDERFLOW_RECORD_DIR", "")
+ORDERFLOW_DEPTH_SAMPLE_SECONDS: float      = _getfloat("ORDERFLOW_DEPTH_SAMPLE_SECONDS", 1.0)
+ORDERFLOW_FUT_MIN_DAYS_TO_EXPIRY: int      = _getint("ORDERFLOW_FUT_MIN_DAYS_TO_EXPIRY", 3)
+
 # ── Validation ────────────────────────────────────────────────────────────────
 ALLOWED_MODES = {"PAPER", "SHADOW", "LIVE"}
 
@@ -838,9 +952,9 @@ def validate() -> None:
             "Set a positive threshold (e.g. TIME_DECAY_MIN_PNL_PTS=20.0) or "
             "disable the feature with ENABLE_TIME_DECAY_EXIT=false."
         )
-    if ENABLE_DAILY_LOSS_LIMIT and DAILY_LOSS_LIMIT_PTS <= 0:
+    if ENABLE_DAILY_LOSS_LIMIT and DAILY_LOSS_LIMIT_RUPEES <= 0:
         raise ValueError(
-            "ENABLE_DAILY_LOSS_LIMIT=true but DAILY_LOSS_LIMIT_PTS is missing or zero. "
-            "Set a positive loss cap (e.g. DAILY_LOSS_LIMIT_PTS=200.0) or "
+            "ENABLE_DAILY_LOSS_LIMIT=true but DAILY_LOSS_LIMIT_RUPEES is missing or zero. "
+            "Set a positive loss cap in RUPEES (e.g. DAILY_LOSS_LIMIT_RUPEES=3000) or "
             "disable the feature with ENABLE_DAILY_LOSS_LIMIT=false."
         )

@@ -146,10 +146,14 @@ class TestCEStrategy:
                         bounce_close - 1, bounce_close)
         return c5, e21_final
 
-    def test_pullback_on_ema21_fires(self):
-        # Genuine pullback: dip low touches EMA21, prior candle above EMA9, bounce on EMA21.
+    def test_candle_falling_into_ema21_does_not_fire(self):
+        # This series' last candle closes ~40 pts BELOW the prior close: it is
+        # still falling from EMA9 to EMA21.  That is the dip, not the bounce,
+        # so the pullback trigger must not fire (genuine bounces are covered in
+        # test_strategy_review_fixes.TestEmaPullbackConfirmation).
         c5, _ = self._make_pullback_series()
-        assert is_ce_signal(c5, _uptrend_15m(), pullback_tol_pts=10.0) is True
+        assert c5[-1].close < c5[-2].close
+        assert is_ce_signal(c5, _uptrend_15m(), pullback_tol_pts=10.0) is False
 
     def test_pullback_blocked_when_prior_candle_did_not_dip_to_ema21(self):
         # Prior candle's low stays 20pts above EMA21 — no genuine touch of the level.

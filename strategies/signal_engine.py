@@ -29,11 +29,14 @@ import logging
 import threading
 from collections.abc import Sequence
 from datetime import datetime, time
+from utils.time_utils import today_ist
+from strategies.trend_gate import daily_trend_ok, strategy_key, trend_15m_ok
 from typing import Literal
 
 from config import settings
 from market.candle_builder import Candle
 from market.historical_data import PivotLevels
+from market.indicators import atr_at
 from persistence.trade_store import claim_signal_atomic, has_processed_signal, record_processed_signal
 from strategies.ce_strategy import is_ce_signal
 from strategies.pe_strategy import is_pe_signal
@@ -123,6 +126,12 @@ def consume_pivot_setup():
         return setup
 
 
+def peek_pivot_setup():
+    """Read the pending pivot setup WITHOUT clearing it (pre-order risk checks)."""
+    with _pivot_setup_lock:
+        return _last_pivot_setup
+
+
 # FIX (Flaw 17): _pivot_trades_today is seeded from the DB on first access
 # so a bot restart mid-day does not reset the counter to 0.
 _pivot_trades_today: dict[str, int] = {}
@@ -146,6 +155,21 @@ def _seed_pivot_count(day: str) -> None:
 def note_pivot_trade(day: str) -> None:
     """Count a filled Pivot trade toward PIVOT_MAX_TRADES_PER_DAY."""
     _pivot_trades_today[day] = _pivot_trades_today.get(day, 0) + 1
+
+
+# Acceptance (Mode C) signals claimed per (day, side) — PIVOT_ACCEPT_MAX_PER_SIDE.
+# In-memory only (a restart clears it — fails open, like the momentum cooldown).
+_pivot_accept_count: dict[tuple[str, str], int] = {}
+
+
+def _pivot_accept_blocked_sides(day: str) -> frozenset[str]:
+    """Sides whose acceptance signal cap is already used up today."""
+    cap = settings.PIVOT_ACCEPT_MAX_PER_SIDE
+    if cap <= 0:
+        return frozenset()
+    return frozenset(
+        side for side in ("CE", "PE") if _pivot_accept_count.get((day, side), 0) >= cap
+    )
 
 
 # ── Momentum guards: per-day trade cap + same-direction re-entry cooldown ─────
@@ -281,6 +305,7 @@ def evaluate_signals(
     atr: float | None = None,
     regime: str = "UNKNOWN",
     *,
+    intraday_regime: str | None = None,   # market_regime.classify_intraday().regime
     orb_fired_today: bool = False,
     orb_direction_today: str | None = None,
     # Option premium context — forwarded to AI confirmation so the LLM can
@@ -291,6 +316,8 @@ def evaluate_signals(
     option_ltp: float | None = None,
     option_day_low: float | None = None,
     option_day_high: float | None = None,
+    # Higher-timeframe trend from main ("UP" / "DOWN" / "UNKNOWN" / None)
+    daily_trend: str | None = None,
 ) -> SignalType:
     """
     Evaluate CE and PE rules on the latest completed candles.
@@ -314,8 +341,7 @@ def evaluate_signals(
     # The candle aggregator is seeded with historical data from previous days.
     # Never evaluate signals on a candle whose date is not today — that would
     # mean firing on yesterday's EMA state rather than the live session.
-    from datetime import date as _date
-    if latest_5m_ts.date() != _date.today():
+    if latest_5m_ts.date() != today_ist():
         return None
 
     # ── ORB Session Qualifier update ───────────────────────────────────────────
@@ -367,6 +393,18 @@ def evaluate_signals(
             log_event(logger, "GLOBAL_SIDE_CAP_BLOCKED",
                       signal=sig, side=_sig_side, reason=_side_blk)
             return None
+        # ── Higher-timeframe trend gate (trend-following strategies only) ──────
+        if (settings.TREND_GATE_15M or settings.TREND_GATE_DAILY) \
+                and strategy_key(sig) in settings.TREND_GATE_STRATEGIES:
+            _why = None
+            if settings.TREND_GATE_15M and not trend_15m_ok(_sig_side, candles_15m):
+                _why = "against 15m trend (close/EMA21 slope)"
+            elif settings.TREND_GATE_DAILY and not daily_trend_ok(_sig_side, daily_trend):
+                _why = f"against daily trend ({daily_trend})"
+            if _why:
+                log_event(logger, "TREND_GATE_BLOCKED", signal=sig, side=_sig_side,
+                          reason=_why, daily_trend=daily_trend)
+                return None
         # Rule-based quality gate.
         # EMA CE/PE with EMA_SKIP_SMART_FILTERS: skip the candle filters (the
         # rule-set has its own 15m trend + RSI) but keep the post-loss cooldown.
@@ -491,6 +529,15 @@ def evaluate_signals(
         # mid-day restart does not reset the max-trades guard to 0.
         _seed_pivot_count(_day)
         if _pivot_trades_today.get(_day, 0) < settings.PIVOT_MAX_TRADES_PER_DAY:
+            _accept_on = settings.PIVOT_ACCEPTANCE
+            if (
+                _accept_on
+                and intraday_regime
+                and intraday_regime.upper() in settings.PIVOT_ACCEPT_BLOCK_REGIMES
+            ):
+                _accept_on = False
+                log_event(logger, "PIVOT_ACCEPT_BLOCKED_REGIME",
+                          candle=latest_5m_ts, regime=intraday_regime)
             setup = find_pivot_setup(
                 candles_5m, pivot_levels,
                 sustain_candles=settings.PIVOT_SUSTAIN_CANDLES,
@@ -507,7 +554,10 @@ def evaluate_signals(
                 min_od_gap_atr=settings.PIVOT_OD_MIN_GAP_ATR,
                 first_candle_confirm=settings.PIVOT_OD_FIRST_CANDLE_CONFIRM,
                 max_first_wick_atr=settings.PIVOT_OD_MAX_FIRST_WICK_ATR,
-                enable_acceptance=settings.PIVOT_ACCEPTANCE,
+                enable_acceptance=_accept_on,
+                acceptance_min_dist_atr=settings.PIVOT_ACCEPT_MIN_DIST_ATR,
+                acceptance_min_room_r=settings.PIVOT_ACCEPT_MIN_ROOM_R,
+                acceptance_blocked_sides=_pivot_accept_blocked_sides(_day),
                 bounce_zone_atr=settings.PIVOT_BOUNCE_ZONE_ATR,
                 bounce_min_range_atr=settings.PIVOT_BOUNCE_MIN_RANGE_ATR,
                 bounce_min_wick_pct=settings.PIVOT_BOUNCE_MIN_WICK_PCT,
@@ -531,6 +581,9 @@ def evaluate_signals(
                     # writer, so a concurrent bot process that races here is blocked.
                     if claim_signal_atomic(sig_id, sig_name, latest_5m_ts.isoformat()):
                         _candle_attempted = True
+                        if setup.mode == "ACCEPTANCE":
+                            _k = (_day, setup.side)
+                            _pivot_accept_count[_k] = _pivot_accept_count.get(_k, 0) + 1
                         # FIX (Flaw 15): write setup under the lock so consume_pivot_setup()
                         # in execute_entry always sees a consistent value.
                         with _pivot_setup_lock:
@@ -538,25 +591,58 @@ def evaluate_signals(
                         return sig_name  # type: ignore[return-value]
 
     # ── VWAP Retest strategy ───────────────────────────────────────────────────
-    if settings.ENABLE_VWAP_STRATEGY and not _sq_blocked and not _candle_already_attempted():
+    # VWAP_NO_NEW_ENTRY_AFTER: afternoon VWAP crosses are mostly chop + theta
+    # (270-day replay: net R per trade −0.10 after 12:00, −0.15 after 13:30).
+    if (settings.ENABLE_VWAP_STRATEGY
+            and (not settings.VWAP_NO_NEW_ENTRY_AFTER
+                 or latest_5m_ts.time() < _parse_time(settings.VWAP_NO_NEW_ENTRY_AFTER))
+            and not _sq_blocked and not _candle_already_attempted()):
         from strategies.vwap_strategy import is_vwap_ce_signal, is_vwap_pe_signal
 
         _vwap_kwargs = dict(
             retest_lookback=settings.VWAP_RETEST_LOOKBACK,
             min_bounce_pts=settings.VWAP_MIN_BOUNCE_PTS,
             max_submerged_candles=settings.VWAP_MAX_SUBMERGED_CANDLES,
+            slope_lookback=settings.VWAP_SLOPE_LOOKBACK,
         )
 
-        if is_vwap_ce_signal(candles_5m, vwap, **_vwap_kwargs):
+        def _vwap_level_blocked(side: str) -> bool:
+            """Opt-in S/R room check (ENABLE_VWAP_LEVEL_FILTER)."""
+            if not settings.ENABLE_VWAP_LEVEL_FILTER:
+                return False
+            from strategies.level_filter import collect_levels, level_room_blocked
+            levels = collect_levels(
+                candles_5m,
+                prev_day_high=prev_day_high,
+                prev_day_low=prev_day_low,
+                pivot_levels=pivot_levels,
+                use_pivots=settings.VWAP_LEVEL_USE_PIVOTS,
+                use_day_extremes=settings.VWAP_LEVEL_USE_DAY_EXTREMES,
+            )
+            blocked, level, room = level_room_blocked(
+                side, candles_5m[-1].close, atr_at(candles_5m, period=14),
+                levels, settings.VWAP_LEVEL_MIN_ROOM_ATR,
+            )
+            if blocked:
+                log_event(logger, "VWAP_BLOCKED_LEVEL", side=side, candle=latest_5m_ts,
+                          close=candles_5m[-1].close, level=level,
+                          room_pts=round(room, 1), min_room_atr=settings.VWAP_LEVEL_MIN_ROOM_ATR)
+            return blocked
+
+        if settings.ENABLE_CE_VWAP and is_vwap_ce_signal(candles_5m, vwap, **_vwap_kwargs):
             log_event(logger, "CE_VWAP_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close,
                       vwap=round(vwap, 2) if vwap else None)
-            if (sig := _gate("CE_VWAP")) is not None:
+            if _vwap_level_blocked("CE"):
+                _candle_attempted = True
+            elif (sig := _gate("CE_VWAP")) is not None:
                 return sig
 
-        if not _candle_already_attempted() and is_vwap_pe_signal(candles_5m, vwap, **_vwap_kwargs):
+        if not _candle_already_attempted() and settings.ENABLE_PE_VWAP and is_vwap_pe_signal(candles_5m, vwap, **_vwap_kwargs):
             log_event(logger, "PE_VWAP_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close,
                       vwap=round(vwap, 2) if vwap else None)
-            if (sig := _gate("PE_VWAP")) is not None:
+            if _vwap_level_blocked("PE"):
+                _candle_attempted = True
+            elif (sig := _gate("PE_VWAP")) is not None:
                 return sig
 
     # ── PDHL (Previous Day High/Low) Breakout strategy ─────────────────────────
@@ -622,6 +708,8 @@ def evaluate_signals(
         _trb_kwargs = dict(
             min_body_ratio=settings.TRB_MIN_BODY_RATIO,
             buffer_atr_mult=settings.TRB_BUFFER_ATR_MULT,
+            window_end=_parse_time(settings.TRB_WINDOW_END) if settings.TRB_WINDOW_END else None,
+            first_breakout_only=settings.TRB_FIRST_BREAKOUT_ONLY,
         )
 
         if is_trb_ce_signal(candles_5m, candles_15m, **_trb_kwargs):

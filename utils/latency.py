@@ -89,6 +89,10 @@ class LatencyTracker:
             self.trade_id, checkpoint, self._checkpoints[checkpoint][0],
         )
 
+    def mark_at(self, checkpoint: str, wall_iso: str, monotonic_ns: int) -> None:
+        """Back-fill a checkpoint captured earlier (wall clock + monotonic ns)."""
+        self._checkpoints[checkpoint] = (wall_iso, monotonic_ns)
+
     def set_price(self, key: str, value: float) -> None:
         """Store a price observation for slippage analysis."""
         self._prices[key] = value

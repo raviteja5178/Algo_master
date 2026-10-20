@@ -1,0 +1,21 @@
+<meta name="dashboard-token" content="{{ dashboard_token }}">
+<script>
+// Attach the dashboard token to every same-origin state-changing fetch().
+// The server rejects POST/PUT/PATCH/DELETE requests without it.
+(function () {
+  var token = {{ dashboard_token|tojson }};
+  var header = {{ dashboard_token_header|tojson }};
+  var origFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    init = init || {};
+    var method = (init.method || (input && input.method) || 'GET').toUpperCase();
+    var url = new URL(typeof input === 'string' ? input : input.url, window.location.href);
+    if (method !== 'GET' && method !== 'HEAD' && url.origin === window.location.origin) {
+      var headers = new Headers(init.headers || (typeof input !== 'string' && input.headers) || {});
+      headers.set(header, token);
+      init = Object.assign({}, init, { headers: headers });
+    }
+    return origFetch(input, init);
+  };
+})();
+</script>

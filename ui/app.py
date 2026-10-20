@@ -77,6 +77,46 @@ app.jinja_loader = _jinja2.FileSystemLoader(
 )
 
 
+# ── Access control ────────────────────────────────────────────────────────────
+# The dashboard can switch TRADING_MODE to LIVE, change QUANTITY and start the
+# bot, so it is bound to loopback only and every state-changing request must
+# carry the per-process token.  Pages get the token through the
+# _dashboard_auth.html include, which adds it to same-origin fetch() calls.
+# A cross-site page cannot set the custom header without a CORS preflight
+# (which is never granted), and the Host check defeats DNS rebinding.
+import hmac as _hmac
+import secrets as _secrets
+
+DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "127.0.0.1")
+DASHBOARD_TOKEN = os.getenv("DASHBOARD_TOKEN") or _secrets.token_urlsafe(32)
+_TOKEN_HEADER = "X-Dashboard-Token"
+_ALLOWED_HOSTS = {"127.0.0.1", "localhost", "[::1]", "::1"}
+_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _request_hostname() -> str:
+    host = (request.host or "").lower()
+    if host.startswith("["):                     # IPv6 literal, e.g. [::1]:5000
+        return host.split("]", 1)[0] + "]"
+    return host.rsplit(":", 1)[0] if ":" in host else host
+
+
+@app.before_request
+def _require_local_and_token():
+    if _request_hostname() not in _ALLOWED_HOSTS:
+        return jsonify({"ok": False, "error": "forbidden host"}), 403
+    if request.method in _MUTATING_METHODS:
+        supplied = request.headers.get(_TOKEN_HEADER, "")
+        if not supplied or not _hmac.compare_digest(supplied, DASHBOARD_TOKEN):
+            return jsonify({"ok": False, "error": "missing or invalid dashboard token"}), 403
+    return None
+
+
+@app.context_processor
+def _inject_dashboard_token():
+    return {"dashboard_token": DASHBOARD_TOKEN, "dashboard_token_header": _TOKEN_HEADER}
+
+
 @app.after_request
 def _force_utf8(response):
     """Ensure every response is sent as UTF-8 and never cached by the browser.
@@ -165,15 +205,26 @@ def _check_token_validity_cached():
 
 # ── Bot subprocess management ─────────────────────────────────────────────────
 
+from utils.process_control import (
+    is_paused, kill_tree, pause_bot, resume_bot, stop_bot_processes, wait_until_released,
+)
+from utils.process_lock import acquire_process_lock, is_lock_held
+
 _bot_proc: subprocess.Popen | None = None
 _bot_lock = threading.Lock()
 _BOT_LOG = ROOT / "bot.log"
 _BOT_PID_FILE = ROOT / ".bot.pid"
 
 
-def _start_bot_proc() -> bool:
-    """Launch main.py as a subprocess. Returns True if started, False if already running."""
+def _start_bot_proc(auto: bool = False) -> bool:
+    """
+    Launch main.py as a subprocess. Returns True if started, False if already
+    running — or, for automatic starts (watchdog, login), while a manual Stop
+    has paused the bot.
+    """
     global _bot_proc
+    if auto and is_paused():
+        return False
     if _is_bot_running():
         return False
     proc = subprocess.Popen(
@@ -191,7 +242,7 @@ def _start_bot_proc() -> bool:
 def _watchdog() -> None:
     """
     Background thread: every 30 s, if the Kite token is valid but the bot
-    is not running, auto-restart it.  This keeps the bot alive across Flask
+    is not running, auto-restart it — unless a manual Stop paused it.  This keeps the bot alive across Flask
     restarts, crashes, and initial dashboard loads where the token is already
     persisted in .env.
     """
@@ -200,8 +251,8 @@ def _watchdog() -> None:
     while True:
         try:
             tok = _check_token_validity_cached()
-            if tok.get("is_valid") and not _is_bot_running():
-                _start_bot_proc()
+            if tok.get("is_valid") and not is_paused() and not _is_bot_running():
+                _start_bot_proc(auto=True)
         except Exception:
             pass
         time.sleep(30)
@@ -264,8 +315,11 @@ def _pid_is_alive(pid: int) -> bool:
 
 
 def _is_bot_running() -> bool:
-    """Check in-memory handle, then PID file, then recent log activity."""
+    """Check the bot's process lock, then the in-memory handle, then the PID file."""
     global _bot_proc
+    # The bot lock is held by main.py however it was started (UI, launcher, terminal)
+    if is_lock_held("bot"):
+        return True
     # In-memory handle (same Flask process lifecycle)
     with _bot_lock:
         if _bot_proc is not None:
@@ -279,41 +333,27 @@ def _is_bot_running() -> bool:
     # PID file is stale — clean it up
     if pid:
         _clear_pid()
-    # Fallback: if bot.log was written to within the last 5 minutes,
-    # the bot is running externally (started from terminal, not via UI).
-    if _BOT_LOG.exists():
-        import time as _time
-        age_secs = _time.time() - _BOT_LOG.stat().st_mtime
-        if age_secs < 300:  # 5 minutes
-            return True
     return False
 
 
 def _stop_bot() -> bool:
-    """Terminate bot process via in-memory handle or PID file. Returns True if killed."""
+    """Kill the bot's whole process tree (venv launcher + interpreter). Returns True if killed."""
     global _bot_proc
     killed = False
     with _bot_lock:
         if _bot_proc is not None:
             _bot_proc.poll()
             if _bot_proc.returncode is None:
-                _bot_proc.terminate()
-                killed = True
+                killed |= kill_tree(_bot_proc.pid)
             _bot_proc = None
-    # Also kill via PID file in case Flask was restarted
+    # Also the lock holder + PID file, for bots started by an earlier dashboard,
+    # the launcher, or a terminal
     pid = _read_pid()
     if pid and _pid_is_alive(pid):
-        try:
-            import signal as _signal
-            os.kill(pid, _signal.SIGTERM)
-            killed = True
-        except Exception:
-            try:
-                subprocess.call(["taskkill", "/PID", str(pid), "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                killed = True
-            except Exception:
-                pass
+        killed |= kill_tree(pid)
+    killed |= stop_bot_processes()
     _clear_pid()
+    wait_until_released("bot")
     return killed
 
 
@@ -413,6 +453,7 @@ def api_status():
 
     return jsonify({
         "bot_running": bot_running,
+        "bot_paused": is_paused(),
         "trading_mode": env.get("TRADING_MODE", "PAPER"),
         "active_trade": active_trade,
         "server_time": datetime.now(timezone.utc).isoformat(),
@@ -884,11 +925,173 @@ def api_shadow_active():
 def shadow_results_page():
     return render_template("shadow_results.html")
 
+# ── API: LIVE bot orders (incl. rejected) ─────────────────────────────────────
+
+_LIVE_TRADE_SQL = (
+    "trade_mode='LIVE' AND (entry_order_id IS NULL OR entry_order_id NOT LIKE 'PAPER_%')"
+)
+
+
+@app.get("/api/live/trades")
+def api_live_trades():
+    """LIVE trades with ATR / SL / BE / TSL / Target detail.  Query: date=YYYY-MM-DD."""
+    date_filter = request.args.get("date", "").strip() or None
+    con = _conn()
+    if not con:
+        return jsonify([])
+    try:
+        if date_filter:
+            rows = con.execute(
+                f"SELECT * FROM trades WHERE {_LIVE_TRADE_SQL} AND entry_time LIKE ? "
+                "ORDER BY created_at DESC LIMIT 500",
+                (f"{date_filter}%",),
+            ).fetchall()
+        else:
+            rows = con.execute(
+                f"SELECT * FROM trades WHERE {_LIVE_TRADE_SQL} "
+                "ORDER BY created_at DESC LIMIT 500"
+            ).fetchall()
+    finally:
+        con.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.get("/api/live/dates")
+def api_live_dates():
+    """Distinct dates having LIVE trades or LIVE order events (incl. rejected), newest first."""
+    con = _conn()
+    if not con:
+        return jsonify([])
+    try:
+        dates = {
+            r["d"] for r in con.execute(
+                f"SELECT DISTINCT substr(entry_time,1,10) AS d FROM trades "
+                f"WHERE {_LIVE_TRADE_SQL} AND entry_time IS NOT NULL"
+            ).fetchall() if r["d"]
+        }
+        try:
+            dates |= {
+                r["d"] for r in con.execute(
+                    "SELECT DISTINCT substr(ts,1,10) AS d FROM live_order_events"
+                ).fetchall() if r["d"]
+            }
+        except sqlite3.OperationalError:
+            pass   # events table not created yet (bot not started since upgrade)
+    finally:
+        con.close()
+    return jsonify(sorted(dates, reverse=True))
+
+
+@app.get("/api/live/events")
+def api_live_events():
+    """
+    LIVE order-event history (ENTRY_SENT / ENTRY_REJECTED / ENTRY_FILLED / SL_PLACED /
+    SL_MODIFIED / BREAK_EVEN / EXIT_FILLED ...), newest first.
+    Query: date=YYYY-MM-DD, trade_id=..., type=ENTRY_REJECTED
+    """
+    date_filter = request.args.get("date", "").strip() or None
+    trade_id    = request.args.get("trade_id", "").strip() or None
+    ev_type     = request.args.get("type", "").strip() or None
+    con = _conn()
+    if not con:
+        return jsonify([])
+    where, params = [], []
+    if date_filter:
+        where.append("ts LIKE ?"); params.append(f"{date_filter}%")
+    if trade_id:
+        where.append("trade_id = ?"); params.append(trade_id)
+    if ev_type:
+        where.append("event_type = ?"); params.append(ev_type)
+    sql = "SELECT * FROM live_order_events"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY id DESC LIMIT 2000"
+    try:
+        rows = con.execute(sql, params).fetchall()
+    except sqlite3.OperationalError:
+        return jsonify([])
+    finally:
+        con.close()
+    out = []
+    for r in rows:
+        d = dict(r)
+        if d.get("extra"):
+            try:
+                d["extra"] = json.loads(d["extra"])
+            except Exception:
+                pass
+        out.append(d)
+    return jsonify(out)
+
+
+@app.get("/api/live/active")
+def api_live_active():
+    """Currently OPEN LIVE trade merged with live bot state (stop, high, BE, trail, target)."""
+    con = _conn()
+    if not con:
+        return jsonify(None)
+    try:
+        row = con.execute(
+            f"SELECT * FROM trades WHERE {_LIVE_TRADE_SQL} AND status='OPEN' "
+            "ORDER BY created_at DESC LIMIT 1"
+        ).fetchone()
+    finally:
+        con.close()
+    if not row:
+        return jsonify(None)
+
+    trade = dict(row)
+    ltp = bot_state = None
+    if _STATE_FILE.exists():
+        try:
+            with open(_STATE_FILE, "r") as f:
+                st = json.load(f)
+            ltp = st.get("ltp")
+            bot_state = st.get("bot_state")
+            trade["updated_at"] = st.get("updated_at")
+            at = st.get("active_trade")
+            if at:
+                for src, dst in (("current_stop", "current_stop"),
+                                 ("highest_ltp", "highest_ltp"),
+                                 ("target", "target_reference"),
+                                 ("break_even_activated", "break_even_activated"),
+                                 ("trail_steps_completed", "trail_steps_completed")):
+                    if at.get(src) is not None:
+                        trade[dst] = at[src]
+                if at.get("be_points") is not None:
+                    trade["be_points"] = at["be_points"]
+        except Exception:
+            pass
+    trade["live_ltp"] = ltp
+    trade["bot_state"] = bot_state
+
+    trade["option_ltp"] = None
+    sym = trade.get("option_symbol")
+    if sym:
+        try:
+            kite = _get_kite_safe()
+            if kite:
+                q = kite.quote([f"BFO:{sym}"])
+                v = q.get(f"BFO:{sym}", {}).get("last_price")
+                if v is not None:
+                    trade["option_ltp"] = float(v)
+        except Exception:
+            pass
+    return jsonify(trade)
+
+
+@app.get("/live")
+def live_results_page():
+    return render_template("live_results.html")
+
+
+
 
 # ── API: bot control ──────────────────────────────────────────────────────────
 
 @app.post("/api/bot/start")
 def api_bot_start():
+    resume_bot()   # explicit Start lifts a manual-Stop pause
     if _is_bot_running():
         return jsonify({"ok": False, "error": "Bot already running"}), 400
     _start_bot_proc()
@@ -898,10 +1101,15 @@ def api_bot_start():
 
 @app.post("/api/bot/stop")
 def api_bot_stop():
+    # Pause first so the watchdog / launcher can't restart it mid-stop; only
+    # Start lifts the pause.
+    pause_bot("dashboard Stop")
     if not _is_bot_running():
-        return jsonify({"ok": False, "error": "Bot is not running"}), 400
+        return jsonify({"ok": False, "paused": True, "error": "Bot is not running"}), 400
     killed = _stop_bot()
-    return jsonify({"ok": killed})
+    still_running = _is_bot_running()
+    return jsonify({"ok": killed and not still_running, "paused": True,
+                    "still_running": still_running})
 
 
 # ── API: env config ───────────────────────────────────────────────────────────
@@ -936,7 +1144,9 @@ _SAFE_KEYS = {
     "ENABLE_TRB_STRATEGY", "TRB_CANDLE_START_TIME", "TRB_CANDLE_DURATION_MINS",
     "TRB_MIN_BODY_RATIO", "TRB_BUFFER_ATR_MULT",
     # VWAP Retest strategy
-    "ENABLE_VWAP_STRATEGY", "VWAP_RETEST_LOOKBACK", "VWAP_MIN_BOUNCE_PTS",
+    "ENABLE_VWAP_STRATEGY", "ENABLE_CE_VWAP", "ENABLE_PE_VWAP", "VWAP_RETEST_LOOKBACK", "VWAP_MIN_BOUNCE_PTS",
+    "VWAP_MAX_SUBMERGED_CANDLES", "ENABLE_VWAP_LEVEL_FILTER", "VWAP_LEVEL_MIN_ROOM_ATR",
+    "VWAP_LEVEL_USE_PIVOTS", "VWAP_LEVEL_USE_DAY_EXTREMES",
     # Pivot Levels + EMA filter
     "ENABLE_PIVOT_LEVELS", "PIVOT_ZONE_BUFFER", "PIVOT_COUNTER_TREND_BLOCK", "PIVOT_BREAKOUT_CONFIRM",
     "ENABLE_PIVOT_STRATEGY", "PIVOT_SUSTAIN_CANDLES", "PIVOT_SL_MODE", "PIVOT_SL_ATR_MULT",
@@ -962,7 +1172,7 @@ _SAFE_KEYS = {
     "ENABLE_SMART_EXIT", "ENABLE_REVERSAL_EXIT", "ENABLE_EMA_COLLAPSE_EXIT",
     "ENABLE_PROFIT_LOCK_EXIT", "ENABLE_TIME_DECAY_EXIT", "ENABLE_DAILY_LOSS_LIMIT",
     "PROFIT_LOCK_MULTIPLIER", "TIME_DECAY_EXIT_AFTER",
-    "TIME_DECAY_MIN_PNL_PTS", "DAILY_LOSS_LIMIT_PTS",
+    "TIME_DECAY_MIN_PNL_PTS", "DAILY_LOSS_LIMIT_RUPEES",
 }
 
 _EDITABLE_KEYS = {
@@ -992,7 +1202,9 @@ _EDITABLE_KEYS = {
     "ENABLE_TRB_STRATEGY", "TRB_CANDLE_START_TIME", "TRB_CANDLE_DURATION_MINS",
     "TRB_MIN_BODY_RATIO", "TRB_BUFFER_ATR_MULT",
     # VWAP Retest strategy
-    "ENABLE_VWAP_STRATEGY", "VWAP_RETEST_LOOKBACK", "VWAP_MIN_BOUNCE_PTS",
+    "ENABLE_VWAP_STRATEGY", "ENABLE_CE_VWAP", "ENABLE_PE_VWAP", "VWAP_RETEST_LOOKBACK", "VWAP_MIN_BOUNCE_PTS",
+    "VWAP_MAX_SUBMERGED_CANDLES", "ENABLE_VWAP_LEVEL_FILTER", "VWAP_LEVEL_MIN_ROOM_ATR",
+    "VWAP_LEVEL_USE_PIVOTS", "VWAP_LEVEL_USE_DAY_EXTREMES",
     # Pivot Levels + EMA filter
     "ENABLE_PIVOT_LEVELS", "PIVOT_ZONE_BUFFER", "PIVOT_COUNTER_TREND_BLOCK", "PIVOT_BREAKOUT_CONFIRM",
     "ENABLE_PIVOT_STRATEGY", "PIVOT_SUSTAIN_CANDLES", "PIVOT_SL_MODE", "PIVOT_SL_ATR_MULT",
@@ -1018,7 +1230,7 @@ _EDITABLE_KEYS = {
     "ENABLE_SMART_EXIT", "ENABLE_REVERSAL_EXIT", "ENABLE_EMA_COLLAPSE_EXIT",
     "ENABLE_PROFIT_LOCK_EXIT", "ENABLE_TIME_DECAY_EXIT", "ENABLE_DAILY_LOSS_LIMIT",
     "PROFIT_LOCK_MULTIPLIER", "TIME_DECAY_EXIT_AFTER",
-    "TIME_DECAY_MIN_PNL_PTS", "DAILY_LOSS_LIMIT_PTS",
+    "TIME_DECAY_MIN_PNL_PTS", "DAILY_LOSS_LIMIT_RUPEES",
 }
 
 
@@ -1320,21 +1532,11 @@ def _handle_oauth_return():
         )
         return Response(html, status=400, mimetype="text/html; charset=utf-8")
 
-    # Auto-start bot
-    if not _is_bot_running():
-        try:
-            global _bot_proc
-            proc = subprocess.Popen(
-                [sys.executable, str(ROOT / "main.py")],
-                cwd=str(ROOT),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            with _bot_lock:
-                _bot_proc = proc
-            _write_pid(proc.pid)
-        except Exception:
-            pass
+    # Auto-start bot (skipped while a manual Stop has paused it)
+    try:
+        _start_bot_proc(auto=True)
+    except Exception:
+        pass
 
     return _redirect("/")
 
@@ -1519,21 +1721,11 @@ def api_auth_finish():
     except Exception:
         pass
 
-    # Auto-start bot
-    if not _is_bot_running():
-        try:
-            global _bot_proc
-            proc = subprocess.Popen(
-                [sys.executable, str(ROOT / "main.py")],
-                cwd=str(ROOT),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            with _bot_lock:
-                _bot_proc = proc
-            _write_pid(proc.pid)
-        except Exception:
-            pass
+    # Auto-start bot (skipped while a manual Stop has paused it)
+    try:
+        _start_bot_proc(auto=True)
+    except Exception:
+        pass
 
     return jsonify({"ok": True, "profile": profile})
 
@@ -1613,9 +1805,9 @@ def api_auth_login():
     except Exception:
         pass
 
-    # Auto-start the bot
+    # Auto-start the bot (skipped while a manual Stop has paused it)
     try:
-        _start_bot_proc()
+        _start_bot_proc(auto=True)
     except Exception:
         pass
 
@@ -1666,10 +1858,18 @@ def api_auth_profile():
 
 
 # ── Watchdog: auto-start bot when token is valid ─────────────────────────────
-_wd = threading.Thread(target=_watchdog, daemon=True, name="bot-watchdog")
-_wd.start()
+# Not under pytest: importing this module in tests must never launch a real bot.
+if "pytest" not in sys.modules:
+    _wd = threading.Thread(target=_watchdog, daemon=True, name="bot-watchdog")
+    _wd.start()
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    # One dashboard at a time (two would run two watchdogs); the lock also
+    # lets stop_bot.bat find this process.
+    if not acquire_process_lock("dashboard"):
+        print("[FATAL] Another dashboard is already running. Exiting.", flush=True)
+        sys.exit(1)
+    # Loopback only by default — the dashboard can switch the bot to LIVE.
+    app.run(host=DASHBOARD_HOST, port=5000, debug=False)

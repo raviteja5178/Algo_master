@@ -2,7 +2,7 @@
 Timezone-aware IST helpers.
 """
 
-from datetime import datetime, time
+from datetime import date, datetime, time
 
 import pytz  # type: ignore
 
@@ -11,6 +11,11 @@ IST = pytz.timezone("Asia/Kolkata")
 
 def now_ist() -> datetime:
     return datetime.now(IST)
+
+
+def today_ist() -> date:
+    """Today's trading date in IST, independent of the PC's local timezone."""
+    return now_ist().date()
 
 
 def parse_time_ist(hhmm: str) -> time:

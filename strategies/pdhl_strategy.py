@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import date
+from utils.time_utils import today_ist
 
 from market.candle_builder import Candle
 
@@ -59,7 +59,7 @@ def is_pdhl_ce_signal(
     c0 = candles_5m[-1]
     c1 = candles_5m[-2]
 
-    if c0.timestamp.date() != date.today():
+    if c0.timestamp.date() != today_ist():
         return False
 
     level = prev_day_high + buffer_pts
@@ -106,7 +106,7 @@ def is_pdhl_pe_signal(
     c0 = candles_5m[-1]
     c1 = candles_5m[-2]
 
-    if c0.timestamp.date() != date.today():
+    if c0.timestamp.date() != today_ist():
         return False
 
     level = prev_day_low - buffer_pts

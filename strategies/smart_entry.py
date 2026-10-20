@@ -131,6 +131,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from datetime import date
+from utils.time_utils import today_ist
 
 from market.candle_builder import Candle
 from market.indicators import atr_at, ema
@@ -244,7 +245,7 @@ class SmartEntryFilter:
         """
         if ltp <= 0:
             return
-        today = date.today()
+        today = today_ist()
 
         # ── First-seen (day low proxy) ─────────────────────────────────────
         existing = self._first_ltp.get(tradingsymbol)
@@ -272,7 +273,7 @@ class SmartEntryFilter:
         Both values are for today only; stale data from previous days is
         treated as absent.
         """
-        today = date.today()
+        today = today_ist()
         day_low: float | None = None
         day_high: float | None = None
         first = self._first_ltp.get(tradingsymbol)
@@ -391,7 +392,7 @@ class SmartEntryFilter:
         if not candles_5m:
             # Jump to Filter 7 only — all other filters need candle data.
             if self._max_ext_pct > 0 and option_ltp is not None and tradingsymbol is not None:
-                today = date.today()
+                today = today_ist()
                 existing = self._first_ltp.get(tradingsymbol)
                 if existing is not None:
                     stored_date, first_ltp = existing
@@ -632,7 +633,7 @@ class SmartEntryFilter:
 
         # ── Filter 7: option premium extension ───────────────────────────────
         if self._max_ext_pct > 0 and option_ltp is not None and tradingsymbol is not None:
-            today = date.today()
+            today = today_ist()
             existing = self._first_ltp.get(tradingsymbol)
             if existing is not None:
                 stored_date, first_ltp = existing

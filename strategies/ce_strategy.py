@@ -7,14 +7,17 @@ Macro trend (15m, latest completed candle):
 Trigger (5m, latest completed candle) — either:
     a) Crossover : prev 5m close <= prev EMA9  AND  5m close > EMA9
     b) Pullback  : price pulled back from above EMA9 down to EMA21, then
-                   the current candle closes back ON or ABOVE EMA21 (within
-                   pullback_tol_pts).  Three conditions must ALL hold:
+                   the current candle bounces off EMA21.  All must hold:
                      1. Current close is on/above EMA21:
                            0 <= close − EMA21 <= pullback_tol_pts
-                     2. Prior candle closed ABOVE EMA9 (was in the trend
-                        before the dip — not already crawling on EMA21).
+                     2. A close above EMA9 within the PULLBACK_TREND_LOOKBACK
+                        candles before the current one (was trending before the
+                        dip — not already crawling on EMA21).
                      3. Prior candle's low dipped AT OR BELOW EMA21
                         (actually touched the level, not just hovered near it).
+                     4. Current candle turned back up: green (close > open)
+                        and close > prior close.  A candle still falling into
+                        EMA21 is the dip, not the bounce.
 
 Momentum:
     5m RSI(rsi_period) > rsi_min   (default 55)
@@ -23,13 +26,15 @@ Momentum:
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date
+from utils.time_utils import today_ist
 
 from market.candle_builder import Candle
 from market.indicators import ema, rsi
 
 FAST_EMA = 9
 SLOW_EMA = 21
+# Candles before the current one searched for the pre-dip close above EMA9.
+PULLBACK_TREND_LOOKBACK = 4
 
 
 def is_global_trend_long(candles_15m: Sequence[Candle]) -> bool:
@@ -61,7 +66,7 @@ def is_ce_signal(
         return False
 
     latest = candles_5m[-1]
-    if latest.timestamp.date() != date.today():
+    if latest.timestamp.date() != today_ist():
         return False
 
     if not is_global_trend_long(candles_15m):
@@ -76,23 +81,32 @@ def is_ce_signal(
 
     crossover = candles_5m[-2].close <= e9_prev and latest.close > e9_now
 
-    # Pullback to EMA21 — three conditions must ALL hold:
+    # Pullback to EMA21 — all conditions must hold:
     #   1. Current close sits on or just above EMA21 (within tolerance).
     #      A close below EMA21 would trip the EMA-collapse exit, so the lower
     #      bound is 0 (not negative).
-    #   2. Prior candle closed ABOVE EMA9 — confirms price was trending before
-    #      the dip.  Without this, candles that have been crawling along EMA21
-    #      for multiple bars repeatedly fire a false pullback signal.
-    #   3. Prior candle's low reached AT OR BELOW EMA21 — confirms the dip
-    #      actually touched the level.  A candle that stayed entirely above
-    #      EMA21 is not a pullback; it is just a continuation candle.
+    #   2. A recent candle closed ABOVE EMA9 — price was trending before the
+    #      dip.  Without this, candles crawling along EMA21 for many bars
+    #      repeatedly fire a false pullback signal.  (Requiring it of the prior
+    #      candle alone made 1+2 describe a candle FALLING from EMA9 to EMA21.)
+    #   3. Prior candle's low reached AT OR BELOW EMA21 — the dip actually
+    #      touched the level.  A candle that stayed entirely above EMA21 is
+    #      not a pullback; it is just a continuation candle.
+    #   4. Current candle is green and closes above the prior close — the
+    #      bounce has started.
     e21_prev = ema(candles_5m, SLOW_EMA)[-2]
     prev = candles_5m[-2]
+    _recent = range(-PULLBACK_TREND_LOOKBACK - 1, -1)          # candles before the current one
+    was_trending = any(
+        ema9_series[k] is not None and candles_5m[k].close > ema9_series[k] for k in _recent
+    )
     pullback = (
         0 <= latest.close - e21_now <= pullback_tol_pts   # (1) close on/above EMA21
-        and prev.close > e9_prev                           # (2) prior candle was above EMA9
+        and was_trending                                   # (2) trend before the dip
         and e21_prev is not None
         and prev.low <= e21_prev                           # (3) prior low dipped to EMA21
+        and latest.close > latest.open                     # (4) bounce candle: green
+        and latest.close > prev.close                      #     and closing higher
     )
 
     return (crossover or pullback) and rsi_now > rsi_min

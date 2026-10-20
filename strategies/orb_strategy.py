@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import date
+from utils.time_utils import today_ist
 
 from market.candle_builder import Candle
 from market.indicators import atr_at, ema
@@ -217,7 +217,7 @@ def is_orb_ce_signal(
     c1 = candles_5m[-2]
 
     # ── Date guard ─────────────────────────────────────────────────────────────
-    if c0.timestamp.date() != date.today():
+    if c0.timestamp.date() != today_ist():
         return False
 
     # ── Entry window: only 09:25, 09:30, 09:35 candles ───────────────────────
@@ -281,7 +281,7 @@ def is_orb_pe_signal(
     c1 = candles_5m[-2]
 
     # ── Date guard ─────────────────────────────────────────────────────────────
-    if c0.timestamp.date() != date.today():
+    if c0.timestamp.date() != today_ist():
         return False
 
     # ── Entry window: only 09:25, 09:30, 09:35 candles ───────────────────────

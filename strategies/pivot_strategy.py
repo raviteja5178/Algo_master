@@ -1,8 +1,14 @@
 """
 Pivot strategy — two complementary entry modes (CE_PIVOT / PE_PIVOT).
 
-Pivot levels are computed from the PREVIOUS day's SENSEX High / Low / Close:
+Pivot levels are computed from the PREVIOUS day's SENSEX High / Low / Close
+(see market.historical_data.compute_pivot_levels; PIVOT_FORMULA selects the formula).
+Default FIBONACCI (range = H − L):
     PP = (H + L + C) / 3
+    R1 = PP + 0.382×range   S1 = PP − 0.382×range
+    R2 = PP + 0.618×range   S2 = PP − 0.618×range
+    R3 = PP + 1.000×range   S3 = PP − 1.000×range
+TRADITIONAL (PIVOT_FORMULA=TRADITIONAL):
     R1 = 2×PP − L          S1 = 2×PP − H
     R2 = PP + (H − L)      S2 = PP − (H − L)
     R3 = H + 2×(PP − L)    S3 = L − 2×(H − PP)
@@ -590,11 +596,19 @@ def _check_acceptance(
     sl_atr_mult: float,
     sl_buffer_atr: float,
     min_room_r: float,
+    min_dist_atr: float = 0.0,
+    min_room_r_accept: float = 0.0,
+    blocked_sides: frozenset[str] = frozenset(),
 ) -> PivotSetup | None:
     """
     Acceptance mode: price closed (or opened) on the wrong side of the Pivot,
     crossed it, and the latest N candles are the FIRST clean N-window on the
     new side since that cross.
+
+    Extra guards (0 / empty = disabled):
+      min_dist_atr      signal close must be >= this x ATR beyond the Pivot.
+      min_room_r_accept T1 room must be >= this x risk (max with min_room_r).
+      blocked_sides     sides ("CE"/"PE") for which acceptance is skipped.
     """
     n = sustain_candles
     if len(today) < n:
@@ -604,6 +618,8 @@ def _check_acceptance(
     last = len(today) - 1
 
     for side in ("CE", "PE"):
+        if side in blocked_sides:
+            continue
         if side == "CE":
             wrong = lambda c: c.close < P                       # noqa: E731
             clean = lambda c: c.close > P and c.low > P         # noqa: E731
@@ -642,9 +658,20 @@ def _check_acceptance(
         if not atr or atr <= 0:
             return None
 
+        dist = abs(today[-1].close - P)
+        if min_dist_atr > 0 and dist < min_dist_atr * atr:
+            import logging as _log
+            _log.getLogger(__name__).info(
+                "[PIVOT_ACCEPT_BLOCKED_DISTANCE] side=%s close=%.2f pivot=%.2f "
+                "dist_pts=%.1f min_dist_atr=%.2f atr=%.1f",
+                side, today[-1].close, P, dist, min_dist_atr, atr,
+            )
+            continue
+
         setup = _make_setup(
             side, "ACCEPTANCE", today[-1].close, today[-n:],
-            atr, pivot_levels, sl_mode, sl_atr_mult, sl_buffer_atr, min_room_r,
+            atr, pivot_levels, sl_mode, sl_atr_mult, sl_buffer_atr,
+            max(min_room_r, min_room_r_accept),
         )
         if setup is not None:
             return setup
@@ -683,6 +710,10 @@ def find_pivot_setup(
     max_first_wick_atr: float = 0.0,
     # enable_acceptance: also run Mode C (cross-and-acceptance).
     enable_acceptance: bool = False,
+    # Acceptance guards — see _check_acceptance.
+    acceptance_min_dist_atr: float = 0.0,
+    acceptance_min_room_r: float = 0.0,
+    acceptance_blocked_sides: frozenset[str] = frozenset(),
     # bounce_zone_atr: S/R bounce-rejection zone half-width (0 = disabled).
     bounce_zone_atr: float = 0.0,
     # ── Bounce quality filters (default OFF) ─────────────────────────────
@@ -780,6 +811,9 @@ def find_pivot_setup(
             today, candles_5m, pivot_levels,
             sustain_candles, atr_period,
             sl_mode, sl_atr_mult, sl_buffer_atr, min_room_r,
+            min_dist_atr=acceptance_min_dist_atr,
+            min_room_r_accept=acceptance_min_room_r,
+            blocked_sides=acceptance_blocked_sides,
         )
         if setup is not None:
             return setup

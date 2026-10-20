@@ -543,9 +543,7 @@ class TestMondayFilter:
              patch("strategies.signal_engine.has_processed_signal", return_value=False), \
              patch("strategies.signal_engine.claim_signal_atomic", return_value=True), \
              patch("strategies.signal_engine.record_processed_signal"), \
-             patch("strategies.orb_strategy.date") as mock_date:
-
-            mock_date.today.return_value = monday_date
+             patch("strategies.orb_strategy.today_ist", return_value=monday_date):
 
             ms.ENABLE_OB_STRATEGY           = False
             ms.ENABLE_ORB_STRATEGY          = True

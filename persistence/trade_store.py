@@ -3,9 +3,13 @@ High-level trade store facade — single import point for persistence ops.
 """
 
 from persistence.models import (
+    add_live_order_event,
     claim_entry_slot_atomic,
     claim_signal_atomic,
     fetch_active_trade,
+    fetch_live_dates,
+    fetch_live_order_events,
+    fetch_live_trades,
     fetch_shadow_trade_dates,
     fetch_shadow_trades,
     fetch_today_mom_trade_count,
@@ -46,4 +50,8 @@ __all__ = [
     "has_action",
     "record_action",
     "update_action_status",
+    "add_live_order_event",
+    "fetch_live_order_events",
+    "fetch_live_trades",
+    "fetch_live_dates",
 ]

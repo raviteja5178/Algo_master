@@ -44,7 +44,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import date
+from utils.time_utils import today_ist
 
 from market.candle_builder import Candle
 from market.indicators import atr as calc_atr
@@ -117,7 +117,7 @@ def is_natr_ce_signal(
         return False
 
     latest = candles_5m[-1]
-    if latest.timestamp.date() != date.today():
+    if latest.timestamp.date() != today_ist():
         return False
 
     # Candle color check: CE entry requires a bullish (green) candle
@@ -166,7 +166,7 @@ def is_natr_pe_signal(
         return False
 
     latest = candles_5m[-1]
-    if latest.timestamp.date() != date.today():
+    if latest.timestamp.date() != today_ist():
         return False
 
     # Candle color check: PE entry requires a bearish (red) candle

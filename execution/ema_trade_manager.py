@@ -27,6 +27,7 @@ from utils.logging_config import log_event
 logger = logging.getLogger(__name__)
 
 _STATE_FILE = Path(__file__).resolve().parent.parent / ".ema_trade.json"
+_IDX_STATE_FILE = Path(__file__).resolve().parent.parent / ".idx_trade.json"
 
 
 def plan_ema_risk(
@@ -73,6 +74,10 @@ def plan_ema_risk(
 
 
 class EmaTradeManager(PivotTradeManager):
+    # Exit reason per stage when the index stop is crossed, and on target.
+    EXIT_REASONS = {"INITIAL": "EMA_SL_HIT", "BE": "EMA_BE_STOP", "TRAIL": "EMA_TSL_HIT",
+                    "TARGET": "EMA_TARGET"}
+
     def __init__(
         self,
         side: str,
@@ -107,10 +112,10 @@ class EmaTradeManager(PivotTradeManager):
     # ── every SENSEX tick ─────────────────────────────────────────────────────
     def on_index_price(self, price: float) -> tuple[str, object] | None:
         if self._fav(price) < -_STOP_EPSILON + self._fav(self.stop_index):
-            reason = {"INITIAL": "EMA_SL_HIT", "BE": "EMA_BE_STOP"}.get(self.stage, "EMA_TSL_HIT")
+            reason = self.EXIT_REASONS.get(self.stage, self.EXIT_REASONS["TRAIL"])
             return ("EXIT", reason)
         if self._fav(price) >= self._fav(self.t3):
-            return ("EXIT", "EMA_TARGET")
+            return ("EXIT", self.EXIT_REASONS["TARGET"])
 
         if self._fav(price) > self._fav(self.best_index):
             self.best_index = price
@@ -136,16 +141,20 @@ class EmaTradeManager(PivotTradeManager):
         return None
 
     # ── persistence (own file, separate from Pivot) ───────────────────────────
+    @classmethod
+    def _state_file(cls) -> Path:
+        return _STATE_FILE
+
     def save(self, trade_id: str) -> None:
         try:
-            _STATE_FILE.write_text(json.dumps({"trade_id": trade_id, **self.__dict__}))
+            self._state_file().write_text(json.dumps({"trade_id": trade_id, **self.__dict__}))
         except Exception as exc:
-            logger.warning("EMA trade state save failed: %s", exc)
+            logger.warning("%s state save failed: %s", type(self).__name__, exc)
 
     @classmethod
     def load(cls, trade_id: str) -> "EmaTradeManager | None":
         try:
-            d = json.loads(_STATE_FILE.read_text())
+            d = json.loads(cls._state_file().read_text())
         except Exception:
             return None
         if d.pop("trade_id", None) != trade_id:
@@ -154,9 +163,33 @@ class EmaTradeManager(PivotTradeManager):
         obj.__dict__.update(d)
         return obj
 
-    @staticmethod
-    def clear() -> None:
+    @classmethod
+    def clear(cls) -> None:
         try:
-            _STATE_FILE.unlink(missing_ok=True)
+            cls._state_file().unlink(missing_ok=True)
         except Exception:
             pass
+
+
+class IndexTradeManager(EmaTradeManager):
+    """
+    Index-anchored SL / break-even / chandelier trail / target for the generic
+    strategies (VWAP, ORB, NATR, ATR, PDHL, TRB, OB, MOM) — the same engine as
+    EMA, without its EMA-specific exits (EMA9 close, time stop).
+
+    Decisions are made on SENSEX ticks, so the stop is exactly the intended
+    index distance instead of an option-premium distance from a fixed delta
+    guess (which drifts on fast / expiry days).  The broker option SL is a
+    wider backstop (hard_sl_cushion) for when the bot itself is down.
+    """
+    EXIT_REASONS = {"INITIAL": "IDX_SL_HIT", "BE": "IDX_BE_STOP", "TRAIL": "IDX_TSL_HIT",
+                    "TARGET": "IDX_TARGET"}
+
+    def __init__(self, *args, **kwargs) -> None:
+        kwargs.setdefault("trail_ema9_exit", False)
+        kwargs.setdefault("time_stop_bars", 0)
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def _state_file(cls) -> Path:
+        return _IDX_STATE_FILE

@@ -14,7 +14,7 @@ from datetime import date, datetime, timedelta
 from broker.kite_client import get_kite
 from market.candle_builder import Candle
 from utils.logging_config import log_event
-from utils.time_utils import IST
+from utils.time_utils import IST, today_ist
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,22 @@ SENSEX_TOKEN = 265  # BSE SENSEX — instrument_token for historical API
 # Market session: only candles at or after 09:15 IST are valid trading data.
 _SESSION_START_HOUR = 9
 _SESSION_START_MINUTE = 15
+
+_INTERVAL_MINUTES = {"minute": 1, "3minute": 3, "5minute": 5, "10minute": 10,
+                     "15minute": 15, "30minute": 30, "60minute": 60}
+
+
+def is_still_forming(candle_start: datetime, interval: str, now: datetime) -> bool:
+    """True if the candle opened at *candle_start* has not closed yet at *now*.
+
+    Kite returns the in-progress candle on a mid-candle restart. The live aggregator
+    rebuilds that same bucket from ticks, so seeding it duplicates the timestamp
+    (an extra close in ER/ADX/ATR) and carries a partial OHLC.
+    """
+    minutes = _INTERVAL_MINUTES.get(interval)
+    if not minutes:
+        return False
+    return candle_start.replace(tzinfo=None) + timedelta(minutes=minutes) > now.replace(tzinfo=None)
 
 
 def fetch_historical_candles(
@@ -74,6 +90,8 @@ def fetch_historical_candles(
         if (ts.hour, ts.minute) < (_SESSION_START_HOUR, _SESSION_START_MINUTE):
             skipped += 1
             continue
+        if is_still_forming(ts, interval, to_date):
+            continue
         candles.append(Candle(
             timestamp=ts,
             open=float(r["open"]),
@@ -114,7 +132,7 @@ def fetch_previous_day_hl(instrument_token: int) -> tuple[float | None, float | 
         logger.error("fetch_previous_day_hl failed: %s", exc)
         return None, None, None
 
-    today = _date.today()
+    today = today_ist()
     # records are chronological oldest-first; find the last day before today
     prev = None
     for r in records:
@@ -130,6 +148,34 @@ def fetch_previous_day_hl(instrument_token: int) -> tuple[float | None, float | 
     pdc = float(prev["close"])
     log_event(logger, "PREV_DAY_HL_LOADED", pdh=pdh, pdl=pdl, pdc=pdc, date=str(prev["date"])[:10])
     return pdh, pdl, pdc
+
+
+def fetch_daily_trend(instrument_token: int, ema_period: int = 20) -> str:
+    """
+    'UP' / 'DOWN' — the last COMPLETED session's close vs the EMA(ema_period)
+    of daily closes; 'UNKNOWN' on any error or too little history.
+    Fetches ~3x ema_period calendar days so the EMA is warmed up.
+    """
+    from strategies.trend_gate import daily_trend_from_closes
+    to_date = datetime.now(IST).replace(tzinfo=None)
+    from_date = to_date - timedelta(days=max(60, ema_period * 3))
+    try:
+        records = get_kite().historical_data(
+            instrument_token=instrument_token,
+            from_date=from_date.strftime("%Y-%m-%d %H:%M:%S"),
+            to_date=to_date.strftime("%Y-%m-%d %H:%M:%S"),
+            interval="day",
+        )
+    except Exception as exc:
+        logger.error("fetch_daily_trend failed: %s", exc)
+        return "UNKNOWN"
+    today = datetime.now(IST).date()
+    closes = [float(r["close"]) for r in records
+              if (IST.localize(r["date"]) if r["date"].tzinfo is None else r["date"]).date() < today]
+    trend = daily_trend_from_closes(closes, ema_period)
+    log_event(logger, "DAILY_TREND_LOADED", trend=trend, sessions=len(closes),
+              last_close=closes[-1] if closes else None, ema_period=ema_period)
+    return trend
 
 
 # ── Pivot-level dataclass ─────────────────────────────────────────────────────
@@ -242,7 +288,7 @@ def fetch_pivot_levels(instrument_token: int, formula: str | None = None) -> Piv
         logger.error("fetch_pivot_levels failed: %s", exc)
         return None
 
-    today = _date.today()
+    today = today_ist()
     prev  = None
     for r in records:
         ts = IST.localize(r["date"]) if r["date"].tzinfo is None else r["date"]
