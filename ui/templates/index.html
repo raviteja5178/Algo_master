@@ -439,6 +439,35 @@
           <div class="sb-row"><span class="sb-lbl" style="color:#3b82f6;font-weight:600">S2</span><span id="sb-s2" class="sb-val" style="color:#3b82f6">—</span></div>
         </div>
         <div class="sb-divider" id="sb-pivot-divider" style="display:none"></div>
+        <!-- CPR + Fair Value Gap -->
+        <div class="sb-section" id="sb-fvg-section" style="display:none">CPR &amp; Fair Value Gap</div>
+        <div id="sb-fvg-rows" style="display:none">
+          <!-- CPR block -->
+          <div class="sb-row" style="margin-bottom:1px">
+            <span class="sb-lbl" style="color:#e879f9;font-weight:600">TC</span>
+            <span id="sb-cpr-tc" class="sb-val" style="color:#e879f9">—</span>
+          </div>
+          <div class="sb-row" style="margin-bottom:1px">
+            <span class="sb-lbl" style="color:#d946ef">BC</span>
+            <span id="sb-cpr-bc" class="sb-val" style="color:#d946ef">—</span>
+          </div>
+          <div class="sb-row" style="margin-bottom:4px">
+            <span class="sb-lbl" style="color:var(--muted);font-size:10px">Width</span>
+            <span id="sb-cpr-width" class="sb-val" style="font-size:10px">—</span>
+          </div>
+          <!-- CPR tag + bias badge -->
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;padding:0 2px">
+            <span id="sb-cpr-tag" style="font-size:10px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--muted)">—</span>
+            <span id="sb-fvg-bias" style="font-size:11px;font-weight:700;border-radius:3px;padding:2px 7px">—</span>
+          </div>
+          <!-- Bullish FVGs -->
+          <div style="font-size:10px;color:var(--green);font-weight:600;letter-spacing:.04em;margin-bottom:2px">▲ BULLISH FVG</div>
+          <div id="sb-fvg-bull" style="font-size:10px;color:var(--muted)">—</div>
+          <!-- Bearish FVGs -->
+          <div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:.04em;margin-top:5px;margin-bottom:2px">▼ BEARISH FVG</div>
+          <div id="sb-fvg-bear" style="font-size:10px;color:var(--muted)">—</div>
+        </div>
+        <div class="sb-divider" id="sb-fvg-divider" style="display:none"></div>
         <!-- ORB range -->
         <div class="sb-section">ORB Range</div>
         <div class="sb-row"><span class="sb-lbl" style="color:var(--green)">High</span><span id="sb-orb-high" class="sb-val">—</span></div>
@@ -1037,6 +1066,23 @@
               </div>
               <label class="st-switch">
                 <input type="checkbox" id="st-ENABLE_PIVOT_STRATEGY" onchange="stToggle('ENABLE_PIVOT_STRATEGY',this.checked)">
+                <span class="st-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Expiry Iron Butterfly (SHADOW only) -->
+          <div class="card" style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                  <span style="font-weight:700;font-size:13px">&#x1F98B; Expiry Iron Butterfly</span>
+                  <span class="pill" style="background:rgba(99,102,241,0.15);color:#818cf8;border:1px solid rgba(99,102,241,0.3);font-size:9px">SHADOW Only &middot; Expiry Day</span>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Sells ATM CE + ATM PE and buys wings 1000 pts out at 10:30 AM on Thursday expiry days. 50% credit SL / 15:10 exit. Non-directional theta decay research running exclusively in SHADOW mode.</div>
+              </div>
+              <label class="st-switch">
+                <input type="checkbox" id="st-ENABLE_EXPIRY_FLY" onchange="stToggle('ENABLE_EXPIRY_FLY',this.checked)">
                 <span class="st-slider"></span>
               </label>
             </div>
@@ -2029,6 +2075,13 @@ const FIELDS=[
   {key:'PIVOT_T1_LOCK_PCT',label:'Pivot T1 Lock %',type:'number'},
   {key:'PIVOT_TRAIL_ATR_MULT',label:'Pivot Trail ATR Mult',type:'number'},
   {key:'PIVOT_MAX_TRADES_PER_DAY',label:'Pivot Max Trades/Day',type:'number'},
+  {key:'ENABLE_EXPIRY_FLY',label:'Expiry Iron Butterfly (SHADOW)',type:'select',options:['false','true']},
+  {key:'FLY_ENTRY_TIME',label:'Fly Entry Time',type:'text'},
+  {key:'FLY_EXIT_TIME',label:'Fly Exit Time',type:'text'},
+  {key:'FLY_WING_POINTS',label:'Fly Wing Points',type:'number'},
+  {key:'FLY_STOP_PCT',label:'Fly Stop % (Loss of Credit)',type:'number'},
+  {key:'FLY_QUANTITY',label:'Fly Quantity',type:'number'},
+  {key:'FLY_MIN_CREDIT',label:'Fly Min Credit Pts',type:'number'},
   {key:'SMART_ENTRY_MIN_BODY_ATR_RATIO',label:'Entry: Min Body/ATR',type:'number'},
   {key:'SMART_ENTRY_REQUIRE_EMA_SLOPE',label:'Entry: Req EMA Slope',type:'select',options:['false','true']},
   {key:'SMART_ENTRY_COOLDOWN_CANDLES',label:'Entry: Cooldown Candles',type:'number'},
@@ -2162,13 +2215,76 @@ async function poll(){try{const[status,trades,orders,cs]=await Promise.all([fetc
 // Fetch env once on page load so calcSignalConds can read strategy flags immediately
 // without waiting for the user to open the Settings tab (which creates cfg- elements).
 async function _loadEnvCache(){try{_envCache=await fetch('/api/env').then(r=>r.json());}catch(e){}}
+
+// ── Fair Value Gap + CPR panel ───────────────────────────────────────────────
+function _renderFvg(d){
+  const show=!d.error;
+  ['sb-fvg-section','sb-fvg-rows','sb-fvg-divider'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=show?'block':'none';});
+  if(!show)return;
+
+  // CPR rows
+  const cpr=d.cpr;
+  document.getElementById('sb-cpr-tc').textContent=cpr.tc.toFixed(1);
+  document.getElementById('sb-cpr-bc').textContent=cpr.bc.toFixed(1);
+  document.getElementById('sb-cpr-width').textContent=cpr.width.toFixed(0)+' pts — '+cpr.tag;
+
+  // Bias badge
+  const biasEl=document.getElementById('sb-fvg-bias');
+  const bias=d.overall_bias;
+  biasEl.textContent=bias==='BULLISH'?'▲ BULLISH':bias==='BEARISH'?'▼ BEARISH':'◆ NEUTRAL';
+  biasEl.style.background=bias==='BULLISH'?'rgba(34,197,94,.18)':bias==='BEARISH'?'rgba(239,68,68,.18)':'rgba(107,122,153,.18)';
+  biasEl.style.color=bias==='BULLISH'?'var(--green)':bias==='BEARISH'?'var(--red)':'var(--muted)';
+  biasEl.title='CPR '+cpr.bias+' | '+cpr.hint;
+
+  // CPR tag pill
+  const tagEl=document.getElementById('sb-cpr-tag');
+  tagEl.textContent=cpr.tag+' CPR';
+  tagEl.style.color=cpr.tag==='NARROW'?'var(--green)':cpr.tag==='WIDE'?'var(--red)':'var(--muted)';
+
+  // Bullish FVGs
+  const bullEl=document.getElementById('sb-fvg-bull');
+  if(d.fvg_bullish&&d.fvg_bullish.length){
+    bullEl.innerHTML=d.fvg_bullish.slice().reverse().map(f=>{
+      const ltp=_lastGoodLtp;
+      const pos=ltp?(ltp>f.top?'above':ltp<f.bottom?'below':'inside'):'';
+      const posStyle=pos==='inside'?'color:var(--green);font-weight:600':'';
+      return `<div style="margin-bottom:2px;${posStyle}">`+
+        `${f.bottom.toFixed(0)}–${f.top.toFixed(0)}`+
+        ` <span style="color:var(--muted)">(mid ${f.mid.toFixed(0)})</span>`+
+        (pos?` <span style="font-size:9px">[${pos}]</span>`:'')+
+        `</div>`;
+    }).join('');
+  } else {
+    bullEl.textContent='None in recent history';
+  }
+
+  // Bearish FVGs
+  const bearEl=document.getElementById('sb-fvg-bear');
+  if(d.fvg_bearish&&d.fvg_bearish.length){
+    bearEl.innerHTML=d.fvg_bearish.slice().reverse().map(f=>{
+      const ltp=_lastGoodLtp;
+      const pos=ltp?(ltp>f.top?'above':ltp<f.bottom?'below':'inside'):'';
+      const posStyle=pos==='inside'?'color:var(--red);font-weight:600':'';
+      return `<div style="margin-bottom:2px;${posStyle}">`+
+        `${f.bottom.toFixed(0)}–${f.top.toFixed(0)}`+
+        ` <span style="color:var(--muted)">(mid ${f.mid.toFixed(0)})</span>`+
+        (pos?` <span style="font-size:9px">[${pos}]</span>`:'')+
+        `</div>`;
+    }).join('');
+  } else {
+    bearEl.textContent='None in recent history';
+  }
+}
+async function pollFvg(){try{const d=await fetch('/api/fvg').then(r=>r.json());_renderFvg(d);}catch(e){}}
+
 _loadEnvCache();
 pollLtp();setInterval(pollLtp,1000);
 pollOptLtp();setInterval(pollOptLtp,2000);
 poll();setInterval(poll,3000);
+pollFvg();setInterval(pollFvg,60000);
 
 // ── Strategies panel ─────────────────────────────────────────
-const ST_KEYS=['ENABLE_EMA_STRATEGY','ENABLE_ORB_STRATEGY','ENABLE_TRB_STRATEGY','ENABLE_OB_STRATEGY','ENABLE_MOMENTUM_PHASE','ENABLE_VWAP_STRATEGY','ENABLE_CE_VWAP','ENABLE_PE_VWAP','ENABLE_PDHL_STRATEGY','ENABLE_NATR_STRATEGY','ENABLE_ATR_COPILOT_STRATEGY','ENABLE_PIVOT_STRATEGY'];
+const ST_KEYS=['ENABLE_EMA_STRATEGY','ENABLE_ORB_STRATEGY','ENABLE_TRB_STRATEGY','ENABLE_OB_STRATEGY','ENABLE_MOMENTUM_PHASE','ENABLE_VWAP_STRATEGY','ENABLE_CE_VWAP','ENABLE_PE_VWAP','ENABLE_PDHL_STRATEGY','ENABLE_NATR_STRATEGY','ENABLE_ATR_COPILOT_STRATEGY','ENABLE_PIVOT_STRATEGY','ENABLE_EXPIRY_FLY'];
 let _stLoaded=false;
 async function loadStrategies(){if(_stLoaded)return;try{const env=await fetch('/api/env').then(r=>r.json());_envCache=env;ST_KEYS.forEach(k=>{const el=document.getElementById('st-'+k);if(el)el.checked=(k==='ENABLE_CE_VWAP'||k==='ENABLE_PE_VWAP'||k==='ENABLE_EMA_STRATEGY')?(env[k]!=='false'):(env[k]==='true');});_stLoaded=true;}catch(e){console.error('loadStrategies:',e);}}
 function stToggle(key,val){/* state held in checkbox — no extra cache needed */}

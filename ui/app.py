@@ -768,6 +768,133 @@ def api_pnl():
     return jsonify([dict(r) for r in rows])
 
 
+# ── API: Fair Value Gap + CPR ─────────────────────────────────────────────────
+
+@app.get("/api/fvg")
+def api_fvg():
+    """
+    Return daily FVGs (bullish + bearish) and CPR for the current session.
+    Fetches the last 15 daily SENSEX candles via Zerodha historical API.
+    Returns: { cpr, fvg_bullish: [...], fvg_bearish: [...], prev_ohlc, error? }
+    """
+    try:
+        kite = _get_kite_safe()
+        if not kite:
+            return jsonify({"error": "Kite not authenticated"}), 200
+
+        from datetime import date, timedelta
+        today = date.today()
+        start = today - timedelta(days=30)
+        candles = kite.historical_data(265, start, today, "day")
+
+        if len(candles) < 3:
+            return jsonify({"error": "Insufficient daily candle data"}), 200
+
+        # Use yesterday (last completed session) as the base for CPR
+        prev = candles[-1]
+        H, L, C = prev["high"], prev["low"], prev["close"]
+        P  = (H + L + C) / 3
+        BC = (H + L) / 2
+        TC = 2 * P - BC
+        top    = max(TC, BC)
+        bottom = min(TC, BC)
+        width  = round(top - bottom, 2)
+
+        # CPR width classification for SENSEX
+        if width < 150:
+            cpr_tag = "NARROW"
+            cpr_hint = "Trending day expected"
+        elif width < 400:
+            cpr_tag = "MEDIUM"
+            cpr_hint = "Moderate range — watch CPR test"
+        else:
+            cpr_tag = "WIDE"
+            cpr_hint = "Choppy / sideways day expected"
+
+        # Close vs CPR
+        if C < bottom:
+            cpr_bias = "BEARISH"
+        elif C > top:
+            cpr_bias = "BULLISH"
+        else:
+            cpr_bias = "NEUTRAL"
+
+        # FVG scan — 3-candle pattern on daily
+        fvg_bullish = []   # low[i] > high[i-2]
+        fvg_bearish = []   # high[i] < low[i-2]
+        for i in range(2, len(candles)):
+            d0, d1, d2 = candles[i-2], candles[i-1], candles[i]
+            # Bullish FVG
+            if d2["low"] > d0["high"]:
+                gap = round(d2["low"] - d0["high"], 2)
+                mid = round((d2["low"] + d0["high"]) / 2, 2)
+                fvg_bullish.append({
+                    "date_from": str(d0["date"].date()),
+                    "date_to":   str(d2["date"].date()),
+                    "top":       round(d2["low"], 2),
+                    "bottom":    round(d0["high"], 2),
+                    "mid":       mid,
+                    "gap":       gap,
+                    # Is current price inside, above or below?
+                })
+            # Bearish FVG
+            if d2["high"] < d0["low"]:
+                gap = round(d0["low"] - d2["high"], 2)
+                mid = round((d0["low"] + d2["high"]) / 2, 2)
+                fvg_bearish.append({
+                    "date_from": str(d0["date"].date()),
+                    "date_to":   str(d2["date"].date()),
+                    "top":       round(d0["low"], 2),
+                    "bottom":    round(d2["high"], 2),
+                    "mid":       mid,
+                    "gap":       gap,
+                })
+
+        # Keep only the most recent 3 of each type (most relevant)
+        fvg_bullish = fvg_bullish[-3:]
+        fvg_bearish = fvg_bearish[-3:]
+
+        # Overall directional bias combining CPR + FVG
+        bull_fvg_nearby = any(
+            f["bottom"] <= C <= f["top"] or C > f["bottom"]
+            for f in fvg_bullish
+        )
+        bear_fvg_nearby = any(
+            f["bottom"] <= C <= f["top"] or C < f["top"]
+            for f in fvg_bearish
+        )
+
+        if cpr_bias == "BULLISH" or (cpr_bias == "NEUTRAL" and bull_fvg_nearby and not bear_fvg_nearby):
+            overall = "BULLISH"
+        elif cpr_bias == "BEARISH" or (cpr_bias == "NEUTRAL" and bear_fvg_nearby and not bull_fvg_nearby):
+            overall = "BEARISH"
+        else:
+            overall = "NEUTRAL"
+
+        return jsonify({
+            "prev_ohlc": {
+                "date":  str(prev["date"].date()),
+                "high":  round(H, 2),
+                "low":   round(L, 2),
+                "close": round(C, 2),
+            },
+            "cpr": {
+                "tc":     round(top, 2),
+                "pivot":  round(P, 2),
+                "bc":     round(bottom, 2),
+                "width":  width,
+                "tag":    cpr_tag,
+                "hint":   cpr_hint,
+                "bias":   cpr_bias,
+            },
+            "fvg_bullish": fvg_bullish,
+            "fvg_bearish": fvg_bearish,
+            "overall_bias": overall,
+        })
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 200
+
+
 # ── API: shadow / paper trade results ────────────────────────────────────────
 
 @app.get("/api/shadow/trades")
@@ -1168,6 +1295,9 @@ _SAFE_KEYS = {
     # Spot ATR risk (Mode C/D)
     "USE_SPOT_ATR_RISK", "SPOT_ATR_PERIOD", "SPOT_ATR_SL_MULT",
     "SPOT_ATR_TARGET_RR", "SPOT_ATR_TRAIL_RR",
+    # Expiry Iron Fly strategy
+    "ENABLE_EXPIRY_FLY", "FLY_ENTRY_TIME", "FLY_EXIT_TIME", "FLY_WING_POINTS",
+    "FLY_STOP_PCT", "FLY_QUANTITY", "FLY_MIN_CREDIT", "FLY_EXTRA_SLIPPAGE_PTS",
     # Smart exit
     "ENABLE_SMART_EXIT", "ENABLE_REVERSAL_EXIT", "ENABLE_EMA_COLLAPSE_EXIT",
     "ENABLE_PROFIT_LOCK_EXIT", "ENABLE_TIME_DECAY_EXIT", "ENABLE_DAILY_LOSS_LIMIT",
@@ -1226,6 +1356,9 @@ _EDITABLE_KEYS = {
     # Spot ATR risk (Mode C/D)
     "USE_SPOT_ATR_RISK", "SPOT_ATR_PERIOD", "SPOT_ATR_SL_MULT",
     "SPOT_ATR_TARGET_RR", "SPOT_ATR_TRAIL_RR",
+    # Expiry Iron Fly strategy
+    "ENABLE_EXPIRY_FLY", "FLY_ENTRY_TIME", "FLY_EXIT_TIME", "FLY_WING_POINTS",
+    "FLY_STOP_PCT", "FLY_QUANTITY", "FLY_MIN_CREDIT", "FLY_EXTRA_SLIPPAGE_PTS",
     # Smart exit
     "ENABLE_SMART_EXIT", "ENABLE_REVERSAL_EXIT", "ENABLE_EMA_COLLAPSE_EXIT",
     "ENABLE_PROFIT_LOCK_EXIT", "ENABLE_TIME_DECAY_EXIT", "ENABLE_DAILY_LOSS_LIMIT",

@@ -1,0 +1,1043 @@
+time,event,fields
+2025-10-08 09:35:00,CE_ORB_SIGNAL,candle=2025-10-08 09:30:00+05:30 | close=82130.57
+2025-10-08 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25100982100CE | first_ltp=277.6
+2025-10-08 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=138.8 | qty=20 | risk_rupees=2776.0 | max_rupees=2000.0
+2025-10-08 09:40:00,CE_ORB_SIGNAL,candle=2025-10-08 09:35:00+05:30 | close=82185.24
+2025-10-08 09:40:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25100982200CE | first_ltp=252.95
+2025-10-08 09:40:00,ENTRY_SENT,symbol=SENSEX25100982200CE | qty=20 | signal=CE_ORB
+2025-10-08 09:40:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX25100982200CE | qty=20 | fill=252.95 | order_id=PAPER_27250125
+2025-10-08 09:40:00,ENTRY_FILLED,symbol=SENSEX25100982200CE | fill=252.95 | qty=20
+2025-10-08 09:40:00,INDEX_RISK_APPLIED,signal=CE_ORB | side=CE | sl_mode=swing_sl | sensex_entry=82184.16 | index_stop=82108.56 | index_target=82350.46 | index_risk=75.6 | delta=0.5 | option_entry=252.95 | option_backstop=196.25
+2025-10-08 09:50:30,PIVOT_EXIT,reason=IDX_SL_HIT | sensex=82076.7 | stage=INITIAL | index_stop=82108.56 | best=82239.15
+2025-10-08 09:50:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX25100982200CE | qty=20 | fill=200.05 | order_id=PAPER_E9722B47 | tag=IDX_SL_HIT
+2025-10-08 09:50:30,EXIT_FILLED,symbol=SENSEX25100982200CE | exit_price=200.05 | pnl=-1057.9999999999995 | reason=IDX_SL_HIT
+2025-10-08 09:50:30,SMART_ENTRY_COOLDOWN_STARTED,pnl_pts=-52.9 | cooldown_candles=2
+2025-10-08 10:00:00,SMART_ENTRY_COOLDOWN_EXPIRED,
+2025-10-09 09:20:00,ORB_BLOCKED_THURSDAY,candle=2025-10-09 09:15:00+05:30
+2025-10-09 09:25:00,ORB_BLOCKED_THURSDAY,candle=2025-10-09 09:20:00+05:30
+2025-10-09 09:30:00,ORB_BLOCKED_THURSDAY,candle=2025-10-09 09:25:00+05:30
+2025-10-09 09:35:00,ORB_BLOCKED_THURSDAY,candle=2025-10-09 09:30:00+05:30
+2025-10-09 09:40:00,ORB_BLOCKED_THURSDAY,candle=2025-10-09 09:35:00+05:30
+2025-10-09 09:45:00,ORB_BLOCKED_THURSDAY,candle=2025-10-09 09:40:00+05:30
+2025-10-10 09:35:00,CE_ORB_SIGNAL,candle=2025-10-10 09:30:00+05:30 | close=82398.44
+2025-10-10 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25101682400CE | first_ltp=501.8
+2025-10-10 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=163.8 | qty=20 | risk_rupees=3276.0 | max_rupees=2000.0
+2025-10-10 09:40:00,CE_ORB_SIGNAL,candle=2025-10-10 09:35:00+05:30 | close=82387.63
+2025-10-10 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=155.4 | qty=20 | risk_rupees=3108.0 | max_rupees=2000.0
+2025-10-16 09:20:00,ORB_BLOCKED_THURSDAY,candle=2025-10-16 09:15:00+05:30
+2025-10-16 09:25:00,ORB_BLOCKED_THURSDAY,candle=2025-10-16 09:20:00+05:30
+2025-10-16 09:30:00,ORB_BLOCKED_THURSDAY,candle=2025-10-16 09:25:00+05:30
+2025-10-16 09:35:00,ORB_BLOCKED_THURSDAY,candle=2025-10-16 09:30:00+05:30
+2025-10-16 09:40:00,ORB_BLOCKED_THURSDAY,candle=2025-10-16 09:35:00+05:30
+2025-10-16 09:45:00,ORB_BLOCKED_THURSDAY,candle=2025-10-16 09:40:00+05:30
+2025-10-23 09:20:00,ORB_BLOCKED_THURSDAY,candle=2025-10-23 09:15:00+05:30
+2025-10-23 09:25:00,ORB_BLOCKED_THURSDAY,candle=2025-10-23 09:20:00+05:30
+2025-10-23 09:30:00,ORB_BLOCKED_THURSDAY,candle=2025-10-23 09:25:00+05:30
+2025-10-23 09:35:00,ORB_BLOCKED_THURSDAY,candle=2025-10-23 09:30:00+05:30
+2025-10-23 09:40:00,ORB_BLOCKED_THURSDAY,candle=2025-10-23 09:35:00+05:30
+2025-10-23 09:45:00,ORB_BLOCKED_THURSDAY,candle=2025-10-23 09:40:00+05:30
+2025-10-27 09:35:00,CE_ORB_SIGNAL,candle=2025-10-27 09:30:00+05:30 | close=84564.16
+2025-10-27 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=CE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2025-10-27 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25103084600CE | first_ltp=463.65
+2025-10-27 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=139.9 | qty=20 | risk_rupees=2798.0 | max_rupees=2000.0
+2025-10-27 09:40:00,CE_ORB_SIGNAL,candle=2025-10-27 09:35:00+05:30 | close=84634.35
+2025-10-27 09:40:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=CE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2025-10-27 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=177.2 | qty=20 | risk_rupees=3544.0 | max_rupees=2000.0
+2025-10-30 09:20:00,ORB_BLOCKED_THURSDAY,candle=2025-10-30 09:15:00+05:30
+2025-10-30 09:25:00,ORB_BLOCKED_THURSDAY,candle=2025-10-30 09:20:00+05:30
+2025-10-30 09:30:00,ORB_BLOCKED_THURSDAY,candle=2025-10-30 09:25:00+05:30
+2025-10-30 09:35:00,ORB_BLOCKED_THURSDAY,candle=2025-10-30 09:30:00+05:30
+2025-10-30 09:40:00,ORB_BLOCKED_THURSDAY,candle=2025-10-30 09:35:00+05:30
+2025-10-30 09:45:00,ORB_BLOCKED_THURSDAY,candle=2025-10-30 09:40:00+05:30
+2025-10-31 09:35:00,CE_ORB_SIGNAL,candle=2025-10-31 09:30:00+05:30 | close=84684.91
+2025-10-31 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=CE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2025-10-31 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25110684700CE | first_ltp=576.5
+2025-10-31 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=100.35 | qty=20 | risk_rupees=2007.0 | max_rupees=2000.0
+2025-10-31 09:40:00,CE_ORB_SIGNAL,candle=2025-10-31 09:35:00+05:30 | close=84655.83
+2025-10-31 09:40:00,ENTRY_SENT,symbol=SENSEX25110684700CE | qty=20 | signal=CE_ORB
+2025-10-31 09:40:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX25110684700CE | qty=20 | fill=562.75 | order_id=PAPER_C6E5A304
+2025-10-31 09:40:00,ENTRY_FILLED,symbol=SENSEX25110684700CE | fill=562.75 | qty=20
+2025-10-31 09:40:00,INDEX_RISK_APPLIED,signal=CE_ORB | side=CE | sl_mode=swing_sl | sensex_entry=84659.33 | index_stop=84481.33 | index_target=85050.93 | index_risk=178.0 | delta=0.5 | option_entry=562.75 | option_backstop=429.25
+2025-10-31 10:04:30,PIVOT_EXIT,reason=IDX_SL_HIT | sensex=84480.18 | stage=INITIAL | index_stop=84481.33 | best=84665.93
+2025-10-31 10:04:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX25110684700CE | qty=20 | fill=470.45 | order_id=PAPER_4F0888ED | tag=IDX_SL_HIT
+2025-10-31 10:04:30,EXIT_FILLED,symbol=SENSEX25110684700CE | exit_price=470.45 | pnl=-1846.0000000000002 | reason=IDX_SL_HIT
+2025-10-31 10:04:30,SMART_ENTRY_COOLDOWN_STARTED,pnl_pts=-92.3 | cooldown_candles=2
+2025-10-31 10:10:00,SMART_ENTRY_COOLDOWN_EXPIRED,
+2025-11-06 09:20:00,ORB_BLOCKED_THURSDAY,candle=2025-11-06 09:15:00+05:30
+2025-11-06 09:25:00,ORB_BLOCKED_THURSDAY,candle=2025-11-06 09:20:00+05:30
+2025-11-06 09:30:00,ORB_BLOCKED_THURSDAY,candle=2025-11-06 09:25:00+05:30
+2025-11-06 09:35:00,ORB_BLOCKED_THURSDAY,candle=2025-11-06 09:30:00+05:30
+2025-11-06 09:40:00,ORB_BLOCKED_THURSDAY,candle=2025-11-06 09:35:00+05:30
+2025-11-06 09:45:00,ORB_BLOCKED_THURSDAY,candle=2025-11-06 09:40:00+05:30
+2025-11-07 09:30:00,PE_ORB_SIGNAL,candle=2025-11-07 09:25:00+05:30 | close=82769.14
+2025-11-07 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25111382800PE | first_ltp=527.0
+2025-11-07 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=263.5 | qty=20 | risk_rupees=5270.0 | max_rupees=2000.0
+2025-11-07 09:35:00,PE_ORB_SIGNAL,candle=2025-11-07 09:30:00+05:30 | close=82688.36
+2025-11-07 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25111382700PE | first_ltp=513.75
+2025-11-07 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=256.9 | qty=20 | risk_rupees=5138.0 | max_rupees=2000.0
+2025-11-07 09:40:00,PE_ORB_SIGNAL,candle=2025-11-07 09:35:00+05:30 | close=82734.38
+2025-11-07 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=245.0 | qty=20 | risk_rupees=4900.0 | max_rupees=2000.0
+2025-11-11 09:30:00,PE_ORB_SIGNAL,candle=2025-11-11 09:25:00+05:30 | close=83360.01
+2025-11-11 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25111383400PE | first_ltp=395.35
+2025-11-11 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=170.55 | qty=20 | risk_rupees=3411.0 | max_rupees=2000.0
+2025-11-11 09:35:00,PE_ORB_SIGNAL,candle=2025-11-11 09:30:00+05:30 | close=83291.28
+2025-11-11 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2025-11-11 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25111383300PE | first_ltp=377.35
+2025-11-11 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=188.7 | qty=20 | risk_rupees=3774.0 | max_rupees=2000.0
+2025-11-11 09:40:00,PE_ORB_SIGNAL,candle=2025-11-11 09:35:00+05:30 | close=83317.93
+2025-11-11 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=183.7 | qty=20 | risk_rupees=3674.0 | max_rupees=2000.0
+2025-11-13 09:20:00,ORB_BLOCKED_THURSDAY,candle=2025-11-13 09:15:00+05:30
+2025-11-13 09:25:00,ORB_BLOCKED_THURSDAY,candle=2025-11-13 09:20:00+05:30
+2025-11-13 09:30:00,ORB_BLOCKED_THURSDAY,candle=2025-11-13 09:25:00+05:30
+2025-11-13 09:35:00,ORB_BLOCKED_THURSDAY,candle=2025-11-13 09:30:00+05:30
+2025-11-13 09:40:00,ORB_BLOCKED_THURSDAY,candle=2025-11-13 09:35:00+05:30
+2025-11-13 09:45:00,ORB_BLOCKED_THURSDAY,candle=2025-11-13 09:40:00+05:30
+2025-11-20 09:20:00,ORB_BLOCKED_THURSDAY,candle=2025-11-20 09:15:00+05:30
+2025-11-20 09:25:00,ORB_BLOCKED_THURSDAY,candle=2025-11-20 09:20:00+05:30
+2025-11-20 09:30:00,ORB_BLOCKED_THURSDAY,candle=2025-11-20 09:25:00+05:30
+2025-11-20 09:35:00,ORB_BLOCKED_THURSDAY,candle=2025-11-20 09:30:00+05:30
+2025-11-20 09:40:00,ORB_BLOCKED_THURSDAY,candle=2025-11-20 09:35:00+05:30
+2025-11-20 09:45:00,ORB_BLOCKED_THURSDAY,candle=2025-11-20 09:40:00+05:30
+2025-11-21 09:30:00,CE_ORB_SIGNAL,candle=2025-11-21 09:25:00+05:30 | close=85568.51
+2025-11-21 09:30:00,SMART_ENTRY_BLOCKED_SLOPE,direction=CE_ORB | ema9_now=85602.14 | ema9_prev=85610.55 | reason=EMA9 not rising for CE
+2025-11-21 09:35:00,CE_ORB_SIGNAL,candle=2025-11-21 09:30:00+05:30 | close=85527.4
+2025-11-21 09:35:00,SMART_ENTRY_BLOCKED_SLOPE,direction=CE_ORB | ema9_now=85587.19 | ema9_prev=85602.14 | reason=EMA9 not rising for CE
+2025-11-21 09:40:00,CE_ORB_SIGNAL,candle=2025-11-21 09:35:00+05:30 | close=85514.05
+2025-11-21 09:40:00,SMART_ENTRY_BLOCKED_SLOPE,direction=CE_ORB | ema9_now=85572.56 | ema9_prev=85587.19 | reason=EMA9 not rising for CE
+2025-11-27 09:20:00,ORB_BLOCKED_THURSDAY,candle=2025-11-27 09:15:00+05:30
+2025-11-27 09:25:00,ORB_BLOCKED_THURSDAY,candle=2025-11-27 09:20:00+05:30
+2025-11-27 09:30:00,ORB_BLOCKED_THURSDAY,candle=2025-11-27 09:25:00+05:30
+2025-11-27 09:35:00,ORB_BLOCKED_THURSDAY,candle=2025-11-27 09:30:00+05:30
+2025-11-27 09:40:00,ORB_BLOCKED_THURSDAY,candle=2025-11-27 09:35:00+05:30
+2025-11-27 09:45:00,ORB_BLOCKED_THURSDAY,candle=2025-11-27 09:40:00+05:30
+2025-12-04 09:20:00,ORB_BLOCKED_THURSDAY,candle=2025-12-04 09:15:00+05:30
+2025-12-04 09:25:00,ORB_BLOCKED_THURSDAY,candle=2025-12-04 09:20:00+05:30
+2025-12-04 09:30:00,ORB_BLOCKED_THURSDAY,candle=2025-12-04 09:25:00+05:30
+2025-12-04 09:35:00,ORB_BLOCKED_THURSDAY,candle=2025-12-04 09:30:00+05:30
+2025-12-04 09:40:00,ORB_BLOCKED_THURSDAY,candle=2025-12-04 09:35:00+05:30
+2025-12-04 09:45:00,ORB_BLOCKED_THURSDAY,candle=2025-12-04 09:40:00+05:30
+2025-12-09 09:30:00,PE_ORB_SIGNAL,candle=2025-12-09 09:25:00+05:30 | close=84619.8
+2025-12-09 09:30:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2025-12-09 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25121184600PE | first_ltp=325.4
+2025-12-09 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=162.7 | qty=20 | risk_rupees=3254.0 | max_rupees=2000.0
+2025-12-09 09:35:00,PE_ORB_SIGNAL,candle=2025-12-09 09:30:00+05:30 | close=84523.46
+2025-12-09 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2025-12-09 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25121184500PE | first_ltp=329.55
+2025-12-09 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=164.8 | qty=20 | risk_rupees=3296.0 | max_rupees=2000.0
+2025-12-09 09:40:00,PE_ORB_SIGNAL,candle=2025-12-09 09:35:00+05:30 | close=84482.61
+2025-12-09 09:40:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2025-12-09 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=175.6 | qty=20 | risk_rupees=3512.0 | max_rupees=2000.0
+2025-12-11 09:20:00,ORB_BLOCKED_THURSDAY,candle=2025-12-11 09:15:00+05:30
+2025-12-11 09:25:00,ORB_BLOCKED_THURSDAY,candle=2025-12-11 09:20:00+05:30
+2025-12-11 09:30:00,ORB_BLOCKED_THURSDAY,candle=2025-12-11 09:25:00+05:30
+2025-12-11 09:35:00,ORB_BLOCKED_THURSDAY,candle=2025-12-11 09:30:00+05:30
+2025-12-11 09:40:00,ORB_BLOCKED_THURSDAY,candle=2025-12-11 09:35:00+05:30
+2025-12-11 09:45:00,ORB_BLOCKED_THURSDAY,candle=2025-12-11 09:40:00+05:30
+2025-12-18 09:20:00,ORB_BLOCKED_THURSDAY,candle=2025-12-18 09:15:00+05:30
+2025-12-18 09:25:00,ORB_BLOCKED_THURSDAY,candle=2025-12-18 09:20:00+05:30
+2025-12-18 09:30:00,ORB_BLOCKED_THURSDAY,candle=2025-12-18 09:25:00+05:30
+2025-12-18 09:35:00,ORB_BLOCKED_THURSDAY,candle=2025-12-18 09:30:00+05:30
+2025-12-18 09:40:00,ORB_BLOCKED_THURSDAY,candle=2025-12-18 09:35:00+05:30
+2025-12-18 09:45:00,ORB_BLOCKED_THURSDAY,candle=2025-12-18 09:40:00+05:30
+2025-12-19 09:35:00,CE_ORB_SIGNAL,candle=2025-12-19 09:30:00+05:30 | close=84990.24
+2025-12-19 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=CE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2025-12-19 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25122485000CE | first_ltp=437.0
+2025-12-19 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=175.15 | qty=20 | risk_rupees=3503.0 | max_rupees=2000.0
+2025-12-19 09:40:00,CE_ORB_SIGNAL,candle=2025-12-19 09:35:00+05:30 | close=85004.33
+2025-12-19 09:40:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=CE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2025-12-19 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=182.35 | qty=20 | risk_rupees=3647.0 | max_rupees=2000.0
+2025-12-22 09:30:00,CE_ORB_SIGNAL,candle=2025-12-22 09:25:00+05:30 | close=85405.82
+2025-12-22 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX25122485400CE | first_ltp=342.9
+2025-12-22 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=171.45 | qty=20 | risk_rupees=3429.0 | max_rupees=2000.0
+2025-12-22 09:35:00,CE_ORB_SIGNAL,candle=2025-12-22 09:30:00+05:30 | close=85412.65
+2025-12-22 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=170.9 | qty=20 | risk_rupees=3418.0 | max_rupees=2000.0
+2025-12-22 09:40:00,CE_ORB_SIGNAL,candle=2025-12-22 09:35:00+05:30 | close=85373.91
+2025-12-22 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=159.6 | qty=20 | risk_rupees=3192.0 | max_rupees=2000.0
+2025-12-30 09:30:00,PE_ORB_SIGNAL,candle=2025-12-30 09:25:00+05:30 | close=84491.89
+2025-12-30 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26010184500PE | first_ltp=293.15
+2025-12-30 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=136.7 | qty=20 | risk_rupees=2734.0 | max_rupees=2000.0
+2026-01-01 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-01-01 09:15:00+05:30
+2026-01-01 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-01-01 09:20:00+05:30
+2026-01-01 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-01-01 09:25:00+05:30
+2026-01-01 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-01-01 09:30:00+05:30
+2026-01-01 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-01-01 09:35:00+05:30
+2026-01-01 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-01-01 09:40:00+05:30
+2026-01-02 09:35:00,CE_ORB_SIGNAL,candle=2026-01-02 09:30:00+05:30 | close=85362.77
+2026-01-02 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26010885400CE | first_ltp=456.95
+2026-01-02 09:35:00,ENTRY_SENT,symbol=SENSEX26010885400CE | qty=20 | signal=CE_ORB
+2026-01-02 09:35:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26010885400CE | qty=20 | fill=456.95 | order_id=PAPER_F400A6E7
+2026-01-02 09:35:00,ENTRY_FILLED,symbol=SENSEX26010885400CE | fill=456.95 | qty=20
+2026-01-02 09:35:00,INDEX_RISK_APPLIED,signal=CE_ORB | side=CE | sl_mode=swing_sl | sensex_entry=85362.55 | index_stop=85230.45 | index_target=85653.15 | index_risk=132.1 | delta=0.5 | option_entry=456.95 | option_backstop=357.85
+2026-01-02 09:40:00,CE_ORB_SIGNAL,candle=2026-01-02 09:35:00+05:30 | close=85392.73
+2026-01-02 09:42:30,PIVOT_STOP_MOVED,side=CE | stage=BE | old=85230.45 | new=85374.55 | option_stop=460.95 | locked_idx_pts=12.0
+2026-01-02 09:42:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=357.85 | new_sl=460.95
+2026-01-02 09:44:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85374.55 | new=85386.95 | option_stop=465.1 | locked_idx_pts=24.4
+2026-01-02 09:44:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=460.95 | new_sl=465.1
+2026-01-02 09:44:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85386.95 | new=85386.95 | option_stop=465.1 | locked_idx_pts=24.4
+2026-01-02 09:47:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85386.95 | new=85393.8 | option_stop=467.35 | locked_idx_pts=31.25
+2026-01-02 09:47:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=465.1 | new_sl=467.35
+2026-01-02 09:48:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85393.8 | new=85408.7 | option_stop=472.35 | locked_idx_pts=46.15
+2026-01-02 09:48:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=467.35 | new_sl=472.35
+2026-01-02 09:50:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85408.7 | new=85412.5 | option_stop=473.6 | locked_idx_pts=49.95
+2026-01-02 09:50:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=472.35 | new_sl=473.6
+2026-01-02 09:50:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85412.5 | new=85414.14 | option_stop=474.15 | locked_idx_pts=51.59
+2026-01-02 09:50:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=473.6 | new_sl=474.15
+2026-01-02 09:52:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85414.14 | new=85431.55 | option_stop=479.95 | locked_idx_pts=69.0
+2026-01-02 09:52:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=474.15 | new_sl=479.95
+2026-01-02 09:53:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85431.55 | new=85442.41 | option_stop=483.55 | locked_idx_pts=79.86
+2026-01-02 09:53:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=479.95 | new_sl=483.55
+2026-01-02 09:54:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85442.41 | new=85452.42 | option_stop=486.9 | locked_idx_pts=89.87
+2026-01-02 09:54:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=483.55 | new_sl=486.9
+2026-01-02 09:55:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85452.42 | new=85453.48 | option_stop=487.25 | locked_idx_pts=90.93
+2026-01-02 09:55:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=486.9 | new_sl=487.25
+2026-01-02 09:55:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.48 | new=85453.48 | option_stop=487.25 | locked_idx_pts=90.93
+2026-01-02 09:55:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.48 | new=85453.48 | option_stop=487.25 | locked_idx_pts=90.93
+2026-01-02 09:55:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.48 | new=85453.48 | option_stop=487.25 | locked_idx_pts=90.93
+2026-01-02 09:56:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.48 | new=85453.48 | option_stop=487.25 | locked_idx_pts=90.93
+2026-01-02 09:56:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.48 | new=85453.48 | option_stop=487.25 | locked_idx_pts=90.93
+2026-01-02 09:56:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.48 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:56:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:57:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:57:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:57:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:57:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:58:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:58:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:58:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:58:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:59:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:59:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:59:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 09:59:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85453.49 | option_stop=487.25 | locked_idx_pts=90.94
+2026-01-02 10:00:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85453.49 | new=85457.01 | option_stop=488.45 | locked_idx_pts=94.46
+2026-01-02 10:00:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=487.25 | new_sl=488.45
+2026-01-02 10:05:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85457.01 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:05:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=488.45 | new_sl=489.2
+2026-01-02 10:05:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:05:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:05:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:06:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:06:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:06:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:06:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:07:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:07:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:07:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:07:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:08:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:08:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:08:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:08:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:09:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:09:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:09:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:09:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85459.34 | option_stop=489.2 | locked_idx_pts=96.79
+2026-01-02 10:10:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85459.34 | new=85462.71 | option_stop=490.35 | locked_idx_pts=100.16
+2026-01-02 10:10:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=489.2 | new_sl=490.35
+2026-01-02 10:15:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85462.71 | new=85465.62 | option_stop=491.3 | locked_idx_pts=103.07
+2026-01-02 10:15:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=490.35 | new_sl=491.3
+2026-01-02 10:20:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85465.62 | new=85467.04 | option_stop=491.8 | locked_idx_pts=104.49
+2026-01-02 10:20:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=491.3 | new_sl=491.8
+2026-01-02 10:25:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85467.04 | new=85471.58 | option_stop=493.3 | locked_idx_pts=109.03
+2026-01-02 10:25:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=491.8 | new_sl=493.3
+2026-01-02 10:30:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85471.58 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:30:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=493.3 | new_sl=494.45
+2026-01-02 10:30:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:30:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:30:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:31:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:31:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:31:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:31:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:32:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:32:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:32:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:32:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:33:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:33:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:33:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:33:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:34:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:34:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:34:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:34:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85475.02 | option_stop=494.45 | locked_idx_pts=112.47
+2026-01-02 10:35:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85475.02 | new=85478.43 | option_stop=495.6 | locked_idx_pts=115.88
+2026-01-02 10:35:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=494.45 | new_sl=495.6
+2026-01-02 10:40:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85478.43 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:40:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=495.6 | new_sl=496.25
+2026-01-02 10:40:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:40:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:40:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:41:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:41:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:41:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:41:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:42:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:42:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:42:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:42:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:43:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:43:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:43:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:43:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:44:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:44:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:44:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:44:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85480.49 | option_stop=496.25 | locked_idx_pts=117.94
+2026-01-02 10:45:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85480.49 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:45:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=496.25 | new_sl=497.6
+2026-01-02 10:45:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:45:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:45:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:46:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:46:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:46:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:46:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:47:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:47:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:47:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:47:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:48:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:48:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:48:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:48:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:49:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:49:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:49:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:49:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85484.55 | option_stop=497.6 | locked_idx_pts=122.0
+2026-01-02 10:50:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85484.55 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:50:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=497.6 | new_sl=498.35
+2026-01-02 10:50:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:50:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:50:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:51:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:51:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:51:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:51:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:52:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:52:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:52:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:52:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:53:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:53:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:53:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:53:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:54:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:54:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:54:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:54:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85486.76 | option_stop=498.35 | locked_idx_pts=124.21
+2026-01-02 10:55:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85486.76 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:55:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=498.35 | new_sl=499.65
+2026-01-02 10:55:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:55:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:55:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:56:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:56:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:56:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:56:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:57:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:57:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:57:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:57:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:58:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:58:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:58:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:58:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:59:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:59:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:59:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 10:59:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85490.66 | option_stop=499.65 | locked_idx_pts=128.11
+2026-01-02 11:00:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85490.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:00:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=499.65 | new_sl=501.0
+2026-01-02 11:00:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:00:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:00:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:01:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:01:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:01:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:01:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:02:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:02:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:02:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:02:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:03:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:03:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:03:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:03:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:04:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:04:15,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:04:30,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:04:45,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85494.66 | option_stop=501.0 | locked_idx_pts=132.11
+2026-01-02 11:05:00,PIVOT_STOP_MOVED,side=CE | stage=TRAIL | old=85494.66 | new=85497.19 | option_stop=501.85 | locked_idx_pts=134.64
+2026-01-02 11:05:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_89748CBE | old_sl=501.0 | new_sl=501.85
+2026-01-02 11:08:30,PIVOT_EXIT,reason=IDX_TSL_HIT | sensex=85494.68 | stage=TRAIL | index_stop=85497.19 | best=85605.55
+2026-01-02 11:08:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX26010885400CE | qty=20 | fill=523.15 | order_id=PAPER_42A9263D | tag=IDX_TSL_HIT
+2026-01-02 11:08:30,EXIT_FILLED,symbol=SENSEX26010885400CE | exit_price=523.15 | pnl=1323.9999999999998 | reason=IDX_TSL_HIT
+2026-01-08 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-01-08 09:15:00+05:30
+2026-01-08 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-01-08 09:20:00+05:30
+2026-01-08 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-01-08 09:25:00+05:30
+2026-01-08 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-01-08 09:30:00+05:30
+2026-01-08 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-01-08 09:35:00+05:30
+2026-01-08 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-01-08 09:40:00+05:30
+2026-01-12 09:30:00,PE_ORB_SIGNAL,candle=2026-01-12 09:25:00+05:30 | close=83071.94
+2026-01-12 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26011483100PE | first_ltp=356.15
+2026-01-12 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=178.05 | qty=20 | risk_rupees=3561.0 | max_rupees=2000.0
+2026-01-12 09:35:00,PE_ORB_SIGNAL,candle=2026-01-12 09:30:00+05:30 | close=83180.25
+2026-01-12 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26011483200PE | first_ltp=362.1
+2026-01-12 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=181.05 | qty=20 | risk_rupees=3621.0 | max_rupees=2000.0
+2026-01-12 09:40:00,PE_ORB_SIGNAL,candle=2026-01-12 09:35:00+05:30 | close=83234.74
+2026-01-12 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=163.5 | qty=20 | risk_rupees=3270.0 | max_rupees=2000.0
+2026-01-20 09:30:00,PE_ORB_SIGNAL,candle=2026-01-20 09:25:00+05:30 | close=82949.11
+2026-01-20 09:30:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-01-20 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26012282900PE | first_ltp=331.4
+2026-01-20 09:30:00,ENTRY_SENT,symbol=SENSEX26012282900PE | qty=20 | signal=PE_ORB
+2026-01-20 09:30:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26012282900PE | qty=20 | fill=331.4 | order_id=PAPER_AFC72AB5
+2026-01-20 09:30:00,ENTRY_FILLED,symbol=SENSEX26012282900PE | fill=331.4 | qty=20
+2026-01-20 09:30:00,INDEX_RISK_APPLIED,signal=PE_ORB | side=PE | sl_mode=swing_sl | sensex_entry=82945.56 | index_stop=83126.76 | index_target=82546.96 | index_risk=181.2 | delta=0.5 | option_entry=331.4 | option_backstop=195.5
+2026-01-20 09:35:00,PE_ORB_SIGNAL,candle=2026-01-20 09:30:00+05:30 | close=82986.21
+2026-01-20 09:40:00,PE_ORB_SIGNAL,candle=2026-01-20 09:35:00+05:30 | close=82883.13
+2026-01-20 12:42:15,PIVOT_STOP_MOVED,side=PE | stage=BE | old=83126.76 | new=82933.56 | option_stop=335.4 | locked_idx_pts=12.0
+2026-01-20 12:42:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82933.56 | new=82872.53 | option_stop=355.75 | locked_idx_pts=73.03
+2026-01-20 12:42:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=195.5 | new_sl=355.75
+2026-01-20 12:44:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82872.53 | new=82869.54 | option_stop=356.75 | locked_idx_pts=76.02
+2026-01-20 12:44:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=355.75 | new_sl=356.75
+2026-01-20 12:45:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82869.54 | new=82868.18 | option_stop=357.2 | locked_idx_pts=77.38
+2026-01-20 12:45:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=356.75 | new_sl=357.2
+2026-01-20 12:45:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82868.18 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:45:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=357.2 | new_sl=361.9
+2026-01-20 12:45:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:45:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:46:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:46:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:46:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:46:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:47:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:47:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:47:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:47:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:48:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:48:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:48:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:48:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:49:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:49:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:49:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:49:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82854.11 | option_stop=361.9 | locked_idx_pts=91.45
+2026-01-20 12:55:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82854.11 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:55:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=361.9 | new_sl=362.5
+2026-01-20 12:55:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:55:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:55:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:56:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:56:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:56:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:56:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:57:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:57:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:57:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:57:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:58:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:58:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:58:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:58:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:59:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:59:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:59:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 12:59:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82852.23 | option_stop=362.5 | locked_idx_pts=93.33
+2026-01-20 13:00:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82852.23 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:00:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=362.5 | new_sl=363.3
+2026-01-20 13:00:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:00:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:00:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:01:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:01:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:01:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:01:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:02:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:02:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:02:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:02:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:03:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:03:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:03:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:03:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:04:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:04:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:04:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:04:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82849.9 | option_stop=363.3 | locked_idx_pts=95.66
+2026-01-20 13:05:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82849.9 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:05:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=363.3 | new_sl=364.3
+2026-01-20 13:05:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:05:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:05:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:06:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:06:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:06:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:06:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:07:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:07:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:07:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:07:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:08:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:08:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:08:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:08:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:09:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:09:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:09:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:09:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82846.89 | option_stop=364.3 | locked_idx_pts=98.67
+2026-01-20 13:10:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82846.89 | new=82845.08 | option_stop=364.9 | locked_idx_pts=100.48
+2026-01-20 13:10:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=364.3 | new_sl=364.9
+2026-01-20 13:15:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82845.08 | new=82843.46 | option_stop=365.45 | locked_idx_pts=102.1
+2026-01-20 13:15:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=364.9 | new_sl=365.45
+2026-01-20 13:20:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82843.46 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:20:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=365.45 | new_sl=365.95
+2026-01-20 13:20:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:20:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:20:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:21:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:21:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:21:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:21:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:22:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:22:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:22:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:22:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:23:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:23:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:23:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:23:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:24:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:24:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:24:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:24:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82841.84 | option_stop=365.95 | locked_idx_pts=103.72
+2026-01-20 13:30:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82841.84 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:30:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=365.95 | new_sl=366.8
+2026-01-20 13:30:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:30:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:30:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:31:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:31:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:31:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:31:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:32:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:32:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:32:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:32:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:33:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:33:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:33:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:33:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:34:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:34:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82839.42 | option_stop=366.8 | locked_idx_pts=106.14
+2026-01-20 13:34:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82839.42 | new=82824.26 | option_stop=371.85 | locked_idx_pts=121.3
+2026-01-20 13:34:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=366.8 | new_sl=371.85
+2026-01-20 13:34:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82824.26 | new=82824.26 | option_stop=371.85 | locked_idx_pts=121.3
+2026-01-20 13:35:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82824.26 | new=82806.61 | option_stop=377.7 | locked_idx_pts=138.95
+2026-01-20 13:35:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=371.85 | new_sl=377.7
+2026-01-20 13:36:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82806.61 | new=82759.82 | option_stop=393.3 | locked_idx_pts=185.74
+2026-01-20 13:36:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=377.7 | new_sl=393.3
+2026-01-20 13:37:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82759.82 | new=82749.06 | option_stop=396.9 | locked_idx_pts=196.5
+2026-01-20 13:37:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=393.3 | new_sl=396.9
+2026-01-20 13:39:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82749.06 | new=82734.72 | option_stop=401.7 | locked_idx_pts=210.84
+2026-01-20 13:39:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=396.9 | new_sl=401.7
+2026-01-20 13:40:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82734.72 | new=82729.1 | option_stop=403.55 | locked_idx_pts=216.46
+2026-01-20 13:40:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=401.7 | new_sl=403.55
+2026-01-20 13:40:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82729.1 | new=82729.1 | option_stop=403.55 | locked_idx_pts=216.46
+2026-01-20 13:41:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82729.1 | new=82729.1 | option_stop=403.55 | locked_idx_pts=216.46
+2026-01-20 13:41:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82729.1 | new=82729.1 | option_stop=403.55 | locked_idx_pts=216.46
+2026-01-20 13:41:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82729.1 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:41:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=403.55 | new_sl=407.6
+2026-01-20 13:41:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:42:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:42:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:42:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:42:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:43:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:43:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:43:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:43:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:44:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:44:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:44:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:44:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.91 | option_stop=407.6 | locked_idx_pts=228.65
+2026-01-20 13:45:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.91 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:45:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=407.6 | new_sl=407.7
+2026-01-20 13:45:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:45:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:45:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:46:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:46:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:46:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:46:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:47:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:47:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:47:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:47:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:48:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:48:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:48:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:48:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:49:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:49:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82716.71 | option_stop=407.7 | locked_idx_pts=228.85
+2026-01-20 13:49:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82716.71 | new=82713.07 | option_stop=408.9 | locked_idx_pts=232.49
+2026-01-20 13:49:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=407.7 | new_sl=408.9
+2026-01-20 13:49:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82713.07 | new=82713.07 | option_stop=408.9 | locked_idx_pts=232.49
+2026-01-20 13:50:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82713.07 | new=82712.33 | option_stop=409.15 | locked_idx_pts=233.23
+2026-01-20 13:50:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=408.9 | new_sl=409.15
+2026-01-20 13:55:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82712.33 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:55:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=409.15 | new_sl=409.9
+2026-01-20 13:55:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:55:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:55:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:56:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:56:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:56:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:56:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:57:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:57:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:57:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:57:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:58:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:58:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:58:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:58:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:59:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:59:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:59:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 13:59:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82710.06 | option_stop=409.9 | locked_idx_pts=235.5
+2026-01-20 14:00:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82710.06 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:00:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=409.9 | new_sl=410.25
+2026-01-20 14:00:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:00:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:00:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:01:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:01:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:01:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:01:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:02:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:02:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:02:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:02:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:03:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:03:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82709.03 | option_stop=410.25 | locked_idx_pts=236.53
+2026-01-20 14:03:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82709.03 | new=82694.03 | option_stop=415.25 | locked_idx_pts=251.53
+2026-01-20 14:03:30,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=410.25 | new_sl=415.25
+2026-01-20 14:03:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82694.03 | new=82694.03 | option_stop=415.25 | locked_idx_pts=251.53
+2026-01-20 14:04:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82694.03 | new=82694.03 | option_stop=415.25 | locked_idx_pts=251.53
+2026-01-20 14:04:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82694.03 | new=82680.42 | option_stop=419.8 | locked_idx_pts=265.14
+2026-01-20 14:04:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=415.25 | new_sl=419.8
+2026-01-20 14:04:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82680.42 | new=82680.42 | option_stop=419.8 | locked_idx_pts=265.14
+2026-01-20 14:04:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82680.42 | new=82680.42 | option_stop=419.8 | locked_idx_pts=265.14
+2026-01-20 14:08:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82680.42 | new=82672.84 | option_stop=422.3 | locked_idx_pts=272.72
+2026-01-20 14:08:15,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=419.8 | new_sl=422.3
+2026-01-20 14:08:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.84 | new=82672.84 | option_stop=422.3 | locked_idx_pts=272.72
+2026-01-20 14:08:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.84 | new=82672.84 | option_stop=422.3 | locked_idx_pts=272.72
+2026-01-20 14:09:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.84 | new=82672.84 | option_stop=422.3 | locked_idx_pts=272.72
+2026-01-20 14:09:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.84 | new=82672.84 | option_stop=422.3 | locked_idx_pts=272.72
+2026-01-20 14:09:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.84 | new=82672.84 | option_stop=422.3 | locked_idx_pts=272.72
+2026-01-20 14:09:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.84 | new=82672.84 | option_stop=422.3 | locked_idx_pts=272.72
+2026-01-20 14:15:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.84 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:15:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=422.3 | new_sl=422.5
+2026-01-20 14:15:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:15:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:15:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:16:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:16:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:16:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:16:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:17:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:17:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:17:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:17:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:18:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:18:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:18:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:18:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:19:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:19:15,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:19:30,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:19:45,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.3 | option_stop=422.5 | locked_idx_pts=273.26
+2026-01-20 14:20:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.3 | new=82672.21 | option_stop=422.5 | locked_idx_pts=273.35
+2026-01-20 14:25:00,PIVOT_STOP_MOVED,side=PE | stage=TRAIL | old=82672.21 | new=82669.78 | option_stop=423.35 | locked_idx_pts=275.78
+2026-01-20 14:25:00,TRAILING_SL_UPDATED,mode=PAPER | order_id=PAPER_SL_83B3FAC7 | old_sl=422.5 | new_sl=423.35
+2026-01-20 14:29:30,PIVOT_EXIT,reason=IDX_TSL_HIT | sensex=82672.1 | stage=TRAIL | index_stop=82669.78 | best=82563.9
+2026-01-20 14:29:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX26012282900PE | qty=20 | fill=446.55 | order_id=PAPER_6991C6C2 | tag=IDX_TSL_HIT
+2026-01-20 14:29:30,EXIT_FILLED,symbol=SENSEX26012282900PE | exit_price=446.55 | pnl=2303.000000000001 | reason=IDX_TSL_HIT
+2026-01-22 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-01-22 09:15:00+05:30
+2026-01-22 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-01-22 09:20:00+05:30
+2026-01-22 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-01-22 09:25:00+05:30
+2026-01-22 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-01-22 09:30:00+05:30
+2026-01-22 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-01-22 09:35:00+05:30
+2026-01-22 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-01-22 09:40:00+05:30
+2026-01-27 09:30:00,PE_ORB_SIGNAL,candle=2026-01-27 09:25:00+05:30 | close=81148.59
+2026-01-27 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26012981200PE | first_ltp=483.35
+2026-01-27 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=241.7 | qty=20 | risk_rupees=4834.0 | max_rupees=2000.0
+2026-01-27 09:35:00,PE_ORB_SIGNAL,candle=2026-01-27 09:30:00+05:30 | close=81293.73
+2026-01-27 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26012981300PE | first_ltp=463.6
+2026-01-27 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=231.8 | qty=20 | risk_rupees=4636.0 | max_rupees=2000.0
+2026-01-28 09:30:00,CE_ORB_SIGNAL,candle=2026-01-28 09:25:00+05:30 | close=82428.72
+2026-01-28 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26012982400CE | first_ltp=374.1
+2026-01-28 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=187.05 | qty=20 | risk_rupees=3741.0 | max_rupees=2000.0
+2026-01-29 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-01-29 09:15:00+05:30
+2026-01-29 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-01-29 09:20:00+05:30
+2026-01-29 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-01-29 09:25:00+05:30
+2026-01-29 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-01-29 09:30:00+05:30
+2026-01-29 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-01-29 09:35:00+05:30
+2026-01-29 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-01-29 09:40:00+05:30
+2026-02-04 09:30:00,CE_ORB_SIGNAL,candle=2026-02-04 09:25:00+05:30 | close=83728.58
+2026-02-04 09:30:00,SMART_ENTRY_BLOCKED_SLOPE,direction=CE_ORB | ema9_now=83741.82 | ema9_prev=83745.12 | reason=EMA9 not rising for CE
+2026-02-04 09:35:00,CE_ORB_SIGNAL,candle=2026-02-04 09:30:00+05:30 | close=83767.67
+2026-02-04 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26020583800CE | first_ltp=319.85
+2026-02-04 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=159.9 | qty=20 | risk_rupees=3198.0 | max_rupees=2000.0
+2026-02-05 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-02-05 09:15:00+05:30
+2026-02-05 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-02-05 09:20:00+05:30
+2026-02-05 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-02-05 09:25:00+05:30
+2026-02-05 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-02-05 09:30:00+05:30
+2026-02-05 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-02-05 09:35:00+05:30
+2026-02-05 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-02-05 09:40:00+05:30
+2026-02-12 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-02-12 09:15:00+05:30
+2026-02-12 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-02-12 09:20:00+05:30
+2026-02-12 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-02-12 09:25:00+05:30
+2026-02-12 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-02-12 09:30:00+05:30
+2026-02-12 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-02-12 09:35:00+05:30
+2026-02-12 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-02-12 09:40:00+05:30
+2026-02-19 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-02-19 09:15:00+05:30
+2026-02-19 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-02-19 09:20:00+05:30
+2026-02-19 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-02-19 09:25:00+05:30
+2026-02-19 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-02-19 09:30:00+05:30
+2026-02-19 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-02-19 09:35:00+05:30
+2026-02-19 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-02-19 09:40:00+05:30
+2026-02-23 09:35:00,CE_ORB_SIGNAL,candle=2026-02-23 09:30:00+05:30 | close=83376.09
+2026-02-23 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26022683400CE | first_ltp=543.9
+2026-02-23 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=260.05 | qty=20 | risk_rupees=5201.0 | max_rupees=2000.0
+2026-02-23 09:40:00,CE_ORB_SIGNAL,candle=2026-02-23 09:35:00+05:30 | close=83330.24
+2026-02-23 09:40:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26022683300CE | first_ltp=571.35
+2026-02-23 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=235.15 | qty=20 | risk_rupees=4703.0 | max_rupees=2000.0
+2026-02-24 09:35:00,PE_ORB_SIGNAL,candle=2026-02-24 09:30:00+05:30 | close=82591.34
+2026-02-24 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-02-24 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26022682600PE | first_ltp=417.0
+2026-02-24 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=208.5 | qty=20 | risk_rupees=4170.0 | max_rupees=2000.0
+2026-02-24 09:40:00,PE_ORB_SIGNAL,candle=2026-02-24 09:35:00+05:30 | close=82564.38
+2026-02-24 09:40:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-02-24 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=215.25 | qty=20 | risk_rupees=4305.0 | max_rupees=2000.0
+2026-02-26 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-02-26 09:15:00+05:30
+2026-02-26 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-02-26 09:20:00+05:30
+2026-02-26 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-02-26 09:25:00+05:30
+2026-02-26 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-02-26 09:30:00+05:30
+2026-02-26 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-02-26 09:35:00+05:30
+2026-02-26 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-02-26 09:40:00+05:30
+2026-03-05 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-03-05 09:15:00+05:30
+2026-03-05 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-03-05 09:20:00+05:30
+2026-03-05 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-03-05 09:25:00+05:30
+2026-03-05 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-03-05 09:30:00+05:30
+2026-03-05 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-03-05 09:35:00+05:30
+2026-03-05 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-03-05 09:40:00+05:30
+2026-03-12 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-03-12 09:15:00+05:30
+2026-03-12 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-03-12 09:20:00+05:30
+2026-03-12 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-03-12 09:25:00+05:30
+2026-03-12 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-03-12 09:30:00+05:30
+2026-03-12 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-03-12 09:35:00+05:30
+2026-03-12 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-03-12 09:40:00+05:30
+2026-03-19 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-03-19 09:15:00+05:30
+2026-03-19 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-03-19 09:20:00+05:30
+2026-03-19 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-03-19 09:25:00+05:30
+2026-03-19 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-03-19 09:30:00+05:30
+2026-03-19 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-03-19 09:35:00+05:30
+2026-03-19 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-03-19 09:40:00+05:30
+2026-03-25 09:30:00,CE_ORB_SIGNAL,candle=2026-03-25 09:25:00+05:30 | close=74985.81
+2026-03-25 09:30:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=CE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-03-25 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26032575000CE | first_ltp=343.65
+2026-03-25 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=171.8 | qty=20 | risk_rupees=3436.0 | max_rupees=2000.0
+2026-03-25 09:35:00,CE_ORB_SIGNAL,candle=2026-03-25 09:30:00+05:30 | close=75039.19
+2026-03-25 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=CE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-03-25 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=183.7 | qty=20 | risk_rupees=3674.0 | max_rupees=2000.0
+2026-03-25 09:40:00,CE_ORB_SIGNAL,candle=2026-03-25 09:35:00+05:30 | close=74975.84
+2026-03-25 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=166.9 | qty=20 | risk_rupees=3338.0 | max_rupees=2000.0
+2026-04-02 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-04-02 09:15:00+05:30
+2026-04-02 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-04-02 09:20:00+05:30
+2026-04-02 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-04-02 09:25:00+05:30
+2026-04-02 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-04-02 09:30:00+05:30
+2026-04-02 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-04-02 09:35:00+05:30
+2026-04-02 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-04-02 09:40:00+05:30
+2026-04-09 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-04-09 09:15:00+05:30
+2026-04-09 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-04-09 09:20:00+05:30
+2026-04-09 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-04-09 09:25:00+05:30
+2026-04-09 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-04-09 09:30:00+05:30
+2026-04-09 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-04-09 09:35:00+05:30
+2026-04-09 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-04-09 09:40:00+05:30
+2026-04-16 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-04-16 09:15:00+05:30
+2026-04-16 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-04-16 09:20:00+05:30
+2026-04-16 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-04-16 09:25:00+05:30
+2026-04-16 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-04-16 09:30:00+05:30
+2026-04-16 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-04-16 09:35:00+05:30
+2026-04-16 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-04-16 09:40:00+05:30
+2026-04-23 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-04-23 09:15:00+05:30
+2026-04-23 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-04-23 09:20:00+05:30
+2026-04-23 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-04-23 09:25:00+05:30
+2026-04-23 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-04-23 09:30:00+05:30
+2026-04-23 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-04-23 09:35:00+05:30
+2026-04-23 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-04-23 09:40:00+05:30
+2026-04-24 09:30:00,PE_ORB_SIGNAL,candle=2026-04-24 09:25:00+05:30 | close=77197.43
+2026-04-24 09:30:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-04-24 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26043077200PE | first_ltp=744.55
+2026-04-24 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=316.05 | qty=20 | risk_rupees=6321.0 | max_rupees=2000.0
+2026-04-24 09:35:00,PE_ORB_SIGNAL,candle=2026-04-24 09:30:00+05:30 | close=77063.5
+2026-04-24 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-04-24 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26043077100PE | first_ltp=758.7
+2026-04-24 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=378.5 | qty=20 | risk_rupees=7570.0 | max_rupees=2000.0
+2026-04-24 09:40:00,PE_ORB_SIGNAL,candle=2026-04-24 09:35:00+05:30 | close=77028.97
+2026-04-24 09:40:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-04-24 09:40:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26043077000PE | first_ltp=731.1
+2026-04-24 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=365.55 | qty=20 | risk_rupees=7311.0 | max_rupees=2000.0
+2026-04-30 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-04-30 09:15:00+05:30
+2026-04-30 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-04-30 09:20:00+05:30
+2026-04-30 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-04-30 09:25:00+05:30
+2026-04-30 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-04-30 09:30:00+05:30
+2026-04-30 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-04-30 09:35:00+05:30
+2026-04-30 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-04-30 09:40:00+05:30
+2026-05-07 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-05-07 09:15:00+05:30
+2026-05-07 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-05-07 09:20:00+05:30
+2026-05-07 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-05-07 09:25:00+05:30
+2026-05-07 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-05-07 09:30:00+05:30
+2026-05-07 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-05-07 09:35:00+05:30
+2026-05-07 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-05-07 09:40:00+05:30
+2026-05-12 09:30:00,PE_ORB_SIGNAL,candle=2026-05-12 09:25:00+05:30 | close=75349.43
+2026-05-12 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26051475300PE | first_ltp=484.25
+2026-05-12 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=242.1 | qty=20 | risk_rupees=4842.0 | max_rupees=2000.0
+2026-05-12 09:35:00,PE_ORB_SIGNAL,candle=2026-05-12 09:30:00+05:30 | close=75314.66
+2026-05-12 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-05-12 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=249.1 | qty=20 | risk_rupees=4982.0 | max_rupees=2000.0
+2026-05-12 09:40:00,PE_ORB_SIGNAL,candle=2026-05-12 09:35:00+05:30 | close=75316.96
+2026-05-12 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=248.25 | qty=20 | risk_rupees=4965.0 | max_rupees=2000.0
+2026-05-14 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-05-14 09:15:00+05:30
+2026-05-14 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-05-14 09:20:00+05:30
+2026-05-14 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-05-14 09:25:00+05:30
+2026-05-14 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-05-14 09:30:00+05:30
+2026-05-14 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-05-14 09:35:00+05:30
+2026-05-14 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-05-14 09:40:00+05:30
+2026-05-19 09:30:00,CE_ORB_SIGNAL,candle=2026-05-19 09:25:00+05:30 | close=75695.64
+2026-05-19 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26052175700CE | first_ltp=559.45
+2026-05-19 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=279.7 | qty=20 | risk_rupees=5594.0 | max_rupees=2000.0
+2026-05-21 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-05-21 09:15:00+05:30
+2026-05-21 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-05-21 09:20:00+05:30
+2026-05-21 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-05-21 09:25:00+05:30
+2026-05-21 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-05-21 09:30:00+05:30
+2026-05-21 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-05-21 09:35:00+05:30
+2026-05-21 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-05-21 09:40:00+05:30
+2026-05-22 09:35:00,CE_ORB_SIGNAL,candle=2026-05-22 09:30:00+05:30 | close=75590.24
+2026-05-22 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26052775600CE | first_ltp=697.75
+2026-05-22 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=156.0 | qty=20 | risk_rupees=3120.0 | max_rupees=2000.0
+2026-05-22 09:40:00,CE_ORB_SIGNAL,candle=2026-05-22 09:35:00+05:30 | close=75574.76
+2026-05-22 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=146.8 | qty=20 | risk_rupees=2936.0 | max_rupees=2000.0
+2026-05-26 09:30:00,CE_ORB_SIGNAL,candle=2026-05-26 09:25:00+05:30 | close=76476.49
+2026-05-26 09:30:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=CE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-05-26 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26052776500CE | first_ltp=374.85
+2026-05-26 09:30:00,ENTRY_SENT,symbol=SENSEX26052776500CE | qty=20 | signal=CE_ORB
+2026-05-26 09:30:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26052776500CE | qty=20 | fill=374.85 | order_id=PAPER_F21C3B7E
+2026-05-26 09:30:00,ENTRY_FILLED,symbol=SENSEX26052776500CE | fill=374.85 | qty=20
+2026-05-26 09:30:00,INDEX_RISK_APPLIED,signal=CE_ORB | side=CE | sl_mode=swing_sl | sensex_entry=76477.76 | index_stop=76319.16 | index_target=76826.66 | index_risk=158.6 | delta=0.5 | option_entry=374.85 | option_backstop=255.9
+2026-05-26 09:35:00,CE_ORB_SIGNAL,candle=2026-05-26 09:30:00+05:30 | close=76474.35
+2026-05-26 09:40:00,CE_ORB_SIGNAL,candle=2026-05-26 09:35:00+05:30 | close=76586.06
+2026-05-26 12:35:30,STOP_HIT,mode=PAPER | symbol=SENSEX26052776500CE | sl=255.9 | ltp=249.3 | order_id=PAPER_SL_40E81D43
+2026-05-26 12:35:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX26052776500CE | qty=20 | fill=249.3 | order_id=PAPER_CAC30D71 | tag=STOP_HIT
+2026-05-26 12:35:30,EXIT_FILLED,symbol=SENSEX26052776500CE | exit_price=249.3 | pnl=-2511.0 | reason=STOP_HIT
+2026-05-26 12:35:30,SMART_ENTRY_COOLDOWN_STARTED,pnl_pts=-125.55 | cooldown_candles=2
+2026-05-26 12:45:00,SMART_ENTRY_COOLDOWN_EXPIRED,
+2026-06-01 09:30:00,PE_ORB_SIGNAL,candle=2026-06-01 09:25:00+05:30 | close=74961.78
+2026-06-01 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26060475000PE | first_ltp=512.3
+2026-06-01 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=256.15 | qty=20 | risk_rupees=5123.0 | max_rupees=2000.0
+2026-06-04 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-06-04 09:15:00+05:30
+2026-06-04 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-06-04 09:20:00+05:30
+2026-06-04 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-06-04 09:25:00+05:30
+2026-06-04 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-06-04 09:30:00+05:30
+2026-06-04 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-06-04 09:35:00+05:30
+2026-06-04 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-06-04 09:40:00+05:30
+2026-06-11 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-06-11 09:15:00+05:30
+2026-06-11 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-06-11 09:20:00+05:30
+2026-06-11 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-06-11 09:25:00+05:30
+2026-06-11 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-06-11 09:30:00+05:30
+2026-06-11 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-06-11 09:35:00+05:30
+2026-06-11 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-06-11 09:40:00+05:30
+2026-06-18 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-06-18 09:15:00+05:30
+2026-06-18 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-06-18 09:20:00+05:30
+2026-06-18 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-06-18 09:25:00+05:30
+2026-06-18 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-06-18 09:30:00+05:30
+2026-06-18 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-06-18 09:35:00+05:30
+2026-06-18 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-06-18 09:40:00+05:30
+2026-06-25 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-06-25 09:15:00+05:30
+2026-06-25 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-06-25 09:20:00+05:30
+2026-06-25 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-06-25 09:25:00+05:30
+2026-06-25 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-06-25 09:30:00+05:30
+2026-06-25 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-06-25 09:35:00+05:30
+2026-06-25 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-06-25 09:40:00+05:30
+2026-06-30 09:30:00,PE_ORB_SIGNAL,candle=2026-06-30 09:25:00+05:30 | close=76615.08
+2026-06-30 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26070276600PE | first_ltp=370.3
+2026-06-30 09:30:00,ENTRY_SENT,symbol=SENSEX26070276600PE | qty=20 | signal=PE_ORB
+2026-06-30 09:30:00,ENTRY_FILLED,mode=PAPER | symbol=SENSEX26070276600PE | qty=20 | fill=370.3 | order_id=PAPER_1BCA59C0
+2026-06-30 09:30:00,ENTRY_FILLED,symbol=SENSEX26070276600PE | fill=370.3 | qty=20
+2026-06-30 09:30:00,INDEX_RISK_APPLIED,signal=PE_ORB | side=PE | sl_mode=swing_sl | sensex_entry=76618.93 | index_stop=76801.63 | index_target=76217.03 | index_risk=182.7 | delta=0.5 | option_entry=370.3 | option_backstop=233.25
+2026-06-30 09:35:00,PE_ORB_SIGNAL,candle=2026-06-30 09:30:00+05:30 | close=76523.69
+2026-06-30 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-06-30 09:40:00,PE_ORB_SIGNAL,candle=2026-06-30 09:35:00+05:30 | close=76535.03
+2026-06-30 11:23:30,PIVOT_EXIT,reason=IDX_SL_HIT | sensex=76848.11 | stage=INITIAL | index_stop=76801.63 | best=76455.49
+2026-06-30 11:23:30,EXIT_FILLED,mode=PAPER | symbol=SENSEX26070276600PE | qty=20 | fill=239.95 | order_id=PAPER_3985122A | tag=IDX_SL_HIT
+2026-06-30 11:23:30,EXIT_FILLED,symbol=SENSEX26070276600PE | exit_price=239.95 | pnl=-2607.0000000000005 | reason=IDX_SL_HIT
+2026-06-30 11:23:30,SMART_ENTRY_COOLDOWN_STARTED,pnl_pts=-130.35 | cooldown_candles=2
+2026-06-30 11:30:00,SMART_ENTRY_COOLDOWN_EXPIRED,
+2026-07-02 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-07-02 09:15:00+05:30
+2026-07-02 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-07-02 09:20:00+05:30
+2026-07-02 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-07-02 09:25:00+05:30
+2026-07-02 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-07-02 09:30:00+05:30
+2026-07-02 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-07-02 09:35:00+05:30
+2026-07-02 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-07-02 09:40:00+05:30
+2026-07-09 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-07-09 09:15:00+05:30
+2026-07-09 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-07-09 09:20:00+05:30
+2026-07-09 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-07-09 09:25:00+05:30
+2026-07-09 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-07-09 09:30:00+05:30
+2026-07-09 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-07-09 09:35:00+05:30
+2026-07-09 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-07-09 09:40:00+05:30
+2026-07-14 09:30:00,CE_ORB_SIGNAL,candle=2026-07-14 09:25:00+05:30 | close=77362.01
+2026-07-14 09:30:00,SMART_ENTRY_BLOCKED_SLOPE,direction=CE_ORB | ema9_now=77470.35 | ema9_prev=77497.43 | reason=EMA9 not rising for CE
+2026-07-15 09:35:00,CE_ORB_SIGNAL,candle=2026-07-15 09:30:00+05:30 | close=77572.09
+2026-07-15 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26071677600CE | first_ltp=304.75
+2026-07-15 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=152.4 | qty=20 | risk_rupees=3048.0 | max_rupees=2000.0
+2026-07-15 09:40:00,CE_ORB_SIGNAL,candle=2026-07-15 09:35:00+05:30 | close=77548.14
+2026-07-15 09:40:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26071677500CE | first_ltp=342.0
+2026-07-15 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=171.0 | qty=20 | risk_rupees=3420.0 | max_rupees=2000.0
+2026-07-16 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-07-16 09:15:00+05:30
+2026-07-16 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-07-16 09:20:00+05:30
+2026-07-16 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-07-16 09:25:00+05:30
+2026-07-16 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-07-16 09:30:00+05:30
+2026-07-16 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-07-16 09:35:00+05:30
+2026-07-16 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-07-16 09:40:00+05:30
+2026-07-17 09:35:00,CE_ORB_SIGNAL,candle=2026-07-17 09:30:00+05:30 | close=77679.58
+2026-07-17 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26072377700CE | first_ltp=582.6
+2026-07-17 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=236.05 | qty=20 | risk_rupees=4721.0 | max_rupees=2000.0
+2026-07-17 09:40:00,CE_ORB_SIGNAL,candle=2026-07-17 09:35:00+05:30 | close=77733.33
+2026-07-17 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=261.05 | qty=20 | risk_rupees=5221.0 | max_rupees=2000.0
+2026-07-23 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-07-23 09:15:00+05:30
+2026-07-23 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-07-23 09:20:00+05:30
+2026-07-23 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-07-23 09:25:00+05:30
+2026-07-23 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-07-23 09:30:00+05:30
+2026-07-23 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-07-23 09:35:00+05:30
+2026-07-23 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-07-23 09:40:00+05:30
+2026-07-30 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-07-30 09:15:00+05:30
+2026-07-30 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-07-30 09:20:00+05:30
+2026-07-30 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-07-30 09:25:00+05:30
+2026-07-30 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-07-30 09:30:00+05:30
+2026-07-30 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-07-30 09:35:00+05:30
+2026-07-30 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-07-30 09:40:00+05:30
+2026-08-06 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-08-06 09:15:00+05:30
+2026-08-06 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-08-06 09:20:00+05:30
+2026-08-06 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-08-06 09:25:00+05:30
+2026-08-06 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-08-06 09:30:00+05:30
+2026-08-06 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-08-06 09:35:00+05:30
+2026-08-06 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-08-06 09:40:00+05:30
+2026-08-07 09:30:00,CE_ORB_SIGNAL,candle=2026-08-07 09:25:00+05:30 | close=78700.0
+2026-08-07 09:30:00,SMART_ENTRY_BLOCKED_SLOPE,direction=CE_ORB | ema9_now=78763.77 | ema9_prev=78779.71 | reason=EMA9 not rising for CE
+2026-08-13 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-08-13 09:15:00+05:30
+2026-08-13 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-08-13 09:20:00+05:30
+2026-08-13 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-08-13 09:25:00+05:30
+2026-08-13 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-08-13 09:30:00+05:30
+2026-08-13 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-08-13 09:35:00+05:30
+2026-08-13 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-08-13 09:40:00+05:30
+2026-08-19 09:30:00,PE_ORB_SIGNAL,candle=2026-08-19 09:25:00+05:30 | close=77067.55
+2026-08-19 09:30:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-08-19 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26082077100PE | first_ltp=266.9
+2026-08-19 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=133.45 | qty=20 | risk_rupees=2669.0 | max_rupees=2000.0
+2026-08-19 09:35:00,PE_ORB_SIGNAL,candle=2026-08-19 09:30:00+05:30 | close=76994.24
+2026-08-19 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-08-19 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26082077000PE | first_ltp=252.65
+2026-08-19 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=126.3 | qty=20 | risk_rupees=2526.0 | max_rupees=2000.0
+2026-08-19 09:40:00,PE_ORB_SIGNAL,candle=2026-08-19 09:35:00+05:30 | close=77018.68
+2026-08-19 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=119.2 | qty=20 | risk_rupees=2384.0 | max_rupees=2000.0
+2026-08-20 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-08-20 09:15:00+05:30
+2026-08-20 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-08-20 09:20:00+05:30
+2026-08-20 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-08-20 09:25:00+05:30
+2026-08-20 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-08-20 09:30:00+05:30
+2026-08-20 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-08-20 09:35:00+05:30
+2026-08-20 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-08-20 09:40:00+05:30
+2026-08-27 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-08-27 09:15:00+05:30
+2026-08-27 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-08-27 09:20:00+05:30
+2026-08-27 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-08-27 09:25:00+05:30
+2026-08-27 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-08-27 09:30:00+05:30
+2026-08-27 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-08-27 09:35:00+05:30
+2026-08-27 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-08-27 09:40:00+05:30
+2026-09-03 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-09-03 09:15:00+05:30
+2026-09-03 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-09-03 09:20:00+05:30
+2026-09-03 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-09-03 09:25:00+05:30
+2026-09-03 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-09-03 09:30:00+05:30
+2026-09-03 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-09-03 09:35:00+05:30
+2026-09-03 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-09-03 09:40:00+05:30
+2026-09-08 09:30:00,PE_ORB_SIGNAL,candle=2026-09-08 09:25:00+05:30 | close=75727.07
+2026-09-08 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26091075700PE | first_ltp=287.7
+2026-09-08 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=143.85 | qty=20 | risk_rupees=2877.0 | max_rupees=2000.0
+2026-09-08 09:35:00,PE_ORB_SIGNAL,candle=2026-09-08 09:30:00+05:30 | close=75730.44
+2026-09-08 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=143.3 | qty=20 | risk_rupees=2866.0 | max_rupees=2000.0
+2026-09-10 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-09-10 09:15:00+05:30
+2026-09-10 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-09-10 09:20:00+05:30
+2026-09-10 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-09-10 09:25:00+05:30
+2026-09-10 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-09-10 09:30:00+05:30
+2026-09-10 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-09-10 09:35:00+05:30
+2026-09-10 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-09-10 09:40:00+05:30
+2026-09-17 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-09-17 09:15:00+05:30
+2026-09-17 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-09-17 09:20:00+05:30
+2026-09-17 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-09-17 09:25:00+05:30
+2026-09-17 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-09-17 09:30:00+05:30
+2026-09-17 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-09-17 09:35:00+05:30
+2026-09-17 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-09-17 09:40:00+05:30
+2026-09-24 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-09-24 09:15:00+05:30
+2026-09-24 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-09-24 09:20:00+05:30
+2026-09-24 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-09-24 09:25:00+05:30
+2026-09-24 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-09-24 09:30:00+05:30
+2026-09-24 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-09-24 09:35:00+05:30
+2026-09-24 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-09-24 09:40:00+05:30
+2026-09-28 09:35:00,PE_ORB_SIGNAL,candle=2026-09-28 09:30:00+05:30 | close=73119.03
+2026-09-28 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-09-28 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26100173100PE | first_ltp=404.5
+2026-09-28 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=202.25 | qty=20 | risk_rupees=4045.0 | max_rupees=2000.0
+2026-09-28 09:40:00,PE_ORB_SIGNAL,candle=2026-09-28 09:35:00+05:30 | close=73014.21
+2026-09-28 09:40:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-09-28 09:40:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26100173000PE | first_ltp=417.7
+2026-09-28 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=208.85 | qty=20 | risk_rupees=4177.0 | max_rupees=2000.0
+2026-09-29 09:30:00,PE_ORB_SIGNAL,candle=2026-09-29 09:25:00+05:30 | close=72253.76
+2026-09-29 09:30:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-09-29 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26100172200PE | first_ltp=340.6
+2026-09-29 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=170.3 | qty=20 | risk_rupees=3406.0 | max_rupees=2000.0
+2026-09-29 09:35:00,PE_ORB_SIGNAL,candle=2026-09-29 09:30:00+05:30 | close=72228.85
+2026-09-29 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-09-29 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=178.3 | qty=20 | risk_rupees=3566.0 | max_rupees=2000.0
+2026-09-29 09:40:00,PE_ORB_SIGNAL,candle=2026-09-29 09:35:00+05:30 | close=72073.19
+2026-09-29 09:40:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=PE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-09-29 09:40:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26100172100PE | first_ltp=385.1
+2026-09-29 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=PE_ORB | risk_pts=192.55 | qty=20 | risk_rupees=3851.0 | max_rupees=2000.0
+2026-09-30 09:30:00,CE_ORB_SIGNAL,candle=2026-09-30 09:25:00+05:30 | close=72705.03
+2026-09-30 09:30:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26100172700CE | first_ltp=304.5
+2026-09-30 09:30:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=116.2 | qty=20 | risk_rupees=2324.0 | max_rupees=2000.0
+2026-10-01 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-10-01 09:15:00+05:30
+2026-10-01 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-10-01 09:20:00+05:30
+2026-10-01 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-10-01 09:25:00+05:30
+2026-10-01 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-10-01 09:30:00+05:30
+2026-10-01 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-10-01 09:35:00+05:30
+2026-10-01 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-10-01 09:40:00+05:30
+2026-10-08 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-10-08 09:15:00+05:30
+2026-10-08 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-10-08 09:20:00+05:30
+2026-10-08 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-10-08 09:25:00+05:30
+2026-10-08 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-10-08 09:30:00+05:30
+2026-10-08 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-10-08 09:35:00+05:30
+2026-10-08 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-10-08 09:40:00+05:30
+2026-10-13 09:35:00,CE_ORB_SIGNAL,candle=2026-10-13 09:30:00+05:30 | close=72351.79
+2026-10-13 09:35:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=CE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-10-13 09:35:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26101572300CE | first_ltp=445.25
+2026-10-13 09:35:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=222.6 | qty=20 | risk_rupees=4452.0 | max_rupees=2000.0
+2026-10-13 09:40:00,CE_ORB_SIGNAL,candle=2026-10-13 09:35:00+05:30 | close=72404.27
+2026-10-13 09:40:00,SMART_ENTRY_SQUEEZE_BYPASS,direction=CE_ORB | candles=4 | reason=consecutive same-direction 5m candles — bypassing 15m/slope filters
+2026-10-13 09:40:00,SMART_ENTRY_FIRST_LTP_RECORDED,symbol=SENSEX26101572400CE | first_ltp=417.4
+2026-10-13 09:40:00,ENTRY_BLOCKED_MAX_RISK,signal=CE_ORB | risk_pts=208.7 | qty=20 | risk_rupees=4174.0 | max_rupees=2000.0
+2026-10-15 09:20:00,ORB_BLOCKED_THURSDAY,candle=2026-10-15 09:15:00+05:30
+2026-10-15 09:25:00,ORB_BLOCKED_THURSDAY,candle=2026-10-15 09:20:00+05:30
+2026-10-15 09:30:00,ORB_BLOCKED_THURSDAY,candle=2026-10-15 09:25:00+05:30
+2026-10-15 09:35:00,ORB_BLOCKED_THURSDAY,candle=2026-10-15 09:30:00+05:30
+2026-10-15 09:40:00,ORB_BLOCKED_THURSDAY,candle=2026-10-15 09:35:00+05:30
+2026-10-15 09:45:00,ORB_BLOCKED_THURSDAY,candle=2026-10-15 09:40:00+05:30

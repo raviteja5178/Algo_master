@@ -59,11 +59,14 @@ def vwap_retest_ts(
 
 def vwap_slope_ok(candles_5m: Sequence[Candle], side: str, lookback: int) -> bool:
     """
-    Rule 4: CE needs VWAP rising (or flat), PE falling (or flat), comparing the
-    VWAP of today's candles now against *lookback* candles ago.  Uses the same
-    weighting as VWAPCalculator.on_candle (typical price x volume, volume
-    floored at 1 for the volume-less index).  Passes when disabled or when
-    today has too few candles to measure a slope.
+    Rule 4: CE needs VWAP rising (or flat), PE falling (or flat).
+
+    Compares the point-in-time VWAP after the candle *lookback* bars ago
+    against the VWAP after the latest candle — both computed as running
+    cumulative VWAPs from the start of today's session.  This gives a true
+    "was VWAP higher / lower N bars ago?" slope check.
+
+    Passes when disabled (lookback=0) or when today has too few candles.
     """
     if lookback <= 0 or not candles_5m:
         return True
@@ -72,19 +75,21 @@ def vwap_slope_ok(candles_5m: Sequence[Candle], side: str, lookback: int) -> boo
     if len(today) <= lookback:
         return True
 
-    def _vwap(cs: Sequence[Candle]) -> float:
+    def _running_vwap(cs: Sequence[Candle]) -> float:
+        """Cumulative VWAP up to and including the last candle in cs."""
         num = den = 0.0
         for c in cs:
             vol = c.volume if c.volume > 0 else 1
             num += (c.high + c.low + c.close) / 3.0 * vol
             den += vol
-        return num / den
+        return num / den if den else 0.0
 
-    now, before = _vwap(today), _vwap(today[:-lookback])
-    ok = now >= before if side == "CE" else now <= before
+    vwap_now    = _running_vwap(today)            # VWAP including latest candle
+    vwap_before = _running_vwap(today[:-lookback])  # VWAP N candles ago
+    ok = vwap_now >= vwap_before if side == "CE" else vwap_now <= vwap_before
     if not ok:
-        logger.debug("VWAP %s: slope against signal — VWAP %.2f vs %.2f %d candles ago",
-                     side, now, before, lookback)
+        logger.debug("VWAP %s: slope against signal — VWAP now=%.2f vs %.2f (%d candles ago)",
+                     side, vwap_now, vwap_before, lookback)
     return ok
 
 
@@ -141,10 +146,15 @@ def is_vwap_ce_signal(
         return False
 
     # Excessive submerge check: price must not have spent too many consecutive
-    # candles below VWAP (prevents false breakouts from an extended downtrend).
+    # TODAY candles below VWAP (prevents false breakouts from an extended downtrend).
+    # Restricted to today-only candles — previous-day data sits below today's
+    # freshly-reset VWAP and would trigger a spurious block on morning signals.
     if max_submerged_candles > 0:
+        _today_date = c0.timestamp.date()
         submerged_count = 0
         for c in reversed(candles_5m[:-1]):
+            if c.timestamp.date() != _today_date:
+                break
             if c.close < vwap:
                 submerged_count += 1
             else:
@@ -212,10 +222,15 @@ def is_vwap_pe_signal(
         return False
 
     # Excessive submerge check: price must not have spent too many consecutive
-    # candles above VWAP (prevents false breakdowns from an extended uptrend).
+    # TODAY candles above VWAP (prevents false breakdowns from an extended uptrend).
+    # Restricted to today-only candles — previous-day data sits below today's
+    # freshly-reset VWAP and would trigger a spurious block on morning signals.
     if max_submerged_candles > 0:
+        _today_date = c0.timestamp.date()
         emerged_count = 0
         for c in reversed(candles_5m[:-1]):
+            if c.timestamp.date() != _today_date:
+                break
             if c.close > vwap:
                 emerged_count += 1
             else:

@@ -478,6 +478,43 @@ class TestFiltersComposed:
             require_15m_trend=True,
         ) is False
 
+
+class TestORBThursdayFilter:
+    """Test ORB Thursday gating in signal evaluation."""
+
+    def test_orb_blocked_on_thursday_when_flag_enabled(self, monkeypatch) -> None:
+        from unittest.mock import MagicMock
+        from config import settings
+        from strategies.signal_engine import evaluate_signals
+
+        candles = make_orb_candles(
+            orb_high=74500.0, prev_close=74490.0, latest_close=74520.0,
+        )
+        # Force Thursday (weekday 3)
+        thursday = _TODAY
+        while thursday.weekday() != 3:
+            thursday += timedelta(days=1)
+
+        # Update candles timestamp to Thursday
+        for i, c in enumerate(candles):
+            candles[i] = Candle(
+                datetime(thursday.year, thursday.month, thursday.day, c.timestamp.hour, c.timestamp.minute),
+                c.open, c.high, c.low, c.close,
+            )
+
+        monkeypatch.setattr(settings, "ENABLE_ORB_STRATEGY", True)
+        monkeypatch.setattr(settings, "ENABLE_EMA_STRATEGY", False)
+        monkeypatch.setattr(settings, "ENABLE_PIVOT_STRATEGY", False)
+        monkeypatch.setattr(settings, "ORB_NO_THURSDAY", True)
+        monkeypatch.setattr(settings, "ORB_MOMENTUM_SKIP_MONDAY", False)
+
+        # Mock today_ist to match Thursday date
+        monkeypatch.setattr("strategies.orb_strategy.today_ist", lambda: thursday)
+        monkeypatch.setattr("strategies.signal_engine.today_ist", lambda: thursday)
+
+        sig = evaluate_signals(candles, [])
+        assert sig is None
+
     def test_trend_blocks_even_when_body_ok(self) -> None:
         # good body, but 15m is in downtrend
         candles = make_orb_candles(
