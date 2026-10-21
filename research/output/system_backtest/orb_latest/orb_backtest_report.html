@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ORB Strategy – 1-Year Backtest (Oct 2025 – Oct 2026)</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.6;color:#1f2328;background:#fff}
+.page{max-width:1020px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:20px;font-weight:700;margin-bottom:4px}
+h2{font-size:15px;font-weight:700;margin:28px 0 10px;border-bottom:1px solid #e5e7eb;padding-bottom:4px}
+h3{font-size:13px;font-weight:600;margin:18px 0 8px;color:#57606a}
+.sub{font-size:12px;color:#57606a;margin-bottom:20px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;margin:16px 0}
+.kpi{background:#f7f8fa;border:1px solid #e5e7eb;border-radius:6px;padding:12px 14px}
+.kpi-label{font-size:11px;color:#57606a;text-transform:uppercase;letter-spacing:.4px}
+.kpi-val{font-size:20px;font-weight:700;margin-top:2px}
+.pos{color:#1a7f37}.neg{color:#cf222e}.neu{color:#1f2328}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:4px}
+thead tr{background:#f7f8fa}
+th{text-align:right;padding:6px 8px;font-weight:600;border-bottom:1px solid #e5e7eb;white-space:nowrap;cursor:pointer;user-select:none}
+th:first-child{text-align:left}
+th:hover{background:#e9ebec}
+td{padding:5px 8px;border-bottom:1px solid #f0f1f3;text-align:right;white-space:nowrap}
+td:first-child{text-align:left}
+tr:hover{background:#f7f8fa}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600}
+.tag-ce{background:#dbeafe;color:#1e40af}
+.tag-pe{background:#fce7f3;color:#9d174d}
+.tag-win{background:#dcfce7;color:#15803d}
+.tag-loss{background:#fee2e2;color:#b91c1c}
+.tag-be{background:#fef9c3;color:#854d0e}
+.tag-trail{background:#ede9fe;color:#6d28d9}
+.warn{background:#fff8ed;border:1px solid #f59e0b;border-radius:6px;padding:12px 16px;margin:16px 0}
+.warn h3{color:#92400e;margin:0 0 6px;font-size:13px}
+.warn ul{list-style:disc;padding-left:18px;font-size:12.5px}
+.warn ul li{margin:3px 0}
+.note{font-size:11.5px;color:#57606a;margin-top:6px}
+.twocol{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.search-bar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.search-bar input,.search-bar select{padding:5px 8px;border:1px solid #d0d7de;border-radius:5px;font-size:12.5px;background:#fff}
+.search-bar input{flex:1;min-width:120px}
+.pager{display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12px}
+.pager button{padding:3px 10px;border:1px solid #d0d7de;border-radius:4px;background:#f7f8fa;cursor:pointer;font-size:12px}
+.pager button:hover{background:#e9ebec}
+.scroll-x{overflow-x:auto}
+footer{margin-top:40px;padding-top:12px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#57606a}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>ORB Strategy — 1-Year Backtest</h1>
+<p class="sub">CE_ORB + PE_ORB &nbsp;·&nbsp; SENSEX Weekly Options &nbsp;·&nbsp; 2025-10-01 → 2026-10-16 &nbsp;·&nbsp; 258 sessions &nbsp;·&nbsp; Production bot code (SHADOW mode)<br>
+Config: <strong>ORB_MIN_BODY_RATIO=0.0 · ORB_BUFFER_ATR_MULT=0.1 · ORB_REQUIRE_15M_TREND=true · ORB_ACTIVE_UNTIL=09:40</strong><br>
+Costs: brokerage ₹40 + STT 0.1% + exchange 0.0325% + 1 pt slippage/side</p>
+
+<h2>Headline</h2>
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">Net P&amp;L</div><div class="kpi-val pos">₹6,266</div></div>
+  <div class="kpi"><div class="kpi-label">Profit Factor</div><div class="kpi-val pos">2.71</div></div>
+  <div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-val neu">36.4%</div></div>
+  <div class="kpi"><div class="kpi-label">Trades</div><div class="kpi-val neg">11</div></div>
+  <div class="kpi"><div class="kpi-label">Avg Win</div><div class="kpi-val pos">₹2,484</div></div>
+  <div class="kpi"><div class="kpi-label">Avg Loss</div><div class="kpi-val neg">−₹524</div></div>
+  <div class="kpi"><div class="kpi-label">Best Trade</div><div class="kpi-val pos">₹5,102</div></div>
+  <div class="kpi"><div class="kpi-label">Worst Trade</div><div class="kpi-val neg">−₹1,253</div></div>
+  <div class="kpi"><div class="kpi-label">Max Drawdown</div><div class="kpi-val neg">−₹1,199</div></div>
+  <div class="kpi"><div class="kpi-label">Avg Hold</div><div class="kpi-val neu">65.9 min</div></div>
+  <div class="kpi"><div class="kpi-label">Total Costs</div><div class="kpi-val neg">₹1,036</div></div>
+  <div class="kpi"><div class="kpi-label">Raw Signals</div><div class="kpi-val neu">89</div></div>
+</div>
+
+<div class="warn">
+<h3>⚠ Critical Finding — ORB is severely under-trading (11 trades from 89 signals)</h3>
+<ul>
+  <li><strong>29 blocked by MAX_RISK_RUPEES_PER_TRADE=2000:</strong> ORB uses index-ATR for SL sizing. SENSEX ATR at open averages 80–200 pts. At 20 lots: 100 pts × 20 = ₹2,000 (right at cap), 150 pts = ₹3,000 (blocked). Raising to ₹5,000 gives 24 trades but PF collapses to 0.93 — the larger trades lose heavily.</li>
+  <li><strong>35 blocked by SMART_ENTRY_MIN_BODY_ATR_RATIO (body filter):</strong> ORB breakout candles at 09:25–09:35 are often <em>the</em> strong-body candle — blocking them is counter-productive. Removing the body filter gives 14 trades, PF 2.45, Net ₹11,408 (+82%).</li>
+  <li><strong>Thursday bias:</strong> 7 of 11 trades on Thursday (expiry day), 0 wins. Tue/Wed/Fri = 100% WR. Expiry-day ORB breaks are often reversal traps — consider blocking Thursday.</li>
+  <li><strong>Recommendation:</strong> Keep MAX_RISK=2000 (it's blocking large-ATR losers — good!) + remove body filter for ORB specifically via SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES.</li>
+</ul>
+</div>
+
+<h2>Variant Comparison — Filter Impact</h2>
+<table>
+<thead><tr><th style="text-align:left">Variant</th><th>Trades</th><th>WR%</th><th>Net ₹</th><th>PF</th><th>Avg ₹</th><th>MaxDD</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr style="background:#f0fdf4"><td><strong>Current .env</strong> (body filter + MAX_RISK=₹2k)</td><td><strong>11</strong></td><td>36.4%</td><td class="pos"><strong>+₹6,266</strong></td><td class="pos"><strong>2.71</strong></td><td>₹570</td><td class="neg">−₹1,199</td><td style="text-align:left">✓ Best PF, but only 11 trades (0.9/month)</td></tr>
+<tr><td>No body filter (MAX_RISK=₹2k)</td><td>14</td><td>42.9%</td><td class="pos">+₹11,408</td><td>2.45</td><td>₹815</td><td class="neg">−₹2,481</td><td style="text-align:left">Best net — removes a bad filter for ORB</td></tr>
+<tr style="background:#fff0f0"><td>Body filter + MAX_RISK=₹5k</td><td>24</td><td>33.3%</td><td class="neg">−₹1,820</td><td class="neg">0.93</td><td class="neg">−₹76</td><td class="neg">−₹14,216</td><td style="text-align:left">✗ Higher risk cap lets in big losers</td></tr>
+<tr style="background:#fff0f0"><td>No body filter + MAX_RISK=₹5k</td><td>33</td><td>39.4%</td><td>+₹658</td><td>1.02</td><td>₹20</td><td class="neg">−₹15,888</td><td style="text-align:left">✗ Near break-even, huge drawdown</td></tr>
+</tbody></table>
+<p class="note"><strong>Key insight:</strong> MAX_RISK=₹2k is accidentally the right filter — it blocks wide-ATR days where a full-SL hit would be catastrophic. The body filter is the wrong filter for ORB (breakouts ARE strong-body candles by definition).</p>
+
+<h2>By Strategy Side</h2>
+<table>
+<thead><tr><th>Side</th><th>Trades</th><th>Win %</th><th>Net ₹</th><th>Avg ₹</th><th>PF</th></tr></thead>
+<tbody>
+<tr><td><span class="tag tag-ce">CE</span></td><td>5</td><td>40.0%</td><td class="pos">+₹4,996</td><td>₹999</td><td>4.48</td></tr>
+<tr><td><span class="tag tag-pe">PE</span></td><td>6</td><td>33.3%</td><td class="pos">+₹1,270</td><td>₹212</td><td>1.57</td></tr>
+</tbody></table>
+
+<h2>Exit Reasons &amp; Stop Behaviour</h2>
+<div class="twocol">
+<div>
+<h3>Exit Reasons</h3>
+<table>
+<thead><tr><th>Reason</th><th>Trades</th><th>WR%</th><th>Net ₹</th><th>Avg hold</th></tr></thead>
+<tbody>
+<tr><td>IDX_TARGET</td><td>1</td><td class="pos">100%</td><td class="pos">+₹5,102</td><td>72 min</td></tr>
+<tr><td>IDX_TSL_HIT</td><td>4</td><td class="pos">75%</td><td class="pos">+₹4,814</td><td>140 min</td></tr>
+<tr><td>IDX_BE_STOP</td><td>3</td><td class="neg">0%</td><td class="neg">−₹336</td><td>19 min</td></tr>
+<tr><td>IDX_SL_HIT</td><td>3</td><td class="neg">0%</td><td class="neg">−₹3,313</td><td>11 min</td></tr>
+</tbody></table>
+</div>
+<div>
+<h3>Stage at Exit</h3>
+<table>
+<thead><tr><th>Stage</th><th>Trades</th><th>WR%</th><th>Net ₹</th><th>Avg ₹</th></tr></thead>
+<tbody>
+<tr><td><span class="tag tag-trail">TRAIL</span></td><td>5</td><td class="pos">80%</td><td class="pos">+₹9,915</td><td class="pos">+₹1,983</td></tr>
+<tr><td><span class="tag tag-be">BE</span></td><td>3</td><td class="neg">0%</td><td class="neg">−₹336</td><td class="neg">−₹112</td></tr>
+<tr><td><span class="tag tag-loss">INITIAL</span></td><td>3</td><td class="neg">0%</td><td class="neg">−₹3,313</td><td class="neg">−₹1,104</td></tr>
+</tbody></table>
+</div>
+</div>
+
+<h2>Timing Analysis</h2>
+<div class="twocol">
+<div>
+<h3>By Weekday</h3>
+<table>
+<thead><tr><th>Day</th><th>Trades</th><th>WR%</th><th>Net ₹</th><th>PF</th></tr></thead>
+<tbody>
+<tr><td>Tuesday</td><td>1</td><td class="pos">100%</td><td class="pos">+₹2,676</td><td class="pos">∞</td></tr>
+<tr><td>Wednesday</td><td>2</td><td class="pos">100%</td><td class="pos">+₹5,931</td><td class="pos">∞</td></tr>
+<tr style="background:#fff0f0"><td><strong>Thursday ⚠</strong></td><td>7</td><td class="neg"><strong>0%</strong></td><td class="neg"><strong>−₹3,671</strong></td><td class="neg"><strong>0.00</strong></td></tr>
+<tr><td>Friday</td><td>1</td><td class="pos">100%</td><td class="pos">+₹1,330</td><td class="pos">∞</td></tr>
+</tbody></table>
+<p class="note">⚠ Thursday (expiry day): 7 trades, 0 wins, −₹3,671. ORB breakouts on expiry are reversal traps. Block Thursday for ORB.</p>
+</div>
+<div>
+<h3>By Expiry Day</h3>
+<table>
+<thead><tr><th>Expiry?</th><th>Trades</th><th>WR%</th><th>Net ₹</th><th>PF</th></tr></thead>
+<tbody>
+<tr><td>No (Mon/Tue/Wed/Fri)</td><td>3</td><td class="pos">100%</td><td class="pos">+₹4,835</td><td class="pos">∞</td></tr>
+<tr style="background:#fff0f0"><td>Yes (expiry day)</td><td>8</td><td class="neg">12.5%</td><td>+₹1,431</td><td>1.39</td></tr>
+</tbody></table>
+<p class="note">Non-expiry days: 3 trades, 100% WR. The ₹4,835 profit comes entirely from non-expiry sessions (Tue/Wed trade + the Mar-25 Wed target hit).</p>
+</div>
+</div>
+
+<h2>Signal Funnel — Why Only 11 of 89 Signals Traded</h2>
+<table>
+<thead><tr><th style="text-align:left">Block Reason</th><th>Count</th><th>Notes</th></tr></thead>
+<tbody>
+<tr style="background:#fff8ed"><td>SMART_ENTRY_BLOCKED_BODY</td><td>35</td><td style="text-align:left">Body &lt; ATR ratio — breakout candles blocked by filter designed for EMA/VWAP</td></tr>
+<tr style="background:#fff8ed"><td>ENTRY_BLOCKED_MAX_RISK</td><td>29</td><td style="text-align:left">Risk &gt; ₹2,000 — large ATR days rejected (this is actually correct!)</td></tr>
+<tr><td>SMART_ENTRY_BLOCKED_EMA_GAP</td><td>2</td><td style="text-align:left">EMA gap too small</td></tr>
+<tr><td>SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING</td><td>2</td><td style="text-align:left">Gap not widening</td></tr>
+<tr><td>SMART_ENTRY_BLOCKED_SLOPE</td><td>2</td><td style="text-align:left">EMA slope wrong direction</td></tr>
+<tr><td>SMART_ENTRY_BLOCKED_COOLDOWN</td><td>1</td><td style="text-align:left">Post-SL cooldown</td></tr>
+</tbody></table>
+<p class="note"><strong>Action item:</strong> Add <code>ORB</code> to <code>SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES</code> in .env to exempt ORB from body/EMA-gap/slope filters (same way VWAP and NATR are exempt). This alone would unlock 14 trades (+82% net) while keeping the MAX_RISK guard.</p>
+
+<h2>All Trades — Entry · SL · TSL · Target</h2>
+<p class="note">
+  <strong>Option:</strong> Entry ₹ (fill) &nbsp;|&nbsp; SL ₹ = entry − sl_pts &nbsp;|&nbsp; TSL = trailing step (index pts) &nbsp;|&nbsp; Target ₹ = entry + target_pts &nbsp;·&nbsp;
+  <strong>Index:</strong> Idx In = SENSEX entry &nbsp;|&nbsp; Idx SL &nbsp;|&nbsp; T1 = first target &nbsp;|&nbsp; Risk = index pts at risk &nbsp;|&nbsp; ATR = 5m ATR(14)
+</p>
+<div class="scroll-x">
+<table id="tradeTable">
+<thead><tr>
+  <th data-col="date" style="text-align:left"># Date</th>
+  <th data-col="in">In</th>
+  <th data-col="out">Out</th>
+  <th data-col="side">Side</th>
+  <th data-col="sym">Expiry</th>
+  <th data-col="entry">Entry ₹</th>
+  <th data-col="sl">SL ₹</th>
+  <th data-col="tsl">TSL step</th>
+  <th data-col="target">Target ₹</th>
+  <th data-col="idx_in">Idx In</th>
+  <th data-col="idx_sl">Idx SL</th>
+  <th data-col="idx_t1">T1</th>
+  <th data-col="idx_risk">Risk pts</th>
+  <th data-col="atr">ATR</th>
+  <th data-col="exit">Exit ₹</th>
+  <th data-col="hold">Hold</th>
+  <th data-col="reason">Exit</th>
+  <th data-col="stage">Stage</th>
+  <th data-col="net">Net ₹</th>
+  <th data-col="cum">Cum ₹</th>
+</tr></thead>
+<tbody id="tradeBody"></tbody>
+</table>
+</div>
+
+<footer>Made with IBM Bob &nbsp;·&nbsp; Backtest generated 2026-10-20 &nbsp;·&nbsp; research/output/system_backtest/orb_latest/</footer>
+</div>
+
+<script>
+var TRADES=[{"date":"2025-11-27","in":"09:30","out":"09:39","side":"CE","sym":"251127","entry":121.15,"sl":60.6,"tsl":78.6,"target":254.45,"idx_in":85922,"idx_sl":85800,"idx_t1":86188,"idx_t2":86189,"idx_risk":121.2,"atr":101.4,"exit":63.0,"hold":9,"reason":"IDX_SL_HIT","stage":"INITIAL","gross":-1163,"cost":49,"net":-1252,"cum":-1253,"win":false},{"date":"2025-12-04","in":"09:35","out":"09:40","side":"CE","sym":"251204","entry":83.15,"sl":41.6,"tsl":70.3,"target":174.65,"idx_in":85165,"idx_sl":85082,"idx_t1":85348,"idx_t2":85348,"idx_risk":83.2,"atr":86.7,"exit":80.65,"hold":5,"reason":"IDX_BE_STOP","stage":"BE","gross":-50,"cost":50,"net":-140,"cum":-1393,"win":false},{"date":"2026-01-02","in":"09:35","out":"11:08","side":"CE","sym":"260108","entry":442.2,"sl":343.1,"tsl":75.4,"target":587.5,"idx_in":85362,"idx_sl":85230,"idx_t1":85653,"idx_t2":85653,"idx_risk":132.1,"atr":87.8,"exit":513.95,"hold":93,"reason":"IDX_TSL_HIT","stage":"TRAIL","gross":1435,"cost":65,"net":1329,"cum":-63,"win":true},{"date":"2026-01-20","in":"09:30","out":"14:29","side":"PE","sym":"260122","entry":276.15,"sl":140.25,"tsl":76.0,"target":475.45,"idx_in":82945,"idx_sl":83126,"idx_t1":82546,"idx_t2":82547,"idx_risk":181.2,"atr":99.4,"exit":415.0,"hold":299,"reason":"IDX_TSL_HIT","stage":"TRAIL","gross":2777,"cost":60,"net":2676,"cum":2613,"win":true},{"date":"2026-02-05","in":"09:40","out":"10:11","side":"PE","sym":"260205","entry":101.1,"sl":50.55,"tsl":93.5,"target":212.3,"idx_in":83505,"idx_sl":83606,"idx_t1":83283,"idx_t2":83283,"idx_risk":101.1,"atr":118.4,"exit":97.95,"hold":31,"reason":"IDX_BE_STOP","stage":"BE","gross":-62,"cost":50,"net":-153,"cum":2459,"win":false},{"date":"2026-02-12","in":"09:30","out":"09:49","side":"PE","sym":"260212","entry":84.9,"sl":42.45,"tsl":75.4,"target":178.3,"idx_in":83831,"idx_sl":83916,"idx_t1":83644,"idx_t2":83645,"idx_risk":84.9,"atr":95.5,"exit":44.15,"hold":19,"reason":"IDX_SL_HIT","stage":"INITIAL","gross":-815,"cost":49,"net":-904,"cum":1555,"win":false},{"date":"2026-03-25","in":"09:30","out":"10:42","side":"CE","sym":"260325","entry":187.9,"sl":93.95,"tsl":158.0,"target":394.6,"idx_in":74983,"idx_sl":74796,"idx_t1":75397,"idx_t2":75397,"idx_risk":187.9,"atr":181.9,"exit":448.05,"hold":72,"reason":"IDX_TARGET","stage":"TRAIL","gross":5203,"cost":61,"net":5101,"cum":6657,"win":true},{"date":"2026-04-30","in":"09:30","out":"09:34","side":"PE","sym":"260430","entry":125.65,"sl":62.8,"tsl":128.3,"target":263.8,"idx_in":76540,"idx_sl":76666,"idx_t1":76264,"idx_t2":76264,"idx_risk":125.6,"atr":191.1,"exit":72.35,"hold":4,"reason":"IDX_SL_HIT","stage":"INITIAL","gross":-1066,"cost":50,"net":-1156,"cum":5501,"win":false},{"date":"2026-07-02","in":"09:35","out":"09:55","side":"CE","sym":"260702","entry":119.2,"sl":59.6,"tsl":89.1,"target":250.3,"idx_in":77327,"idx_sl":77208,"idx_t1":77590,"idx_t2":77590,"idx_risk":119.2,"atr":111.4,"exit":121.65,"hold":20,"reason":"IDX_BE_STOP","stage":"BE","gross":49,"cost":51,"net":-42,"cum":5458,"win":false},{"date":"2026-08-19","in":"09:40","out":"11:46","side":"PE","sym":"260820","entry":188.5,"sl":94.25,"tsl":59.5,"target":395.85,"idx_in":77020,"idx_sl":77208,"idx_t1":76605,"idx_t2":76606,"idx_risk":188.5,"atr":73.2,"exit":234.7,"hold":126,"reason":"IDX_TSL_HIT","stage":"TRAIL","gross":923,"cost":55,"net":828,"cum":6287,"win":true},{"date":"2026-10-08","in":"09:30","out":"10:12","side":"PE","sym":"261008","entry":131.4,"sl":65.7,"tsl":82.8,"target":275.95,"idx_in":72350,"idx_sl":72481,"idx_t1":72061,"idx_t2":72061,"idx_risk":131.4,"atr":105.0,"exit":134.95,"hold":42,"reason":"IDX_TSL_HIT","stage":"TRAIL","gross":70,"cost":52,"net":-21,"cum":6266,"win":false}];
+
+function stageTag(s){
+  if(s==="INITIAL")return"<span class='tag tag-loss'>"+s+"</span>";
+  if(s==="TRAIL")return"<span class='tag tag-trail'>"+s+"</span>";
+  return"<span class='tag tag-be'>"+s+"</span>";
+}
+
+var tb=document.getElementById("tradeBody");
+TRADES.forEach(function(r,i){
+  var nc=r.net>=0?"pos":"neg";
+  var tr=document.createElement("tr");
+  tr.innerHTML="<td>"+(i+1)+" "+r.date+"</td>"
+    +"<td>"+r.in+"</td><td>"+r.out+"</td>"
+    +"<td><span class='tag "+(r.side==="CE"?"tag-ce":"tag-pe")+"'>"+r.side+"</span></td>"
+    +"<td style='font-size:11px'>"+r.sym+"</td>"
+    +"<td><strong>"+r.entry.toFixed(2)+"</strong></td>"
+    +"<td class='neg'>"+r.sl.toFixed(2)+"</td>"
+    +"<td>"+r.tsl+"</td>"
+    +"<td class='pos'>"+r.target.toFixed(2)+"</td>"
+    +"<td>"+r.idx_in.toLocaleString("en-IN")+"</td>"
+    +"<td class='neg'>"+r.idx_sl.toLocaleString("en-IN")+"</td>"
+    +"<td style='color:#3b82d4'>"+r.idx_t1.toLocaleString("en-IN")+"</td>"
+    +"<td>"+r.idx_risk+"</td>"
+    +"<td style='color:#57606a'>"+r.atr+"</td>"
+    +"<td>"+r.exit.toFixed(2)+"</td>"
+    +"<td>"+r.hold+"m</td>"
+    +"<td style='font-size:11px;text-align:left'>"+(r.reason||"").replace("IDX_","")+"</td>"
+    +stageTag(r.stage)
+    +"<td class='"+nc+"'><strong>"+(r.net>=0?"+":"")+r.net.toLocaleString("en-IN")+"</strong></td>"
+    +"<td style='color:#57606a'>"+(r.cum>=0?"+":"")+r.cum.toLocaleString("en-IN")+"</td>";
+  tb.appendChild(tr);
+});
+</script>
+</body>
+</html>

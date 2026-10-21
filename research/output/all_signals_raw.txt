@@ -1,0 +1,655 @@
+﻿2026-10-04 21:40:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE_ATR | body=0.0 | atr=55.1 | min_ratio=0.35 | required=19.29 | squeeze_relaxed=False
+2026-10-06 10:25:46 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-06 09:15:00+05:30 | close=72440.57
+2026-10-06 10:25:46 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE signal confirmed
+2026-10-06 10:25:46 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-06 10:25:51 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0872700CE | qty=20 | fill=396.9 | order_id=PAPER_FED55671
+2026-10-06 10:25:51 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0872700CE | fill=396.9 | qty=20
+2026-10-06 10:25:51 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72158.16 | sensex_ltp=72685.26 | sl_index_pts=527.1 | delta=0.4 | sl=138.9 | be=69.45 | target=208.35 | trail=27.8 | rr=1.5 | entry=396.9
+2026-10-06 10:25:51 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O0872700CE | sl=258.0 | order_id=PAPER_SL_2B19DCC3
+2026-10-06 10:25:51 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O0872700CE | sl=258.0 | order_id=PAPER_SL_2B19DCC3
+2026-10-06 10:44:51 | INFO     | execution.smart_exit | [SMART_EXIT_PROFIT_LOCK] entry=396.9 | ltp=437.6 | threshold=436.85 | mode=atr | atr=79.91
+2026-10-06 10:44:51 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=POSITION_OPEN | to_state=EXIT_PENDING | reason=PROFIT_LOCK
+2026-10-06 10:44:51 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O0872700CE | qty=20 | fill=437.6 | order_id=PAPER_DFE91F09 | tag=PROFIT_LOCK
+2026-10-06 10:44:51 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O0872700CE | exit_price=437.6 | pnl=814.0000000000009 | reason=PROFIT_LOCK
+2026-10-06 10:44:51 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=EXIT_PENDING | to_state=CLOSED | reason=PROFIT_LOCK
+2026-10-06 10:45:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-06 10:40:00+05:30 | close=72760.12 | vwap=72684.15
+2026-10-06 10:45:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE_VWAP | body=24.42 | atr=78.31 | min_ratio=0.35 | required=27.41 | squeeze_relaxed=False
+2026-10-06 11:05:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-06 11:00:00+05:30 | close=72781.96
+2026-10-06 11:05:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE signal confirmed
+2026-10-06 11:05:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-06 11:05:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0872800CE | qty=20 | fill=378.7 | order_id=PAPER_92FA66FE
+2026-10-06 11:05:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0872800CE | fill=378.7 | qty=20
+2026-10-06 11:05:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72244.93 | sensex_ltp=72782.24 | sl_index_pts=537.31 | delta=0.4 | sl=132.55 | be=66.3 | target=198.8 | trail=26.5 | rr=1.5 | entry=378.7
+2026-10-06 11:10:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-06 11:05:00+05:30 | close=72801.91
+2026-10-06 11:10:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE | body=19.67 | atr=71.21 | min_ratio=0.35 | required=24.92 | squeeze_relaxed=False
+2026-10-06 11:20:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-06 11:15:00+05:30 | close=72816.77
+2026-10-06 11:20:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE | body=17.01 | atr=57.5 | min_ratio=0.35 | required=20.12 | squeeze_relaxed=False
+2026-10-06 11:45:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-06 11:40:00+05:30 | close=72824.0
+2026-10-06 11:45:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING] direction=CE | gap_now=57.7 | gap_prev=58.52 | reason=EMA gap not widening
+2026-10-06 11:50:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-06 11:45:00+05:30 | close=72849.18 | vwap=72802.97
+2026-10-06 11:50:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-06 11:50:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-06 11:50:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0872800CE | qty=20 | fill=415.8 | order_id=PAPER_CDC73FC9
+2026-10-06 11:50:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0872800CE | fill=415.8 | qty=20
+2026-10-06 11:50:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72713.41 | sensex_ltp=72848.65 | sl_index_pts=135.24 | delta=0.4 | sl=54.1 | be=27.05 | target=81.15 | trail=10.8 | rr=1.5 | entry=415.8
+2026-10-06 11:50:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O0872800CE | sl=361.7 | order_id=PAPER_SL_977767B0
+2026-10-06 11:50:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O0872800CE | sl=361.7 | order_id=PAPER_SL_977767B0
+2026-10-06 12:38:36 | INFO     | execution.smart_exit | [SMART_EXIT_PROFIT_LOCK] entry=415.8 | ltp=435.75 | threshold=434.86 | mode=atr | atr=38.11
+2026-10-06 12:38:36 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=POSITION_OPEN | to_state=EXIT_PENDING | reason=PROFIT_LOCK
+2026-10-06 12:38:36 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O0872800CE | qty=20 | fill=435.75 | order_id=PAPER_EF144F31 | tag=PROFIT_LOCK
+2026-10-06 12:38:36 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O0872800CE | exit_price=435.75 | pnl=398.9999999999998 | reason=PROFIT_LOCK
+2026-10-06 12:38:36 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=EXIT_PENDING | to_state=CLOSED | reason=PROFIT_LOCK
+2026-10-06 12:40:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-06 12:35:00+05:30 | close=72912.52
+2026-10-06 12:40:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE signal confirmed
+2026-10-06 12:40:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-06 12:40:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0872900CE | qty=20 | fill=394.4 | order_id=PAPER_D94CB159
+2026-10-06 12:40:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0872900CE | fill=394.4 | qty=20
+2026-10-06 12:40:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72713.41 | sensex_ltp=72913.08 | sl_index_pts=199.67 | delta=0.4 | sl=79.85 | be=39.9 | target=119.75 | trail=15.95 | rr=1.5 | entry=394.4
+2026-10-06 13:40:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-06 13:35:00+05:30 | close=72905.25
+2026-10-06 13:40:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING] direction=CE | gap_now=22.37 | gap_prev=23.01 | reason=EMA gap not widening
+2026-10-06 13:55:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-06 13:50:00+05:30 | close=72923.11
+2026-10-06 13:55:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE | body=8.7 | atr=43.86 | min_ratio=0.35 | required=15.35 | squeeze_relaxed=False
+2026-10-06 14:05:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-06 14:00:00+05:30 | close=72944.3
+2026-10-06 14:05:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE signal confirmed
+2026-10-06 14:05:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-06 14:05:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0872900CE | qty=20 | fill=396.0 | order_id=PAPER_B23FF5EC
+2026-10-06 14:05:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0872900CE | fill=396.0 | qty=20
+2026-10-06 14:05:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72848.95 | sensex_ltp=72944.61 | sl_index_pts=95.66 | delta=0.4 | sl=38.25 | be=19.1 | target=57.4 | trail=7.65 | rr=1.5 | entry=396.0
+2026-10-06 14:05:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O0872900CE | sl=357.75 | order_id=PAPER_SL_3774F726
+2026-10-06 14:05:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O0872900CE | sl=357.75 | order_id=PAPER_SL_3774F726
+2026-10-06 14:14:54 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O0872900CE | qty=20 | fill=396.0 | order_id=PAPER_16980536 | tag=STOP_HIT
+2026-10-06 14:14:54 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O0872900CE | exit_price=396.0 | pnl=0.0 | reason=STOP_HIT
+2026-10-06 14:30:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-06 14:25:00+05:30 | close=72849.98 | vwap=72912.08
+2026-10-06 14:30:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=PE_VWAP | ema9=72914.17 | ema21=72903.34 | gap=10.83 | required=10.0
+2026-10-06 14:50:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-06 14:45:00+05:30 | close=72914.52
+2026-10-06 14:50:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=CE | ema9=72898.2 | ema21=72897.34 | gap=0.86 | required=10.0
+2026-10-06 16:40:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-06 16:35:00+05:30 | close=73067.81 | vwap=72911.09
+2026-10-06 16:40:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE_VWAP | body=0.0 | atr=53.03 | min_ratio=0.35 | required=18.56 | squeeze_relaxed=False
+2026-10-06 16:50:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE_ATR | body=0.0 | atr=45.75 | min_ratio=0.35 | required=16.01 | squeeze_relaxed=False
+2026-10-07 09:20:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-07 09:15:00+05:30 | close=72665.53 | vwap=72698.58
+2026-10-07 09:20:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=PE_VWAP | ema9=72893.03 | ema21=72900.26 | gap=-7.22 | required=10.0
+2026-10-07 09:50:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-07 09:45:00+05:30 | close=72631.93
+2026-10-07 09:50:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=PE | body=18.16 | atr=70.36 | min_ratio=0.35 | required=24.62 | squeeze_relaxed=False
+2026-10-07 10:00:01 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-07 09:55:00+05:30 | close=72629.34
+2026-10-07 10:00:01 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=PE | body=13.63 | atr=67.41 | min_ratio=0.35 | required=23.59 | squeeze_relaxed=False
+2026-10-07 10:10:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-07 10:05:00+05:30 | close=72681.72 | vwap=72643.48
+2026-10-07 10:10:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_SLOPE] direction=CE_VWAP | ema9_now=72689.07 | ema9_prev=72690.91 | reason=EMA9 not rising for CE
+2026-10-07 10:20:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-07 10:15:00+05:30 | close=72792.39 | vwap=72656.64
+2026-10-07 10:20:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=CE_VWAP | ema9=72701.67 | ema21=72756.83 | gap=-55.16 | required=10.0
+2026-10-07 10:25:00 | INFO     | strategies.signal_engine | [CE_NATR_SIGNAL] candle=2026-10-07 10:20:00+05:30 | close=72846.78
+2026-10-07 10:25:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=CE_NATR | ema9=72730.69 | ema21=72765.02 | gap=-34.33 | required=10.0
+2026-10-07 10:30:00 | INFO     | strategies.signal_engine | [PE_OB_SIGNAL] candle=2026-10-07 10:25:00+05:30 | close=72955.61
+2026-10-07 10:30:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_SLOPE] direction=PE_OB | ema9_now=72775.68 | ema9_prev=72730.69 | reason=EMA9 not falling for PE
+2026-10-07 10:40:00 | INFO     | strategies.signal_engine | [PE_NATR_SIGNAL] candle=2026-10-07 10:35:00+05:30 | close=72782.82
+2026-10-07 10:40:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=PE_NATR | ema9=72786.28 | ema21=72786.7 | gap=-0.41 | required=10.0
+2026-10-07 10:45:00 | INFO     | strategies.signal_engine | [CE_NATR_SIGNAL] candle=2026-10-07 10:40:00+05:30 | close=72839.8
+2026-10-07 10:45:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=CE_NATR | ema9=72796.99 | ema21=72791.54 | gap=5.45 | required=10.0
+2026-10-07 10:55:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-07 10:50:00+05:30 | close=72909.84
+2026-10-07 10:55:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE signal confirmed
+2026-10-07 10:55:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-07 10:55:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0872900CE | qty=20 | fill=286.25 | order_id=PAPER_50798766
+2026-10-07 10:55:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0872900CE | fill=286.25 | qty=20
+2026-10-07 10:55:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72866.5 | sensex_ltp=72910.55 | sl_index_pts=44.05 | delta=0.4 | sl=20.0 | be=10.0 | target=30.0 | trail=5.0 | rr=1.5 | entry=286.25
+2026-10-07 10:55:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O0872900CE | sl=266.25 | order_id=PAPER_SL_4A7B87F3
+2026-10-07 10:55:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O0872900CE | sl=266.25 | order_id=PAPER_SL_4A7B87F3
+2026-10-07 10:55:39 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O0872900CE | qty=20 | fill=282.65 | order_id=PAPER_7D07E538 | tag=STOP_HIT
+2026-10-07 10:55:39 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O0872900CE | exit_price=282.65 | pnl=-72.00000000000045 | reason=STOP_HIT
+2026-10-07 11:00:00 | INFO     | strategies.signal_engine | [PE_OB_SIGNAL] candle=2026-10-07 10:55:00+05:30 | close=72984.93
+2026-10-07 11:00:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_SLOPE] direction=PE_OB | ema9_now=72857.78 | ema9_prev=72825.99 | reason=EMA9 not falling for PE
+2026-10-07 11:05:00 | INFO     | strategies.signal_engine | [PE_OB_SIGNAL] candle=2026-10-07 11:00:00+05:30 | close=72956.36
+2026-10-07 11:05:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=PE_OB | body=28.57 | atr=84.66 | min_ratio=0.35 | required=29.63 | squeeze_relaxed=False
+2026-10-07 11:10:00 | INFO     | strategies.signal_engine | [PE_OB_SIGNAL] candle=2026-10-07 11:05:00+05:30 | close=72955.49
+2026-10-07 11:10:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=PE_OB | body=4.93 | atr=82.71 | min_ratio=0.35 | required=28.95 | squeeze_relaxed=False
+2026-10-07 11:30:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-07 11:25:00+05:30 | close=72913.0
+2026-10-07 11:30:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE | body=8.7 | atr=70.06 | min_ratio=0.35 | required=24.52 | squeeze_relaxed=False
+2026-10-07 12:00:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-07 11:55:00+05:30 | close=72928.91 | vwap=72896.3
+2026-10-07 12:00:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE_VWAP | body=16.74 | atr=70.0 | min_ratio=0.25 | required=17.5 | squeeze_relaxed=True
+2026-10-07 12:10:00 | INFO     | strategies.signal_engine | [PE_OB_SIGNAL] candle=2026-10-07 12:05:00+05:30 | close=72948.31
+2026-10-07 12:10:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_SLOPE] direction=PE_OB | ema9_now=72942.73 | ema9_prev=72941.33 | reason=EMA9 not falling for PE
+2026-10-07 12:15:00 | INFO     | strategies.signal_engine | [CE_OB_SIGNAL] candle=2026-10-07 12:10:00+05:30 | close=72876.85
+2026-10-07 12:15:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_SLOPE] direction=CE_OB | ema9_now=72929.55 | ema9_prev=72942.73 | reason=EMA9 not rising for CE
+2026-10-07 12:20:01 | INFO     | strategies.signal_engine | [CE_OB_SIGNAL] candle=2026-10-07 12:15:00+05:30 | close=72872.93
+2026-10-07 12:20:01 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE_OB | body=9.52 | atr=71.6 | min_ratio=0.35 | required=25.06 | squeeze_relaxed=False
+2026-10-07 12:39:32 | INFO     | strategies.signal_engine | [CE_OB_SIGNAL] candle=2026-10-07 12:20:00+05:30 | close=72870.68
+2026-10-07 12:39:32 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE_OB | body=4.4 | atr=67.55 | min_ratio=0.35 | required=23.64 | squeeze_relaxed=False
+2026-10-07 12:40:00 | INFO     | strategies.signal_engine | [CE_OB_SIGNAL] candle=2026-10-07 12:35:00+05:30 | close=72849.1
+2026-10-07 12:40:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE_OB | body=4.58 | atr=64.66 | min_ratio=0.35 | required=22.63 | squeeze_relaxed=False
+2026-10-07 12:45:00 | INFO     | strategies.signal_engine | [CE_OB_SIGNAL] candle=2026-10-07 12:40:00+05:30 | close=72872.35
+2026-10-07 12:45:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_SLOPE] direction=CE_OB | ema9_now=72891.91 | ema9_prev=72896.8 | reason=EMA9 not rising for CE
+2026-10-07 12:50:00 | INFO     | strategies.signal_engine | [CE_OB_SIGNAL] candle=2026-10-07 12:45:00+05:30 | close=72822.55
+2026-10-07 12:50:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_SLOPE] direction=CE_OB | ema9_now=72878.04 | ema9_prev=72891.91 | reason=EMA9 not rising for CE
+2026-10-07 13:00:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-07 12:55:00+05:30 | close=72720.0 | vwap=72857.53
+2026-10-07 13:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-07 13:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-07 13:00:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0872700PE | qty=20 | fill=296.85 | order_id=PAPER_43D0094A
+2026-10-07 13:00:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0872700PE | fill=296.85 | qty=20
+2026-10-07 13:00:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=72951.59 | sensex_ltp=72722.49 | sl_index_pts=229.1 | delta=0.4 | sl=91.65 | be=45.8 | target=137.5 | trail=18.35 | rr=1.5 | entry=296.85
+2026-10-07 13:00:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O0872700PE | sl=205.2 | order_id=PAPER_SL_FA1DB292
+2026-10-07 13:00:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O0872700PE | sl=205.2 | order_id=PAPER_SL_FA1DB292
+2026-10-07 13:12:39 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O0872700PE | qty=20 | fill=387.05 | order_id=PAPER_C6F1876F | tag=STOP_HIT
+2026-10-07 13:12:39 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O0872700PE | exit_price=387.05 | pnl=1803.9999999999998 | reason=STOP_HIT
+2026-10-07 13:25:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-07 13:20:00+05:30 | close=72551.31
+2026-10-07 13:25:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE signal confirmed
+2026-10-07 13:25:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-07 13:25:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0872500PE | qty=20 | fill=292.65 | order_id=PAPER_30348C05
+2026-10-07 13:25:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0872500PE | fill=292.65 | qty=20
+2026-10-07 13:25:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=72880.64 | sensex_ltp=72546.57 | sl_index_pts=334.07 | delta=0.4 | sl=102.45 | be=51.2 | target=153.7 | trail=20.5 | rr=1.5 | entry=292.65
+2026-10-07 13:25:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O0872500PE | sl=190.2 | order_id=PAPER_SL_65E0509F
+2026-10-07 13:25:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O0872500PE | sl=190.2 | order_id=PAPER_SL_65E0509F
+2026-10-07 14:26:50 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O0872500PE | qty=20 | fill=189.25 | order_id=PAPER_C5826E4B | tag=STOP_HIT
+2026-10-07 14:26:50 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O0872500PE | exit_price=189.25 | pnl=-2067.9999999999995 | reason=STOP_HIT
+2026-10-07 14:30:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-07 14:25:00+05:30 | close=72737.57 | vwap=72665.58
+2026-10-07 14:30:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_COOLDOWN] direction=CE_VWAP | candles_remaining=5
+2026-10-07 14:40:00 | INFO     | strategies.signal_engine | [PE_NATR_SIGNAL] candle=2026-10-07 14:35:00+05:30 | close=72662.27
+2026-10-07 14:40:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_SLOPE] direction=PE_NATR | ema9_now=72628.63 | ema9_prev=72620.22 | reason=EMA9 not falling for PE
+2026-10-07 14:45:00 | INFO     | strategies.signal_engine | [CE_TRB_SIGNAL] candle=2026-10-07 14:40:00+05:30 | close=72693.15
+2026-10-07 14:45:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_COOLDOWN] direction=CE_TRB | candles_remaining=2
+2026-10-07 15:05:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-07 15:00:00+05:30 | close=72606.56 | vwap=72665.4
+2026-10-07 15:05:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=PE_VWAP | ema9=72640.52 | ema21=72647.61 | gap=-7.09 | gap_velocity=4.39 | required=10.0
+2026-10-07 15:10:01 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-07 15:05:00+05:30 | close=72566.68 | vwap=72662.52
+2026-10-07 15:30:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-07 15:25:00+05:30 | close=72638.7
+2026-10-07 15:30:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=PE | body=9.7 | atr=61.23 | min_ratio=0.35 | required=21.43 | squeeze_relaxed=False
+2026-10-08 12:00:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-08 11:55:00+05:30 | close=71941.34
+2026-10-08 12:00:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=PE | body=3.19 | atr=85.87 | min_ratio=0.35 | required=30.05 | squeeze_relaxed=False
+2026-10-08 12:20:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-08 12:15:00+05:30 | close=71859.78 | vwap=71929.31
+2026-10-08 12:20:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-08 12:20:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-08 12:20:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0871900PE | qty=20 | fill=181.4 | order_id=PAPER_79D2D07B
+2026-10-08 12:20:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0871900PE | fill=181.4 | qty=20
+2026-10-08 12:20:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=72076.55 | sensex_ltp=71850.17 | sl_index_pts=226.38 | delta=0.4 | sl=63.5 | be=31.75 | target=95.25 | trail=19.05 | rr=1.5 | entry=181.4
+2026-10-08 12:20:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O0871900PE | sl=117.9 | order_id=PAPER_SL_B1138F35
+2026-10-08 12:20:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O0871900PE | sl=117.9 | order_id=PAPER_SL_B1138F35
+2026-10-08 12:32:11 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O0871900PE | qty=20 | fill=209.1 | order_id=PAPER_1BD900A1 | tag=STOP_HIT
+2026-10-08 12:32:12 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O0871900PE | exit_price=209.1 | pnl=553.9999999999998 | reason=STOP_HIT
+2026-10-08 12:35:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-08 12:30:00+05:30 | close=71768.58
+2026-10-08 12:35:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE signal confirmed
+2026-10-08 12:35:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-08 12:35:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0871800PE | qty=20 | fill=176.3 | order_id=PAPER_6F00EE69
+2026-10-08 12:35:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0871800PE | fill=176.3 | qty=20
+2026-10-08 12:35:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=72076.55 | sensex_ltp=71773.08 | sl_index_pts=303.47 | delta=0.4 | sl=61.7 | be=30.85 | target=92.55 | trail=18.5 | rr=1.5 | entry=176.3
+2026-10-08 12:35:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O0871800PE | sl=114.6 | order_id=PAPER_SL_A3B316ED
+2026-10-08 12:35:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O0871800PE | sl=114.6 | order_id=PAPER_SL_A3B316ED
+2026-10-08 12:40:10 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O0871800PE | qty=20 | fill=184.8 | order_id=PAPER_84E07F5E | tag=STOP_HIT
+2026-10-08 12:40:11 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O0871800PE | exit_price=184.8 | pnl=170.0 | reason=STOP_HIT
+2026-10-08 13:00:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-08 12:55:00+05:30 | close=71673.48
+2026-10-08 13:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE signal confirmed
+2026-10-08 13:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-08 13:00:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0871700PE | qty=20 | fill=152.5 | order_id=PAPER_009E17A1
+2026-10-08 13:00:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0871700PE | fill=152.5 | qty=20
+2026-10-08 13:00:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=71989.31 | sensex_ltp=71665.47 | sl_index_pts=323.84 | delta=0.4 | sl=53.4 | be=26.7 | target=80.1 | trail=16.0 | rr=1.5 | entry=152.5
+2026-10-08 13:00:00 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O0871700PE | sl=99.1 | order_id=PAPER_SL_168D20FA
+2026-10-08 13:00:00 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O0871700PE | sl=99.1 | order_id=PAPER_SL_168D20FA
+2026-10-08 13:00:50 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O0871700PE | qty=20 | fill=165.6 | order_id=PAPER_D063DCFA | tag=STOP_HIT
+2026-10-08 13:00:50 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O0871700PE | exit_price=165.6 | pnl=261.9999999999999 | reason=STOP_HIT
+2026-10-08 13:05:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-08 13:00:00+05:30 | close=71750.56 | vwap=71692.53
+2026-10-08 13:05:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_SLOPE] direction=CE_VWAP | ema9_now=71765.37 | ema9_prev=71769.08 | reason=EMA9 not rising for CE
+2026-10-08 13:20:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-08 13:15:00+05:30 | close=71609.29 | vwap=71690.3
+2026-10-08 13:20:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-08 13:20:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-08 13:20:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0871600PE | qty=20 | fill=128.2 | order_id=PAPER_77A9F757
+2026-10-08 13:20:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0871600PE | fill=128.2 | qty=20
+2026-10-08 13:20:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=71871.28 | sensex_ltp=71606.82 | sl_index_pts=264.46 | delta=0.4 | sl=44.85 | be=22.4 | target=67.3 | trail=13.45 | rr=1.5 | entry=128.2
+2026-10-08 13:20:00 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O0871600PE | sl=83.35 | order_id=PAPER_SL_0F02D7B5
+2026-10-08 13:20:00 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O0871600PE | sl=83.35 | order_id=PAPER_SL_0F02D7B5
+2026-10-08 14:01:18 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O0871600PE | qty=20 | fill=153.35 | order_id=PAPER_BD2AF76E | tag=STOP_HIT
+2026-10-08 14:01:18 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O0871600PE | exit_price=153.35 | pnl=503.0000000000001 | reason=STOP_HIT
+2026-10-08 14:05:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-08 14:00:00+05:30 | close=71497.55
+2026-10-08 14:05:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE signal confirmed
+2026-10-08 14:05:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-08 14:05:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O0871500PE | qty=20 | fill=125.0 | order_id=PAPER_5F21413F
+2026-10-08 14:05:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O0871500PE | fill=125.0 | qty=20
+2026-10-08 14:05:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=71752.18 | sensex_ltp=71499.48 | sl_index_pts=252.7 | delta=0.4 | sl=43.75 | be=21.9 | target=65.6 | trail=13.1 | rr=1.5 | entry=125.0
+2026-10-08 14:05:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O0871500PE | sl=81.25 | order_id=PAPER_SL_030EDEE9
+2026-10-08 14:05:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O0871500PE | sl=81.25 | order_id=PAPER_SL_030EDEE9
+2026-10-08 14:22:21 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O0871500PE | qty=20 | fill=138.35 | order_id=PAPER_1865363A | tag=STOP_HIT
+2026-10-08 14:22:21 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O0871500PE | exit_price=138.35 | pnl=266.9999999999999 | reason=STOP_HIT
+2026-10-08 14:25:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-08 14:20:00+05:30 | close=71474.89
+2026-10-08 14:25:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=PE | body=25.24 | atr=83.62 | min_ratio=0.35 | required=29.27 | squeeze_relaxed=False
+2026-10-08 14:45:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-08 14:40:00+05:30 | close=71501.82
+2026-10-08 14:45:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING] direction=PE | gap_now=-62.36 | gap_prev=-63.21 | reason=EMA gap not widening
+2026-10-08 14:50:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-08 14:45:00+05:30 | close=71495.24
+2026-10-08 14:50:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=PE | body=8.64 | atr=84.67 | min_ratio=0.25 | required=21.17 | squeeze_relaxed=True
+2026-10-08 15:00:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-08 14:55:00+05:30 | close=71424.0
+2026-10-08 15:10:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-08 15:05:00+05:30 | close=71390.38
+2026-10-09 09:25:00 | INFO     | strategies.signal_engine | [PE_PIVOT_SIGNAL] candle=2026-10-09 09:20:00+05:30 | entry=71821.24 | stop=72039.48 | risk=218.24 | t1=71049.34 | t2=70505.43 | atr=114.35
+2026-10-09 09:25:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_PIVOT signal confirmed
+2026-10-09 09:25:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-09 09:25:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1571800PE | qty=20 | fill=490.8 | order_id=PAPER_4BD93EBA
+2026-10-09 09:25:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1571800PE | fill=490.8 | qty=20
+2026-10-09 09:25:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SPOT_ATR] mode=spot_atr_mult | spot_atr=150.85 | spot_atr_period=5 | atm_delta=0.4 | sl=181.0 | be=90.5 | target=271.5 | trail=54.3 | rr=1.5 | entry=490.8
+2026-10-09 09:25:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1571800PE | sl=383.5 | order_id=PAPER_SL_89904600
+2026-10-09 09:25:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1571800PE | sl=383.5 | order_id=PAPER_SL_89904600
+2026-10-09 09:30:08 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1571800PE | qty=20 | fill=398.6 | order_id=PAPER_51FFF088 | tag=PIVOT_SL_HIT
+2026-10-09 09:30:08 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1571800PE | exit_price=398.6 | pnl=-1843.9999999999998 | reason=PIVOT_SL_HIT
+2026-10-09 09:35:00 | INFO     | strategies.signal_engine | [CE_PIVOT_SIGNAL] candle=2026-10-09 09:30:00+05:30 | entry=72081.96 | stop=71800.95 | risk=281.01 | t1=72415.56 | t2=73237.87 | atr=120.46
+2026-10-09 09:35:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_PIVOT signal confirmed
+2026-10-09 09:35:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-09 09:35:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572100CE | qty=20 | fill=599.05 | order_id=PAPER_3709BF60
+2026-10-09 09:35:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572100CE | fill=599.05 | qty=20
+2026-10-09 09:35:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SPOT_ATR] mode=spot_atr_mult | spot_atr=152.0 | spot_atr_period=5 | atm_delta=0.4 | sl=182.4 | be=91.2 | target=273.6 | trail=54.7 | rr=1.5 | entry=599.05
+2026-10-09 09:35:00 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572100CE | sl=459.4 | order_id=PAPER_SL_13161AAB
+2026-10-09 09:35:00 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572100CE | sl=459.4 | order_id=PAPER_SL_13161AAB
+2026-10-09 11:53:42 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572100CE | qty=20 | fill=713.95 | order_id=PAPER_63BAA37B | tag=PIVOT_TSL_HIT
+2026-10-09 11:53:42 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572100CE | exit_price=713.95 | pnl=2298.000000000002 | reason=PIVOT_TSL_HIT
+2026-10-09 12:00:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-09 11:55:00+05:30 | close=72243.92 | vwap=72281.66
+2026-10-09 12:00:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-09 12:00:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-09 12:00:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572200PE | qty=20 | fill=469.65 | order_id=PAPER_CB200DEA
+2026-10-09 12:00:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572200PE | fill=469.65 | qty=20
+2026-10-09 12:00:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SPOT_ATR] mode=spot_atr_mult | spot_atr=53.69 | spot_atr_period=5 | atm_delta=0.4 | sl=64.45 | be=32.2 | target=96.7 | trail=19.35 | rr=1.5 | entry=469.65
+2026-10-09 12:00:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572200PE | sl=405.2 | order_id=PAPER_SL_88B2DDD9
+2026-10-09 12:00:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572200PE | sl=405.2 | order_id=PAPER_SL_88B2DDD9
+2026-10-09 12:48:25 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572200PE | qty=20 | fill=404.85 | order_id=PAPER_B22B1A1F | tag=STOP_HIT
+2026-10-09 12:48:25 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572200PE | exit_price=404.85 | pnl=-1295.999999999999 | reason=STOP_HIT
+2026-10-09 12:55:00 | INFO     | strategies.signal_engine | [EMA_BLOCKED_PIVOT_ZONE] candle=2026-10-09 12:50:00+05:30 | close=72407.77 | level=72415.56 | buffer=25.0
+2026-10-09 13:00:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-09 12:55:00+05:30 | close=72448.9 | vwap=72343.89
+2026-10-09 13:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-09 13:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-09 13:00:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572400CE | qty=20 | fill=616.1 | order_id=PAPER_720393BC
+2026-10-09 13:00:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572400CE | fill=616.1 | qty=20
+2026-10-09 13:00:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72333.22 | sensex_ltp=72448.9 | sl_index_pts=115.68 | delta=0.4 | sl=46.25 | be=23.1 | target=69.4 | trail=13.9 | rr=1.5 | entry=616.1
+2026-10-09 13:00:00 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572400CE | sl=569.85 | order_id=PAPER_SL_BE4040B9
+2026-10-09 13:00:00 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572400CE | sl=569.85 | order_id=PAPER_SL_BE4040B9
+2026-10-09 13:03:23 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572400CE | qty=20 | fill=567.45 | order_id=PAPER_0BF054B7 | tag=STOP_HIT
+2026-10-09 13:03:24 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572400CE | exit_price=567.45 | pnl=-972.9999999999995 | reason=STOP_HIT
+2026-10-09 13:10:00 | INFO     | strategies.signal_engine | [EMA_BLOCKED_PIVOT_ZONE] candle=2026-10-09 13:05:00+05:30 | close=72419.42 | level=72415.56 | buffer=25.0
+2026-10-09 13:15:00 | INFO     | strategies.signal_engine | [EMA_BLOCKED_PIVOT_ZONE] candle=2026-10-09 13:10:00+05:30 | close=72430.74 | level=72415.56 | buffer=25.0
+2026-10-09 13:20:00 | INFO     | strategies.signal_engine | [EMA_BLOCKED_PIVOT_ZONE] candle=2026-10-09 13:15:00+05:30 | close=72417.76 | level=72415.56 | buffer=25.0
+2026-10-09 13:25:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-09 13:20:00+05:30 | close=72455.95
+2026-10-09 13:25:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE signal confirmed
+2026-10-09 13:25:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-09 13:25:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572500CE | qty=20 | fill=544.95 | order_id=PAPER_C3B8B323
+2026-10-09 13:25:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572500CE | fill=544.95 | qty=20
+2026-10-09 13:25:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72333.22 | sensex_ltp=72457.7 | sl_index_pts=124.48 | delta=0.4 | sl=49.8 | be=24.9 | target=124.5 | trail=14.95 | rr=2.5 | entry=544.95
+2026-10-09 13:25:00 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572500CE | sl=495.15 | order_id=PAPER_SL_73FCB0C2
+2026-10-09 13:25:00 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572500CE | sl=495.15 | order_id=PAPER_SL_73FCB0C2
+2026-10-09 13:45:42 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572500CE | qty=20 | fill=557.65 | order_id=PAPER_8459D4AB | tag=STOP_HIT
+2026-10-09 13:45:42 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572500CE | exit_price=557.65 | pnl=253.99999999999864 | reason=STOP_HIT
+2026-10-09 13:50:00 | INFO     | strategies.signal_engine | [EMA_BLOCKED_COOLDOWN] candle=2026-10-09 13:45:00+05:30 | candles_remaining=7
+2026-10-09 13:55:00 | INFO     | strategies.signal_engine | [EMA_BLOCKED_COOLDOWN] candle=2026-10-09 13:50:00+05:30 | candles_remaining=6
+2026-10-09 14:00:00 | INFO     | strategies.signal_engine | [EMA_BLOCKED_COOLDOWN] candle=2026-10-09 13:55:00+05:30 | candles_remaining=5
+2026-10-09 14:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_MOM signal confirmed
+2026-10-09 14:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-09 14:00:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572600CE | qty=20 | fill=534.0 | order_id=PAPER_CDF47447
+2026-10-09 14:00:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572600CE | fill=534.0 | qty=20
+2026-10-09 14:00:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72374.12 | sensex_ltp=72569.94 | sl_index_pts=195.82 | delta=0.4 | sl=78.35 | be=39.15 | target=117.5 | trail=23.5 | rr=1.5 | entry=534.0
+2026-10-09 14:00:00 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572600CE | sl=455.65 | order_id=PAPER_SL_315F4F9A
+2026-10-09 14:00:00 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572600CE | sl=455.65 | order_id=PAPER_SL_315F4F9A
+2026-10-09 14:19:12 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572600CE | qty=20 | fill=586.7 | order_id=PAPER_A91AC0FD | tag=STOP_HIT
+2026-10-09 14:19:12 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572600CE | exit_price=586.7 | pnl=1054.000000000001 | reason=STOP_HIT
+2026-10-09 14:20:00 | INFO     | strategies.signal_engine | [EMA_BLOCKED_COOLDOWN] candle=2026-10-09 14:15:00+05:30 | candles_remaining=4
+2026-10-09 14:20:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_MOM signal confirmed
+2026-10-09 14:20:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-09 14:20:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572700CE | qty=20 | fill=522.0 | order_id=PAPER_2B6DD88E
+2026-10-09 14:20:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572700CE | fill=522.0 | qty=20
+2026-10-09 14:20:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72407.78 | sensex_ltp=72650.7 | sl_index_pts=242.92 | delta=0.4 | sl=97.15 | be=48.6 | target=145.75 | trail=29.15 | rr=1.5 | entry=522.0
+2026-10-09 14:20:00 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572700CE | sl=424.85 | order_id=PAPER_SL_7C135159
+2026-10-09 14:20:00 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572700CE | sl=424.85 | order_id=PAPER_SL_7C135159
+2026-10-09 15:11:57 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572700CE | qty=20 | fill=425.85 | order_id=PAPER_238D8381 | tag=TIME_DECAY
+2026-10-09 15:11:57 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572700CE | exit_price=425.85 | pnl=-1922.9999999999995 | reason=TIME_DECAY
+2026-10-12 09:20:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-12 09:15:00+05:30 | close=72647.48 | vwap=72689.2
+2026-10-12 09:20:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_SLOPE] direction=PE_VWAP | ema9_now=72600.54 | ema9_prev=72588.81 | reason=EMA9 not falling for PE
+2026-10-12 09:20:00 | INFO     | strategies.signal_engine | [CE_NATR_SIGNAL] candle=2026-10-12 09:15:00+05:30 | close=72647.48
+2026-10-12 09:20:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_NATR signal confirmed
+2026-10-12 09:20:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-12 09:20:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572600CE | qty=20 | fill=567.0 | order_id=PAPER_BBB41AFB
+2026-10-12 09:20:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572600CE | fill=567.0 | qty=20
+2026-10-12 09:20:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72529.63 | sensex_ltp=72643.78 | sl_index_pts=114.15 | delta=0.4 | sl=45.65 | be=22.8 | target=100.45 | trail=13.7 | rr=2.2 | entry=567.0
+2026-10-12 09:20:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572600CE | sl=521.35 | order_id=PAPER_SL_8467AD63
+2026-10-12 09:20:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572600CE | sl=521.35 | order_id=PAPER_SL_8467AD63
+2026-10-12 09:23:01 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572600CE | qty=20 | fill=521.0 | order_id=PAPER_43F8698D | tag=STOP_HIT
+2026-10-12 09:23:01 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572600CE | exit_price=521.0 | pnl=-920.0 | reason=STOP_HIT
+2026-10-12 09:25:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-12 09:20:00+05:30 | close=72423.97 | vwap=72634.76
+2026-10-12 09:25:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-12 09:25:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-12 09:25:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-12 09:20:00+05:30 | close=72423.97 | vwap=72569.32
+2026-10-12 09:25:00 | INFO     | strategies.signal_engine | [PE_NATR_SIGNAL] candle=2026-10-12 09:20:00+05:30 | close=72423.97
+2026-10-12 09:25:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_15M_TREND] direction=PE_NATR | close_15m=72772.1 | ema21_15m=72447.39 | gap=324.7 | threshold=150.0 | reason=15m close too far above EMA21 for PE
+2026-10-12 09:25:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572400PE | qty=20 | fill=418.1 | order_id=PAPER_757FB990
+2026-10-12 09:25:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572400PE | fill=418.1 | qty=20
+2026-10-12 09:25:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SPOT_ATR] mode=spot_atr_mult | spot_atr=146.89 | spot_atr_period=5 | atm_delta=0.4 | sl=176.25 | be=88.1 | target=387.75 | trail=52.9 | rr=2.2 | entry=418.1
+2026-10-12 09:25:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572400PE | sl=241.85 | order_id=PAPER_SL_3EEC5ED5
+2026-10-12 09:25:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572400PE | sl=241.85 | order_id=PAPER_SL_3EEC5ED5
+2026-10-12 10:20:12 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572400PE | qty=20 | fill=514.0 | order_id=PAPER_6B424991 | tag=STOP_HIT
+2026-10-12 10:20:13 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572400PE | exit_price=514.0 | pnl=1917.9999999999995 | reason=STOP_HIT
+2026-10-12 10:30:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-12 10:25:00+05:30 | close=72198.07 | vwap=72268.66
+2026-10-12 10:30:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-12 10:30:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-12 10:30:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572200PE | qty=20 | fill=459.9 | order_id=PAPER_09F447DE
+2026-10-12 10:30:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572200PE | fill=459.9 | qty=20
+2026-10-12 10:30:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=72460.3 | sensex_ltp=72197.7 | sl_index_pts=262.6 | delta=0.4 | sl=105.05 | be=52.5 | target=231.1 | trail=31.5 | rr=2.2 | entry=459.9
+2026-10-12 10:30:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-12 10:25:00+05:30 | close=72197.7 | vwap=72241.15
+2026-10-12 10:30:00 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572200PE | sl=354.85 | order_id=PAPER_SL_AB5D4680
+2026-10-12 10:30:00 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572200PE | sl=354.85 | order_id=PAPER_SL_AB5D4680
+2026-10-12 10:30:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_ATR signal confirmed
+2026-10-12 10:30:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-12 10:30:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572200PE | qty=20 | fill=459.9 | order_id=PAPER_1231D68D
+2026-10-12 10:30:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572200PE | fill=459.9 | qty=20
+2026-10-12 10:30:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=72460.3 | sensex_ltp=72197.7 | sl_index_pts=262.6 | delta=0.4 | sl=105.05 | be=52.5 | target=231.1 | trail=31.5 | rr=2.2 | entry=459.9
+2026-10-12 10:30:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572200PE | sl=354.85 | order_id=PAPER_SL_83EAFDA9
+2026-10-12 10:30:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572200PE | sl=354.85 | order_id=PAPER_SL_83EAFDA9
+2026-10-12 11:02:41 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572200PE | qty=20 | fill=514.3 | order_id=PAPER_F377A206 | tag=STOP_HIT
+2026-10-12 11:02:42 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572200PE | exit_price=514.3 | pnl=1087.9999999999995 | reason=STOP_HIT
+2026-10-12 11:02:44 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572200PE | qty=20 | fill=513.4 | order_id=PAPER_4803FEB1 | tag=STOP_HIT
+2026-10-12 11:02:44 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572200PE | exit_price=513.4 | pnl=1070.0 | reason=STOP_HIT
+2026-10-12 11:05:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-12 11:00:00+05:30 | close=71999.32 | vwap=72158.37
+2026-10-12 11:05:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-12 11:05:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-12 11:05:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572000PE | qty=20 | fill=472.15 | order_id=PAPER_C76F65F3
+2026-10-12 11:05:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572000PE | fill=472.15 | qty=20
+2026-10-12 11:05:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=72319.62 | sensex_ltp=71999.32 | sl_index_pts=320.3 | delta=0.4 | sl=128.1 | be=64.05 | target=281.8 | trail=38.45 | rr=2.2 | entry=472.15
+2026-10-12 11:05:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572000PE | sl=344.05 | order_id=PAPER_SL_FB6E4D28
+2026-10-12 11:05:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572000PE | sl=344.05 | order_id=PAPER_SL_FB6E4D28
+2026-10-12 11:18:33 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572000PE | qty=20 | fill=510.2 | order_id=PAPER_3F01224D | tag=STOP_HIT
+2026-10-12 11:18:34 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572000PE | exit_price=510.2 | pnl=761.0000000000002 | reason=STOP_HIT
+2026-10-12 11:20:00 | INFO     | strategies.signal_engine | [CE_PIVOT_SIGNAL] candle=2026-10-12 11:15:00+05:30 | mode=BOUNCE | entry=71957.5 | stop=71893.9 | risk=63.6 | t1=72293.67 | t2=72847.86 | t3=73223.38 | atr=90.77
+2026-10-12 11:20:00 | INFO     | strategies.signal_engine | [CE_PIVOT_SIGNAL] candle=2026-10-12 11:15:00+05:30 | mode=BOUNCE | entry=71957.5 | stop=71893.84 | risk=63.66 | t1=72293.67 | t2=72847.86 | t3=73223.38 | atr=92.07
+2026-10-12 11:20:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_PIVOT signal confirmed
+2026-10-12 11:20:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-12 11:20:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_PIVOT signal confirmed
+2026-10-12 11:20:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-12 11:20:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572000CE | qty=20 | fill=466.45 | order_id=PAPER_09360DBE
+2026-10-12 11:20:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572000CE | fill=466.45 | qty=20
+2026-10-12 11:20:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SPOT_ATR] mode=spot_atr_mult | spot_atr=79.56 | spot_atr_period=5 | atm_delta=0.4 | sl=95.45 | be=47.7 | target=210.0 | trail=28.65 | rr=2.2 | entry=466.45
+2026-10-12 11:20:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572000CE | qty=20 | fill=466.45 | order_id=PAPER_DC426CC0
+2026-10-12 11:20:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572000CE | fill=466.45 | qty=20
+2026-10-12 11:20:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SPOT_ATR] mode=spot_atr_mult | spot_atr=78.7 | spot_atr_period=5 | atm_delta=0.4 | sl=94.45 | be=47.2 | target=207.8 | trail=28.35 | rr=2.2 | entry=466.45
+2026-10-12 11:20:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572000CE | sl=434.65 | order_id=PAPER_SL_A97CB94B
+2026-10-12 11:20:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572000CE | sl=434.65 | order_id=PAPER_SL_A97CB94B
+2026-10-12 11:20:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572000CE | sl=434.6 | order_id=PAPER_SL_2F8E7A5E
+2026-10-12 11:20:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572000CE | sl=434.6 | order_id=PAPER_SL_2F8E7A5E
+2026-10-12 11:41:51 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572000CE | qty=20 | fill=449.6 | order_id=PAPER_BE15486F | tag=PIVOT_SL_HIT
+2026-10-12 11:41:51 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572000CE | exit_price=449.6 | pnl=-336.9999999999993 | reason=PIVOT_SL_HIT
+2026-10-12 11:56:35 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572000CE | qty=20 | fill=431.0 | order_id=PAPER_FCE7F62D | tag=STOP_HIT
+2026-10-12 11:56:35 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572000CE | exit_price=431.0 | pnl=-708.9999999999998 | reason=STOP_HIT
+2026-10-12 12:10:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-12 12:05:00+05:30 | close=71853.49 | vwap=71900.23
+2026-10-12 12:10:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING] direction=PE_VWAP | gap_now=-92.98 | gap_prev=-93.57 | reason=EMA gap not widening
+2026-10-12 12:20:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-12 12:15:00+05:30 | close=71941.05 | vwap=71902.34
+2026-10-12 12:20:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=CE_VWAP | ema9=71914.39 | ema21=71989.76 | gap=-75.37 | gap_velocity=11.54 | required=10.0
+2026-10-12 12:55:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-12 12:50:00+05:30 | close=71916.87
+2026-10-12 12:55:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE signal confirmed
+2026-10-12 12:55:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-12 12:55:01 | INFO     | __main__ | [EMA_RISK_PLAN] side=PE | sensex=71915.7 | atr=53.57 | swing_high=71924.35 | swing_low=71885.46 | delta=0.5 | expiry=False | plan=None | blocked=room 67.3 < 1.5R (80.4)
+2026-10-12 12:55:01 | INFO     | __main__ | [EMA_ENTRY_BLOCKED] signal=PE | symbol=SENSEX26O1571900PE | reason=room 67.3 < 1.5R (80.4)
+2026-10-12 13:10:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-12 13:05:00+05:30 | close=72013.5 | vwap=71929.4
+2026-10-12 13:10:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=CE_VWAP | ema9=71953.15 | ema21=71969.61 | gap=-16.46 | gap_velocity=10.7 | required=10.0
+2026-10-12 13:15:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-12 13:10:00+05:30 | close=71883.05 | vwap=71930.08
+2026-10-12 13:15:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-12 13:15:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-12 13:15:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1571900PE | qty=20 | fill=459.85 | order_id=PAPER_3336F4A9
+2026-10-12 13:15:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1571900PE | fill=459.85 | qty=20
+2026-10-12 13:15:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=71988.8 | sensex_ltp=71883.75 | sl_index_pts=105.05 | delta=0.4 | sl=42.0 | be=21.0 | target=92.4 | trail=12.6 | rr=2.2 | entry=459.85
+2026-10-12 13:15:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1571900PE | sl=417.85 | order_id=PAPER_SL_5CF5714B
+2026-10-12 13:15:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1571900PE | sl=417.85 | order_id=PAPER_SL_5CF5714B
+2026-10-12 13:54:12 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1571900PE | qty=20 | fill=417.0 | order_id=PAPER_BCF8536B | tag=STOP_HIT
+2026-10-12 13:54:12 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1571900PE | exit_price=417.0 | pnl=-857.0000000000005 | reason=STOP_HIT
+2026-10-12 13:55:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-12 13:50:00+05:30 | close=71928.69 | vwap=71886.79
+2026-10-12 13:55:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=CE_VWAP | ema9=71903.71 | ema21=71925.58 | gap=-21.87 | gap_velocity=5.93 | required=10.0
+2026-10-12 14:00:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-12 13:55:00+05:30 | close=71888.41
+2026-10-12 14:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE signal confirmed
+2026-10-12 14:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-12 14:00:01 | INFO     | __main__ | [EMA_ENTRY_BLOCKED] signal=PE | symbol=SENSEX26O1571900PE | reason=option premium 439.7 <= option 5m EMA9 440.27
+2026-10-12 14:15:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-12 14:10:00+05:30 | close=71810.53 | vwap=71885.8
+2026-10-12 14:15:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-12 14:15:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-12 14:15:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1571800PE | qty=20 | fill=429.05 | order_id=PAPER_E076A65F
+2026-10-12 14:15:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1571800PE | fill=429.05 | qty=20
+2026-10-12 14:15:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=71988.8 | sensex_ltp=71810.72 | sl_index_pts=178.08 | delta=0.4 | sl=71.25 | be=35.6 | target=156.75 | trail=21.4 | rr=2.2 | entry=429.05
+2026-10-12 14:15:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1571800PE | sl=357.8 | order_id=PAPER_SL_A54EC6B6
+2026-10-12 14:15:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1571800PE | sl=357.8 | order_id=PAPER_SL_A54EC6B6
+2026-10-12 14:32:10 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1571800PE | qty=20 | fill=446.7 | order_id=PAPER_3F91F30A | tag=STOP_HIT
+2026-10-12 14:32:10 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1571800PE | exit_price=446.7 | pnl=352.99999999999955 | reason=STOP_HIT
+2026-10-12 14:45:00 | INFO     | strategies.signal_engine | [PE_PDHL_SIGNAL] candle=2026-10-12 14:40:00+05:30 | close=71707.29 | pdl=71739.49
+2026-10-12 14:45:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=PE_PDHL | body=14.61 | atr=53.49 | min_ratio=0.35 | required=18.72 | squeeze_relaxed=False
+2026-10-12 15:13:53 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-12 14:55:00+05:30 | close=71744.28
+2026-10-13 09:20:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-13 09:15:00+05:30 | close=72152.66 | vwap=72024.84
+2026-10-13 09:20:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-13 09:20:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-13 09:20:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572200CE | qty=20 | fill=428.95 | order_id=PAPER_62B34B67
+2026-10-13 09:20:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572200CE | fill=428.95 | qty=20
+2026-10-13 09:20:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=71885.46 | sensex_ltp=72155.95 | sl_index_pts=270.49 | delta=0.4 | sl=108.2 | be=54.1 | target=238.05 | trail=32.45 | rr=2.2 | entry=428.95
+2026-10-13 09:20:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572200CE | sl=320.75 | order_id=PAPER_SL_3F826B94
+2026-10-13 09:20:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572200CE | sl=320.75 | order_id=PAPER_SL_3F826B94
+2026-10-13 09:37:11 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572200CE | qty=20 | fill=520.0 | order_id=PAPER_7EA662FC | tag=STOP_HIT
+2026-10-13 09:37:11 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572200CE | exit_price=520.0 | pnl=1821.0000000000002 | reason=STOP_HIT
+2026-10-13 10:35:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-13 10:30:00+05:30 | close=72401.93 | vwap=72432.38
+2026-10-13 10:35:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=PE_VWAP | body=18.69 | atr=76.8 | min_ratio=0.35 | required=26.88 | squeeze_relaxed=False
+2026-10-13 10:40:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-13 10:35:00+05:30 | close=72353.52 | vwap=72428.76
+2026-10-13 10:40:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_15M_TREND] direction=PE_VWAP | close_15m=72421.36 | ema21_15m=72135.53 | gap=285.8 | threshold=150.0 | reason=15m close too far above EMA21 for PE
+2026-10-13 10:50:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-13 10:45:00+05:30 | close=72440.68
+2026-10-13 10:50:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE signal confirmed
+2026-10-13 10:50:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-13 10:50:01 | INFO     | __main__ | [EMA_ENTRY_BLOCKED] signal=CE | symbol=SENSEX26O1572400CE | reason=option premium 470.55 <= option 5m EMA9 473.89
+2026-10-13 11:00:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-13 10:55:00+05:30 | close=72357.32 | vwap=72422.74
+2026-10-13 11:00:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=PE_VWAP | ema9=72413.33 | ema21=72351.4 | gap=61.93 | gap_velocity=14.59 | required=10.0
+2026-10-13 11:40:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-13 11:35:00+05:30 | close=72442.3 | vwap=72403.88
+2026-10-13 11:40:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-13 11:40:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-13 11:40:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572400CE | qty=20 | fill=440.75 | order_id=PAPER_78CFE726
+2026-10-13 11:40:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572400CE | fill=440.75 | qty=20
+2026-10-13 11:40:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72287.67 | sensex_ltp=72442.84 | sl_index_pts=155.17 | delta=0.4 | sl=62.05 | be=31.0 | target=136.5 | trail=18.6 | rr=2.2 | entry=440.75
+2026-10-13 11:40:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572400CE | sl=378.7 | order_id=PAPER_SL_349A82A5
+2026-10-13 11:40:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572400CE | sl=378.7 | order_id=PAPER_SL_349A82A5
+2026-10-13 11:47:16 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572400CE | qty=20 | fill=375.9 | order_id=PAPER_A4F8CEFE | tag=STOP_HIT
+2026-10-13 11:47:16 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572400CE | exit_price=375.9 | pnl=-1297.0000000000005 | reason=STOP_HIT
+2026-10-13 11:50:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-13 11:45:00+05:30 | close=72323.16 | vwap=72402.39
+2026-10-13 11:50:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=PE_VWAP | ema9=72367.59 | ema21=72357.23 | gap=10.36 | gap_velocity=7.7 | required=10.0
+2026-10-13 11:55:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-13 11:50:00+05:30 | close=72417.32
+2026-10-13 11:55:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE signal confirmed
+2026-10-13 11:55:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-13 11:55:00 | INFO     | __main__ | [EMA_RISK_PLAN] side=CE | sensex=72415.16 | atr=71.28 | swing_high=72432.52 | swing_low=72397.53 | delta=0.5 | expiry=False | plan={'stop': 72343.88, 'target': 72628.99, 'risk': 71.28, 'source': 'swing', 'room': 204.7899999999936, 'risk_rupees': 712.8} | blocked=None
+2026-10-13 11:55:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572400CE | qty=20 | fill=417.4 | order_id=PAPER_6C721F43
+2026-10-13 11:55:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572400CE | fill=417.4 | qty=20
+2026-10-13 11:55:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72287.67 | sensex_ltp=72415.16 | sl_index_pts=127.49 | delta=0.4 | sl=51.0 | be=25.5 | target=153.0 | trail=15.3 | rr=3.0 | entry=417.4
+2026-10-13 11:55:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572400CE | sl=378.2 | order_id=PAPER_SL_0AEAC320
+2026-10-13 11:55:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572400CE | sl=378.2 | order_id=PAPER_SL_0AEAC320
+2026-10-13 13:05:00 | INFO     | execution.ema_trade_manager | [EMA_TRAIL_EMA9_EXIT] side=CE | close=72471.44 | ema9=72477.93
+2026-10-13 13:05:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=POSITION_OPEN | to_state=EXIT_PENDING | reason=EMA_TRAIL_EMA9
+2026-10-13 13:05:00 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572400CE | qty=20 | fill=454.0 | order_id=PAPER_09979DB4 | tag=EMA_TRAIL_EMA9
+2026-10-13 13:05:01 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572400CE | exit_price=454.0 | pnl=732.0000000000005 | reason=EMA_TRAIL_EMA9
+2026-10-13 13:05:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=EXIT_PENDING | to_state=CLOSED | reason=EMA_TRAIL_EMA9
+2026-10-13 13:10:01 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-13 13:05:00+05:30 | close=72493.17
+2026-10-13 13:35:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-13 13:30:00+05:30 | close=72510.23
+2026-10-13 13:45:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-13 13:40:00+05:30 | close=72544.04 | vwap=72498.89
+2026-10-14 09:20:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-14 09:15:00+05:30 | close=72956.19 | vwap=73007.25
+2026-10-14 09:20:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_SLOPE] direction=PE_VWAP | ema9_now=72950.31 | ema9_prev=72948.85 | reason=EMA9 not falling for PE
+2026-10-14 09:45:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-14 09:40:00+05:30 | close=73105.05 | vwap=73005.41
+2026-10-14 09:45:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-14 09:45:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-14 09:45:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1573100CE | qty=20 | fill=310.8 | order_id=PAPER_40AE73F3
+2026-10-14 09:45:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1573100CE | fill=310.8 | qty=20
+2026-10-14 09:45:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72893.92 | sensex_ltp=73110.47 | sl_index_pts=216.55 | delta=0.4 | sl=86.6 | be=43.3 | target=190.5 | trail=26.0 | rr=2.2 | entry=310.8
+2026-10-14 09:45:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1573100CE | sl=224.2 | order_id=PAPER_SL_3C07F213
+2026-10-14 09:45:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1573100CE | sl=224.2 | order_id=PAPER_SL_3C07F213
+2026-10-14 09:49:58 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1573100CE | qty=20 | fill=326.5 | order_id=PAPER_55A20E70 | tag=STOP_HIT
+2026-10-14 09:49:58 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1573100CE | exit_price=326.5 | pnl=313.9999999999998 | reason=STOP_HIT
+2026-10-14 09:50:01 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-14 09:45:00+05:30 | close=73150.57 | vwap=73026.46
+2026-10-14 09:50:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-14 09:50:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-14 09:50:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1573200CE | qty=20 | fill=279.55 | order_id=PAPER_8B01FDA4
+2026-10-14 09:50:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1573200CE | fill=279.55 | qty=20
+2026-10-14 09:50:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=72893.92 | sensex_ltp=73156.13 | sl_index_pts=262.21 | delta=0.4 | sl=104.9 | be=52.45 | target=230.8 | trail=31.45 | rr=2.2 | entry=279.55
+2026-10-14 09:50:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1573200CE | sl=174.65 | order_id=PAPER_SL_A4C2A7E2
+2026-10-14 09:50:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1573200CE | sl=174.65 | order_id=PAPER_SL_A4C2A7E2
+2026-10-14 11:29:47 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1573200CE | qty=20 | fill=173.5 | order_id=PAPER_AE32F3B6 | tag=STOP_HIT
+2026-10-14 11:29:47 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1573200CE | exit_price=173.5 | pnl=-2121.0 | reason=STOP_HIT
+2026-10-14 11:30:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-14 11:25:00+05:30 | close=72964.6 | vwap=73043.67
+2026-10-14 11:30:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=PE_VWAP | ema9=73039.97 | ema21=73029.21 | gap=10.76 | gap_velocity=12.38 | required=10.0
+2026-10-14 11:35:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-14 11:30:00+05:30 | close=72960.94 | vwap=73040.53
+2026-10-14 11:35:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=PE_VWAP | body=2.4 | atr=78.44 | min_ratio=0.35 | required=27.46 | squeeze_relaxed=False
+2026-10-14 12:00:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-14 11:55:00+05:30 | close=73096.21 | vwap=73039.02
+2026-10-14 12:00:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE_VWAP | body=9.87 | atr=72.68 | min_ratio=0.35 | required=25.44 | squeeze_relaxed=False
+2026-10-14 13:00:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-14 12:55:00+05:30 | close=72927.02 | vwap=73052.16
+2026-10-14 13:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-14 13:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-14 13:00:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572900PE | qty=20 | fill=308.1 | order_id=PAPER_537ED221
+2026-10-14 13:00:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572900PE | fill=308.1 | qty=20
+2026-10-14 13:00:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=73151.88 | sensex_ltp=72928.51 | sl_index_pts=223.37 | delta=0.4 | sl=89.35 | be=44.65 | target=196.55 | trail=26.8 | rr=2.2 | entry=308.1
+2026-10-14 13:00:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572900PE | sl=218.75 | order_id=PAPER_SL_A3C0FFC4
+2026-10-14 13:00:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572900PE | sl=218.75 | order_id=PAPER_SL_A3C0FFC4
+2026-10-14 13:01:30 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572900PE | qty=20 | fill=350.75 | order_id=PAPER_341F9EAA | tag=STOP_HIT
+2026-10-14 13:01:31 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572900PE | exit_price=350.75 | pnl=852.9999999999995 | reason=STOP_HIT
+2026-10-14 13:05:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-14 13:00:00+05:30 | close=72754.17 | vwap=73047.0
+2026-10-14 13:05:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-14 13:05:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-14 13:05:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572800PE | qty=20 | fill=356.25 | order_id=PAPER_02977F60
+2026-10-14 13:05:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572800PE | fill=356.25 | qty=20
+2026-10-14 13:05:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=73151.88 | sensex_ltp=72754.17 | sl_index_pts=397.71 | delta=0.4 | sl=159.1 | be=79.55 | target=350.0 | trail=47.75 | rr=2.2 | entry=356.25
+2026-10-14 13:05:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572800PE | sl=197.15 | order_id=PAPER_SL_43499716
+2026-10-14 13:05:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572800PE | sl=197.15 | order_id=PAPER_SL_43499716
+2026-10-14 13:08:27 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572800PE | qty=20 | fill=442.55 | order_id=PAPER_E201C8F1 | tag=STOP_HIT
+2026-10-14 13:08:27 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572800PE | exit_price=442.55 | pnl=1726.0000000000002 | reason=STOP_HIT
+2026-10-14 14:45:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-14 14:40:00+05:30 | close=72784.32
+2026-10-14 14:45:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE signal confirmed
+2026-10-14 14:45:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-14 14:45:00 | INFO     | __main__ | [EMA_RISK_PLAN] side=PE | sensex=72784.32 | atr=65.94 | swing_high=72893.77 | swing_low=72734.89 | delta=0.5 | expiry=False | plan={'stop': 72910.26, 'target': 72406.51, 'risk': 125.94, 'source': 'swing', 'room': 205.04000000000815, 'risk_rupees': 1259.4} | blocked=None
+2026-10-14 14:45:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1572800PE | qty=20 | fill=321.0 | order_id=PAPER_700C7CD7
+2026-10-14 14:45:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1572800PE | fill=321.0 | qty=20
+2026-10-14 14:45:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=72928.51 | sensex_ltp=72784.32 | sl_index_pts=144.19 | delta=0.4 | sl=57.7 | be=28.85 | target=173.1 | trail=17.3 | rr=3.0 | entry=321.0
+2026-10-14 14:45:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1572800PE | sl=251.75 | order_id=PAPER_SL_B3416F9F
+2026-10-14 14:45:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1572800PE | sl=251.75 | order_id=PAPER_SL_B3416F9F
+2026-10-14 14:45:01 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1572800PE | qty=20 | fill=321.0 | order_id=PAPER_6BE8E6DC | tag=TIME_DECAY
+2026-10-14 14:45:01 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1572800PE | exit_price=321.0 | pnl=0.0 | reason=TIME_DECAY
+2026-10-15 09:30:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-15 09:25:00+05:30 | close=73261.31 | vwap=73136.4
+2026-10-15 09:30:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-15 09:30:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-15 09:30:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1573300CE | qty=20 | fill=191.8 | order_id=PAPER_45C761CD
+2026-10-15 09:30:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1573300CE | fill=191.8 | qty=20
+2026-10-15 09:30:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=73031.22 | sensex_ltp=73259.72 | sl_index_pts=228.5 | delta=0.4 | sl=91.4 | be=45.7 | target=201.1 | trail=27.4 | rr=2.2 | entry=191.8
+2026-10-15 09:30:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1573300CE | sl=100.4 | order_id=PAPER_SL_550FDD8B
+2026-10-15 09:30:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1573300CE | sl=100.4 | order_id=PAPER_SL_550FDD8B
+2026-10-15 09:41:25 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1573300CE | qty=20 | fill=204.9 | order_id=PAPER_E9D06A1F | tag=STOP_HIT
+2026-10-15 09:41:26 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1573300CE | exit_price=204.9 | pnl=261.9999999999999 | reason=STOP_HIT
+2026-10-15 10:00:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-15 09:55:00+05:30 | close=73604.11 | vwap=73298.9
+2026-10-15 10:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-15 10:00:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-15 10:00:00 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O1573600CE | qty=20 | fill=208.7 | order_id=PAPER_E908207E
+2026-10-15 10:00:00 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O1573600CE | fill=208.7 | qty=20
+2026-10-15 10:00:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=73031.22 | sensex_ltp=73610.61 | sl_index_pts=579.39 | delta=0.4 | sl=104.35 | be=52.15 | target=229.55 | trail=31.3 | rr=2.2 | entry=208.7
+2026-10-15 10:00:00 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O1573600CE | sl=104.35 | order_id=PAPER_SL_E4B50529
+2026-10-15 10:00:00 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O1573600CE | sl=104.35 | order_id=PAPER_SL_E4B50529
+2026-10-15 10:09:17 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O1573600CE | qty=20 | fill=230.25 | order_id=PAPER_7705AD1B | tag=STOP_HIT
+2026-10-15 10:09:17 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O1573600CE | exit_price=230.25 | pnl=431.0000000000002 | reason=STOP_HIT
+2026-10-15 11:25:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-15 11:20:00+05:30 | close=73813.43
+2026-10-15 11:25:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING] direction=CE | gap_now=135.99 | gap_prev=148.52 | reason=EMA gap not widening
+2026-10-15 12:10:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-15 12:05:00+05:30 | close=73946.81
+2026-10-15 12:10:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE | body=12.29 | atr=75.16 | min_ratio=0.35 | required=26.31 | squeeze_relaxed=False
+2026-10-15 13:25:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-15 13:20:00+05:30 | close=74164.31
+2026-10-15 13:25:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING] direction=CE | gap_now=85.69 | gap_prev=91.3 | reason=EMA gap not widening
+2026-10-15 14:20:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-15 14:15:00+05:30 | close=74250.73
+2026-10-15 14:20:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING] direction=CE | gap_now=52.62 | gap_prev=56.04 | reason=EMA gap not widening
+2026-10-16 09:25:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-16 09:20:00+05:30 | close=74227.66 | vwap=74173.35
+2026-10-16 09:25:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-16 09:25:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-16 09:25:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O2274200CE | fill=539.9 | qty=20
+2026-10-16 09:25:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=74122.04 | sensex_ltp=74225.24 | sl_index_pts=103.2 | delta=0.4 | sl=41.3 | be=20.65 | target=90.85 | trail=12.4 | rr=2.2 | entry=539.9
+2026-10-16 09:25:01 | INFO     | execution.order_manager | [INITIAL_SL_PLACED] symbol=SENSEX26O2274200CE | sl=498.6 | qty=20
+2026-10-16 09:25:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O2274200CE | sl=498.6 | order_id=261016150156383
+2026-10-16 09:26:45 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O2274200CE | exit_price=498.0 | pnl=-837.9999999999995 | reason=SL_FILLED_AT_EXCHANGE
+2026-10-16 09:35:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-16 09:30:00+05:30 | close=74069.62 | vwap=74142.78
+2026-10-16 09:35:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP] direction=PE_VWAP | ema9=74112.6 | ema21=74108.33 | gap=4.27 | gap_velocity=6.87 | required=10.0
+2026-10-16 09:45:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-16 09:40:00+05:30 | close=74216.86 | vwap=74135.63
+2026-10-16 09:45:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-16 09:45:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-16 09:45:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O2274200CE | fill=484.55 | qty=20
+2026-10-16 09:45:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=74122.04 | sensex_ltp=74216.01 | sl_index_pts=93.97 | delta=0.4 | sl=37.6 | be=18.8 | target=82.7 | trail=11.3 | rr=2.2 | entry=484.55
+2026-10-16 09:45:01 | INFO     | execution.order_manager | [INITIAL_SL_PLACED] symbol=SENSEX26O2274200CE | sl=446.95 | qty=20
+2026-10-16 09:45:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O2274200CE | sl=446.95 | order_id=261016150296152
+2026-10-16 09:46:39 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O2274200CE | exit_price=446.95 | pnl=-752.0000000000005 | reason=SL_FILLED_AT_EXCHANGE
+2026-10-16 10:05:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-16 10:00:00+05:30 | close=74475.46 | vwap=74304.91
+2026-10-16 10:05:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-16 10:05:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-16 10:15:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-16 10:10:00+05:30 | close=74596.76 | vwap=74385.01
+2026-10-16 10:15:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-16 10:15:01 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-16 11:00:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-16 10:55:00+05:30 | close=74639.51
+2026-10-16 11:00:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING] direction=CE | gap_now=123.36 | gap_prev=131.63 | reason=EMA gap not widening
+2026-10-16 11:25:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-16 11:20:00+05:30 | close=74635.43 | vwap=74571.84
+2026-10-16 11:25:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING] direction=CE_VWAP | gap_now=69.84 | gap_prev=71.05 | reason=EMA gap not widening
+2026-10-16 11:30:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-16 11:25:00+05:30 | close=74650.12 | vwap=74575.6
+2026-10-16 11:30:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE_VWAP | body=17.61 | atr=93.54 | min_ratio=0.35 | required=32.74 | squeeze_relaxed=False
+2026-10-16 11:55:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-16 11:50:00+05:30 | close=74645.58
+2026-10-16 11:55:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_BODY] direction=CE | body=8.76 | atr=77.08 | min_ratio=0.35 | required=26.98 | squeeze_relaxed=False
+2026-10-16 12:30:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-16 12:25:00+05:30 | close=74664.72
+2026-10-16 12:30:00 | INFO     | strategies.smart_entry | [SMART_ENTRY_BLOCKED_EMA_GAP_SHRINKING] direction=CE | gap_now=30.71 | gap_prev=31.82 | reason=EMA gap not widening
+2026-10-16 12:40:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-16 12:35:00+05:30 | close=74725.27 | vwap=74668.25
+2026-10-16 12:40:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_VWAP signal confirmed
+2026-10-16 12:40:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-16 12:40:02 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O2274700CE | fill=492.25 | qty=20
+2026-10-16 12:40:02 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=74534.22 | sensex_ltp=74725.29 | sl_index_pts=191.07 | delta=0.5 | sl=95.55 | be=47.75 | target=210.2 | trail=28.65 | rr=2.2 | entry=492.25
+2026-10-16 12:40:03 | INFO     | execution.order_manager | [INITIAL_SL_PLACED] symbol=SENSEX26O2274700CE | sl=396.7 | qty=20
+2026-10-16 12:40:03 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O2274700CE | sl=396.7 | order_id=261016150891183
+2026-10-16 13:00:25 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O2274700CE | exit_price=396.45 | pnl=-1916.0000000000002 | reason=SL_FILLED_AT_EXCHANGE
+2026-10-16 13:20:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-16 13:15:00+05:30 | close=74691.71
+2026-10-19 09:40:00 | INFO     | strategies.signal_engine | [CE_VWAP_SIGNAL] candle=2026-10-19 09:35:00+05:30 | close=74708.0 | vwap=74558.28
+2026-10-19 10:15:00 | INFO     | strategies.signal_engine | [PE_PIVOT_SIGNAL] candle=2026-10-19 10:10:00+05:30 | mode=ACCEPTANCE | entry=74439.25 | stop=74533.15 | risk=93.9 | t1=74214.48 | t2=74033.76 | t3=73741.22 | atr=131.1
+2026-10-19 10:15:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_PIVOT signal confirmed
+2026-10-19 10:15:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-19 10:15:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O2274400PE | qty=20 | fill=416.25 | order_id=PAPER_73886820
+2026-10-19 10:15:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O2274400PE | fill=416.25 | qty=20
+2026-10-19 10:15:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=74678.88 | sensex_ltp=74439.2 | sl_index_pts=239.68 | delta=0.5 | sl=119.85 | be=59.9 | target=263.65 | trail=35.95 | rr=2.2 | entry=416.25
+2026-10-19 10:15:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O2274400PE | sl=369.3 | order_id=PAPER_SL_4519A53A
+2026-10-19 10:15:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O2274400PE | sl=369.3 | order_id=PAPER_SL_4519A53A
+2026-10-19 10:22:30 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O2274400PE | qty=20 | fill=366.9 | order_id=PAPER_0C99FBEF | tag=STOP_HIT
+2026-10-19 10:22:30 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O2274400PE | exit_price=366.9 | pnl=-987.0000000000005 | reason=STOP_HIT
+2026-10-19 10:35:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-19 10:30:00+05:30 | close=74477.76 | vwap=74547.38
+2026-10-19 10:35:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_VWAP signal confirmed
+2026-10-19 10:35:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-19 10:35:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O2274500PE | qty=20 | fill=440.65 | order_id=PAPER_5D64FE06
+2026-10-19 10:35:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O2274500PE | fill=440.65 | qty=20
+2026-10-19 10:35:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=74678.88 | sensex_ltp=74482.34 | sl_index_pts=196.54 | delta=0.5 | sl=98.25 | be=49.1 | target=216.15 | trail=29.45 | rr=2.2 | entry=440.65
+2026-10-19 10:35:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O2274500PE | sl=342.4 | order_id=PAPER_SL_2EFE0387
+2026-10-19 10:35:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O2274500PE | sl=342.4 | order_id=PAPER_SL_2EFE0387
+2026-10-19 10:42:20 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O2274500PE | qty=20 | fill=512.95 | order_id=PAPER_7671952E | tag=STOP_HIT
+2026-10-19 10:42:20 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O2274500PE | exit_price=512.95 | pnl=1446.0000000000014 | reason=STOP_HIT
+2026-10-19 10:45:00 | INFO     | strategies.signal_engine | [PE_PIVOT_SIGNAL] candle=2026-10-19 10:40:00+05:30 | mode=ACCEPTANCE | entry=74388.73 | stop=74534.88 | risk=146.15 | t1=74214.48 | t2=74033.76 | t3=73741.22 | atr=161.46
+2026-10-19 10:45:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_PIVOT signal confirmed
+2026-10-19 10:45:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-19 10:45:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O2274400PE | qty=20 | fill=450.85 | order_id=PAPER_CA4761EB
+2026-10-19 10:45:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O2274400PE | fill=450.85 | qty=20
+2026-10-19 10:45:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=PE | swing_level=74678.88 | sensex_ltp=74385.94 | sl_index_pts=292.94 | delta=0.5 | sl=146.45 | be=73.2 | target=322.2 | trail=43.95 | rr=2.2 | entry=450.85
+2026-10-19 10:45:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O2274400PE | sl=376.4 | order_id=PAPER_SL_C0836E73
+2026-10-19 10:45:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O2274400PE | sl=376.4 | order_id=PAPER_SL_C0836E73
+2026-10-19 11:10:10 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O2274400PE | qty=20 | fill=373.55 | order_id=PAPER_10354FF1 | tag=STOP_HIT
+2026-10-19 11:10:10 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O2274400PE | exit_price=373.55 | pnl=-1546.0000000000002 | reason=STOP_HIT
+2026-10-19 12:55:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-19 12:50:00+05:30 | close=73957.84 | vwap=74006.27
+2026-10-19 13:10:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-19 13:05:00+05:30 | close=73966.35
+2026-10-19 13:15:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-19 13:10:00+05:30 | close=73951.93 | vwap=73992.24
+2026-10-19 13:20:00 | INFO     | strategies.signal_engine | [PE_VWAP_SIGNAL] candle=2026-10-19 13:15:00+05:30 | close=73850.54 | vwap=73985.04
+2026-10-19 14:10:00 | INFO     | strategies.signal_engine | [PE_SIGNAL] candle=2026-10-19 14:05:00+05:30 | close=73817.13
+2026-10-21 09:35:00 | INFO     | strategies.signal_engine | [CE_ORB_SIGNAL] candle=2026-10-21 09:30:00+05:30 | close=74657.08
+2026-10-21 09:35:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_ORB signal confirmed
+2026-10-21 09:35:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-21 09:35:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=73740.16 | sensex_ltp=74654.2 | sl_index_pts=914.04 | delta=0.5 | sl=161.1 | be=161.1 | target=354.4 | trail=48.35 | rr=2.2 | entry=322.25
+2026-10-21 09:35:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=73740.16 | sensex_ltp=74654.2 | sl_index_pts=914.04 | delta=0.5 | sl=161.1 | be=161.1 | target=354.4 | trail=48.35 | rr=2.2 | entry=322.25
+2026-10-21 09:40:00 | INFO     | strategies.signal_engine | [CE_ORB_SIGNAL] candle=2026-10-21 09:35:00+05:30 | close=74657.31
+2026-10-21 09:40:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE_ORB signal confirmed
+2026-10-21 09:40:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-21 09:40:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=73740.16 | sensex_ltp=74657.31 | sl_index_pts=917.15 | delta=0.5 | sl=166.05 | be=166.05 | target=365.3 | trail=49.8 | rr=2.2 | entry=332.15
+2026-10-21 09:40:00 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=73740.16 | sensex_ltp=74657.31 | sl_index_pts=917.15 | delta=0.5 | sl=166.05 | be=166.05 | target=365.3 | trail=49.8 | rr=2.2 | entry=332.15
+2026-10-21 10:35:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-21 10:30:00+05:30 | close=74283.91
+2026-10-21 10:35:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=CE_SIGNAL | reason=CE signal confirmed
+2026-10-21 10:35:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=CE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-21 10:35:00 | INFO     | __main__ | [EMA_RISK_PLAN] side=CE | sensex=74283.91 | atr=119.24 | swing_high=74421.74 | swing_low=74164.73 | delta=0.5 | expiry=False | plan={'stop': 74134.92, 'target': 74730.88, 'risk': 148.99, 'source': 'swing', 'room': 395.2699999999895, 'risk_rupees': 1489.9} | blocked=None
+2026-10-21 10:35:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O2274300CE | qty=20 | fill=331.5 | order_id=PAPER_291F1B0A
+2026-10-21 10:35:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O2274300CE | fill=331.5 | qty=20
+2026-10-21 10:35:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SWING_SL] mode=swing_sl | option_type=CE | swing_level=74164.73 | sensex_ltp=74283.91 | sl_index_pts=119.18 | delta=0.5 | sl=59.6 | be=59.6 | target=178.8 | trail=17.9 | rr=3.0 | entry=331.5
+2026-10-21 10:35:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O2274300CE | sl=249.55 | order_id=PAPER_SL_4B204162
+2026-10-21 10:35:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O2274300CE | sl=249.55 | order_id=PAPER_SL_4B204162
+2026-10-21 10:40:01 | INFO     | strategies.signal_engine | [CE_PIVOT_SIGNAL] candle=2026-10-21 10:35:00+05:30 | mode=ACCEPTANCE | entry=74232.88 | stop=74113.85 | risk=119.03 | t1=74573.01 | t2=74842.33 | t3=75278.27 | atr=115.14
+2026-10-21 10:50:00 | INFO     | strategies.signal_engine | [CE_SIGNAL] candle=2026-10-21 10:45:00+05:30 | close=74291.09
+2026-10-21 11:05:00 | INFO     | execution.ema_trade_manager | [EMA_TIME_STOP] side=CE | bars=6 | best_r=0.26
+2026-10-21 11:05:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=POSITION_OPEN | to_state=EXIT_PENDING | reason=EMA_TIME_STOP
+2026-10-21 11:05:00 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O2274300CE | qty=20 | fill=332.05 | order_id=PAPER_553421F8 | tag=EMA_TIME_STOP
+2026-10-21 11:05:00 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O2274300CE | exit_price=332.05 | pnl=11.000000000000227 | reason=EMA_TIME_STOP
+2026-10-21 11:05:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=EXIT_PENDING | to_state=CLOSED | reason=EMA_TIME_STOP
+2026-10-21 11:30:00 | INFO     | strategies.signal_engine | [PE_PIVOT_SIGNAL] candle=2026-10-21 11:25:00+05:30 | mode=ACCEPTANCE | entry=73986.1 | stop=74118.69 | risk=132.59 | t1=73701.12 | t2=73431.8 | t3=72995.85 | atr=106.24
+2026-10-21 11:30:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=IDLE | to_state=PE_SIGNAL | reason=PE_PIVOT signal confirmed
+2026-10-21 11:30:00 | INFO     | execution.position_manager | [STATE_TRANSITION] from_state=PE_SIGNAL | to_state=ENTRY_PENDING | reason=placing entry order
+2026-10-21 11:30:01 | INFO     | execution.paper_broker | [ENTRY_FILLED] mode=PAPER | symbol=SENSEX26O2274000PE | qty=20 | fill=379.35 | order_id=PAPER_F66DFCDC
+2026-10-21 11:30:01 | INFO     | notifications.notifier | [ENTRY_FILLED] symbol=SENSEX26O2274000PE | fill=379.35 | qty=20
+2026-10-21 11:30:01 | INFO     | execution.atr_risk | [RISK_COMPUTED_SPOT_ATR] mode=spot_atr_mult | spot_atr=100.6 | spot_atr_period=5 | atm_delta=0.5 | sl=150.9 | be=150.9 | target=332.0 | trail=45.25 | rr=2.2 | entry=379.35
+2026-10-21 11:30:01 | INFO     | execution.paper_broker | [INITIAL_SL_PLACED] mode=PAPER | symbol=SENSEX26O2274000PE | sl=286.55 | order_id=PAPER_SL_C2DBF8EB
+2026-10-21 11:30:01 | INFO     | execution.protective_stop | [INITIAL_SL_PLACED] symbol=SENSEX26O2274000PE | sl=286.55 | order_id=PAPER_SL_C2DBF8EB
+2026-10-21 12:26:11 | INFO     | execution.paper_broker | [EXIT_FILLED] mode=PAPER | symbol=SENSEX26O2274000PE | qty=20 | fill=747.4 | order_id=PAPER_80C85D80 | tag=PIVOT_TSL_HIT
+2026-10-21 12:26:11 | INFO     | notifications.notifier | [EXIT_FILLED] symbol=SENSEX26O2274000PE | exit_price=747.4 | pnl=7360.999999999999 | reason=PIVOT_TSL_HIT
