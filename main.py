@@ -364,6 +364,7 @@ def print_startup_summary() -> None:
 |  VWAP Retest:            {vwap_str:<22} |
 |  Prev Day H/L (PDHL):    {_yn(settings.ENABLE_PDHL_STRATEGY):<22} |
 |  ATR Copilot:            {_yn(settings.ENABLE_ATR_COPILOT_STRATEGY):<22} |
+|  Expiry iron fly:        {_yn(settings.ENABLE_EXPIRY_FLY):<22} |
 +--------------------------------------------------+
 |  SMART ENTRY FILTERS                             |
 |  {se_str:<48} |
@@ -1872,6 +1873,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
         "EMA_SL_HIT", "EMA_BE_STOP", "EMA_TSL_HIT", "EMA_TARGET",
         "EMA_TRAIL_EMA9", "EMA_TIME_STOP",
         "IDX_SL_HIT", "IDX_BE_STOP", "IDX_TSL_HIT", "IDX_TARGET",
+        "VWAP_CROSS_EXIT",
     }
     _smart_trigger = reason if reason in _SMART_EXITS else None
 
@@ -2349,9 +2351,9 @@ def _make_tick_handler(ctx: BotContext):
                 # Feed into candle aggregators
                 ctx.agg_5m.on_tick(ltp)
                 ctx.agg_15m.on_tick(ltp)
-                # Feed VWAP (tick proxy — each tick = 1 volume unit)
-                if settings.ENABLE_VWAP_STRATEGY:
-                    ctx.vwap.on_tick(ltp)
+                # VWAP is updated from completed candles (on_candle below) for
+                # accuracy — tick-level updates would double-count every price
+                # because the same data is also accumulated into the 5m candle.
                 # Pivot trades manage SL/BE/TSL/T2 on the SENSEX price
                 if ctx.pivot_mgr is not None and ctx.sm.state == State.POSITION_OPEN:
                     on_pivot_index_price(ctx, ltp)
@@ -2479,6 +2481,34 @@ def _make_candle_handler_5m(ctx: BotContext):
                     on_option_ltp(ctx, rest_ltp)
             except Exception as exc:
                 logger.warning("REST option LTP fallback failed: %s", exc)
+
+        # ── VWAP cross-exit: close back through VWAP invalidates the thesis ──────
+        # CE_VWAP thesis = price above VWAP.  The moment a completed 5m candle
+        # closes below VWAP, the level has been surrendered — exit immediately,
+        # before the ATR-based option SL backstop fires.  Mirror for PE_VWAP.
+        # Only runs when VWAP_CROSS_EXIT=true and the strategy is CE_VWAP/PE_VWAP.
+        if (settings.VWAP_CROSS_EXIT
+                and ctx.sm.state == State.POSITION_OPEN
+                and ctx.strategy_type in ("CE_VWAP", "PE_VWAP")
+                and candles_5m
+                and ctx.vwap.value is not None):
+            _vwap_val = ctx.vwap.value
+            _latest_close = candles_5m[-1].close
+            _vwap_crossed = (
+                ctx.strategy_type == "CE_VWAP" and _latest_close < _vwap_val
+            ) or (
+                ctx.strategy_type == "PE_VWAP" and _latest_close > _vwap_val
+            )
+            if _vwap_crossed:
+                log_event(
+                    logger, "VWAP_CROSS_EXIT",
+                    side=ctx.strategy_type,
+                    close=round(_latest_close, 2),
+                    vwap=round(_vwap_val, 2),
+                    candle=candle.timestamp,
+                )
+                execute_exit(ctx, reason="VWAP_CROSS_EXIT")
+                return
 
         # ── EMA index engine: trail ATR refresh, EMA9 trail exit, time stop, reversal ──
         if isinstance(ctx.pivot_mgr, EmaTradeManager) and ctx.sm.state == State.POSITION_OPEN and candles_5m:
@@ -2826,6 +2856,20 @@ def main() -> None:
     ctx = BotContext()
     recover_from_restart(ctx)
 
+    # Expiry-day iron butterfly (SHADOW only; config.validate() refuses LIVE).
+    fly_runner = None
+    if settings.ENABLE_EXPIRY_FLY and settings.TRADING_MODE == "SHADOW":
+        from broker.instrument_repository import get_sensex_options, is_expiry_day
+        from broker.kite_client import get_kite
+        from execution.fly_runner import ExpiryFlyRunner
+        fly_runner = ExpiryFlyRunner(
+            kite_fn=get_kite, options_fn=get_sensex_options, expiry_fn=is_expiry_day,
+            spot_fn=lambda: ctx.sensex_ltp,
+        )
+        logger.info("Expiry-day iron butterfly enabled (SHADOW): entry %s, wings %d, stop %.0f%%, exit %s.",
+                    settings.FLY_ENTRY_TIME, settings.FLY_WING_POINTS,
+                    settings.FLY_STOP_PCT * 100, settings.FLY_EXIT_TIME)
+
     bootstrap_session(ctx)
 
     # Write an initial state file immediately after seeding so the UI shows a
@@ -2926,6 +2970,12 @@ def main() -> None:
     try:
         while True:
             time.sleep(5)
+
+            if fly_runner is not None:
+                try:
+                    fly_runner.tick()
+                except Exception:
+                    logger.exception("Expiry fly tick failed (ignored; trading unaffected).")
 
             # ── Dead-feed detection: warn if no price received during market hours ──
             now_mono = time.monotonic()

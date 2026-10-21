@@ -1,31 +1,31 @@
 # Full-system backtest: 2024-01-15 to 2026-10-16
 
-Run label `v4_pivot_pe_only`, 683 trading sessions, generated 2026-10-20 02:18.  Overrides: {'ENABLE_ORB_STRATEGY': 'false', 'ENABLE_EMA_STRATEGY': 'false'}.
+Run label `v4_pivot_pe_only`, 683 trading sessions, generated 2026-10-20 20:27.  Overrides: {'ENABLE_ORB_STRATEGY': 'false', 'ENABLE_EMA_STRATEGY': 'false'}.
 
 ## Headline
 
 | Metric | Value |
 |---|---:|
-| Trades | 224 |
-| Win % | 21.40 |
-| Net P&L (Rs) | -20,962 |
-| Gross P&L (Rs) | 1,326 |
-| Costs (Rs) | 22,288 |
-|   of which charges (Rs) | 13,328 |
-|   of which slippage (Rs) | 8,960 |
+| Trades | 141 |
+| Win % | 21.30 |
+| Net P&L (Rs) | -715 |
+| Gross P&L (Rs) | 13,429 |
+| Costs (Rs) | 14,144 |
+|   of which charges (Rs) | 8,504 |
+|   of which slippage (Rs) | 5,640 |
 | Avg cost per trade (Rs) | 100 |
-| Profit factor | 0.80 |
-| Avg trade (Rs) | -94 |
-| Avg win (Rs) | 1,782 |
-| Avg loss (Rs) | -605 |
-| Largest win (Rs) | 10,332 |
-| Largest loss (Rs) | -2,226 |
-| Max drawdown (Rs) | -34,932 |
-| Longest losing streak | 20 |
-| Avg hold (min) | 22.60 |
+| Profit factor | 0.99 |
+| Avg trade (Rs) | -5 |
+| Avg win (Rs) | 2,194 |
+| Avg loss (Rs) | -600 |
+| Largest win (Rs) | 8,867 |
+| Largest loss (Rs) | -2,359 |
+| Max drawdown (Rs) | -24,798 |
+| Longest losing streak | 24 |
+| Avg hold (min) | 24.20 |
 
 
-Trades on 170 of 683 sessions; 25% of trading days were green.  Average 6.9 trades a month.
+Trades on 112 of 683 sessions; 25% of trading days were green.  Average 4.3 trades a month.
 
 
 ![equity](equity.svg)
@@ -35,7 +35,7 @@ Trades on 170 of 683 sessions; 25% of trading days were green.  Average 6.9 trad
 
 | strategy | side | Trades | Win % | Net Rs | Avg Rs | PF |
 |---|---|---:|---:|---:|---:|---:|
-| PIVOT | PE | 224 | 21.40 | -20,962 | -94 | 0.80 |
+| PIVOT | PE | 141 | 21.30 | -715 | -5 | 0.99 |
 
 
 ## Exit reasons
@@ -45,24 +45,22 @@ Every exit carries the reason recorded by the bot itself (`trades.exit_reason`).
 
 | exit_reason | Trades | Win % | Net Rs | Avg Rs | PF | Avg hold min |
 |---|---:|---:|---:|---:|---:|---:|
-| PIVOT_SL_HIT | 97 | 0 | -92,076 | -949 | 0 | 12 |
-| PIVOT_BE_STOP | 83 | 14.50 | -13,274 | -160 | 0.03 | 22 |
-| PIVOT_TSL_HIT | 27 | 100 | 63,427 | 2,349 | inf | 40 |
-| STOP_HIT | 7 | 0 | -618 | -88 | 0 | 76 |
-| EOD_SQUARE_OFF | 6 | 83.30 | 5,153 | 859 | 42.43 | 42 |
-| PIVOT_TARGET_T3 | 4 | 100 | 16,425 | 4,106 | inf | 47 |
+| PIVOT_SL_HIT | 58 | 0 | -55,935 | -964 | 0 | 12 |
+| PIVOT_BE_STOP | 46 | 8.70 | -9,036 | -196 | 0.01 | 17 |
+| PIVOT_TSL_HIT | 22 | 100 | 51,124 | 2,324 | inf | 39 |
+| STOP_HIT | 11 | 0 | -1,513 | -138 | 0 | 78 |
+| PIVOT_TARGET_T3 | 4 | 100 | 14,645 | 3,661 | inf | 47 |
 
 
 ### Exit reason by strategy (trade count)
 
 | exit_reason | PIVOT |
 |---|---:|
-| EOD_SQUARE_OFF | 6 |
-| PIVOT_BE_STOP | 83 |
-| PIVOT_SL_HIT | 97 |
+| PIVOT_BE_STOP | 46 |
+| PIVOT_SL_HIT | 58 |
 | PIVOT_TARGET_T3 | 4 |
-| PIVOT_TSL_HIT | 27 |
-| STOP_HIT | 7 |
+| PIVOT_TSL_HIT | 22 |
+| STOP_HIT | 11 |
 
 
 ## Stop-loss and trailing-stop behaviour
@@ -72,19 +70,19 @@ Every exit carries the reason recorded by the bot itself (`trades.exit_reason`).
 
 | stage_at_exit | Trades | Win % | Net Rs | Avg Rs | PF |
 |---|---:|---:|---:|---:|---:|
-| INITIAL | 99 | 1 | -91,973 | -929 | 0 |
-| BE | 95 | 17.90 | -7,326 | -77 | 0.49 |
-| T1 | 24 | 100 | 52,291 | 2,179 | inf |
-| T2 | 6 | 100 | 26,045 | 4,341 | inf |
+| BE | 59 | 10.20 | -7,822 | -133 | 0.26 |
+| INITIAL | 58 | 0 | -55,935 | -964 | 0 |
+| T1 | 19 | 100 | 41,389 | 2,178 | inf |
+| T2 | 5 | 100 | 21,654 | 4,331 | inf |
 
 
-- Trades whose stop moved at least once: 125 of 224 (56%); average 1.5 moves per trade.
+- Trades whose stop moved at least once: 83 of 141 (59%); average 1.9 moves per trade.
 
-- Full initial-stop losses: 99 (44%).
+- Full initial-stop losses: 58 (41%).
 
-- Of the 90 trades that reached +1R, the exit kept on average 32% of the best index move (median 30%); 52% of them still closed at a net loss.
+- Of the 57 trades that reached +1R, the exit kept on average 40% of the best index move (median 40%); 51% of them still closed at a net loss.
 
-- Median best move (MFE) 0.81R; 40% of trades reached +1R at some point.
+- Median best move (MFE) 0.87R; 40% of trades reached +1R at some point.
 
 
 ## Stability
@@ -93,60 +91,59 @@ Every exit carries the reason recorded by the bot itself (`trades.exit_reason`).
 
 | half | Trades | Win % | Net Rs | Avg Rs | PF |
 |---|---:|---:|---:|---:|---:|
-| H1 | 125 | 18.40 | -21,904 | -175 | 0.66 |
-| H2 | 99 | 25.30 | 942 | 10 | 1.02 |
+| H1 | 79 | 16.50 | -5,218 | -66 | 0.87 |
+| H2 | 62 | 27.40 | 4,503 | 73 | 1.17 |
 
 
 ### By year
 
 | year | Trades | Win % | Net Rs | Avg Rs | PF |
 |---|---:|---:|---:|---:|---:|
-| 2024 | 88 | 18.20 | -22,517 | -256 | 0.49 |
-| 2025 | 86 | 18.60 | -11,368 | -132 | 0.74 |
-| 2026 | 50 | 32 | 12,923 | 258 | 1.71 |
+| 2024 | 56 | 16.10 | -10,271 | -183 | 0.63 |
+| 2025 | 51 | 13.70 | -8,357 | -164 | 0.70 |
+| 2026 | 34 | 41.20 | 17,913 | 527 | 2.69 |
 
 
 ### By month
 
 | month | Trades | Win % | Net Rs | Avg Rs | PF | Cumulative Rs |
 |---|---:|---:|---:|---:|---:|---:|
-| 2024-01 | 4 | 0 | -1,269 | -317 | 0 | -1,269 |
-| 2024-02 | 6 | 50 | -2,155 | -359 | 0.01 | -3,424 |
-| 2024-03 | 7 | 28.60 | -4,306 | -615 | 0.01 | -7,730 |
-| 2024-04 | 6 | 16.70 | 72 | 12 | 1.03 | -7,658 |
-| 2024-05 | 11 | 9.10 | -7,868 | -715 | 0.02 | -15,526 |
-| 2024-06 | 4 | 0 | -3,148 | -787 | 0 | -18,674 |
-| 2024-07 | 6 | 0 | -2,614 | -436 | 0 | -21,288 |
-| 2024-08 | 6 | 0 | -1,798 | -300 | 0 | -23,086 |
-| 2024-09 | 8 | 25 | -410 | -51 | 0.88 | -23,496 |
-| 2024-10 | 11 | 9.10 | -6,234 | -567 | 0.15 | -29,730 |
-| 2024-11 | 9 | 44.40 | 10,345 | 1,149 | 4.74 | -19,385 |
-| 2024-12 | 10 | 20 | -3,133 | -313 | 0.35 | -22,518 |
-| 2025-01 | 8 | 25 | 8,476 | 1,060 | 3.27 | -14,042 |
-| 2025-02 | 5 | 20 | 1,215 | 243 | 1.55 | -12,827 |
-| 2025-03 | 4 | 50 | 4,627 | 1,157 | 4.51 | -8,200 |
-| 2025-04 | 10 | 20 | -5,330 | -533 | 0.01 | -13,530 |
-| 2025-05 | 10 | 0 | -8,376 | -838 | 0 | -21,906 |
-| 2025-06 | 7 | 28.60 | -1,538 | -220 | 0.44 | -23,444 |
-| 2025-07 | 10 | 20 | -2,434 | -243 | 0.45 | -25,878 |
-| 2025-08 | 12 | 16.70 | -3,294 | -274 | 0.57 | -29,172 |
-| 2025-09 | 9 | 11.10 | -3,577 | -397 | 0.29 | -32,749 |
-| 2025-10 | 4 | 50 | 1,443 | 361 | 2.61 | -31,306 |
-| 2025-11 | 5 | 0 | -1,513 | -303 | 0 | -32,819 |
-| 2025-12 | 2 | 0 | -1,068 | -534 | 0 | -33,887 |
-| 2026-01 | 7 | 42.90 | 6,786 | 969 | 16.64 | -27,101 |
-| 2026-02 | 10 | 20 | -2,750 | -275 | 0.46 | -29,851 |
-| 2026-03 | 1 | 100 | 3,710 | 3,710 | inf | -26,141 |
-| 2026-04 | 1 | 0 | -1,419 | -1,419 | 0 | -27,560 |
-| 2026-05 | 6 | 16.70 | -2,117 | -353 | 0.10 | -29,677 |
-| 2026-06 | 8 | 25 | -5,361 | -670 | 0.12 | -35,038 |
-| 2026-07 | 2 | 50 | 2,326 | 1,163 | 4.69 | -32,712 |
-| 2026-08 | 9 | 33.30 | 1,594 | 177 | 2.65 | -31,118 |
-| 2026-09 | 2 | 50 | 2,946 | 1,473 | 6.05 | -28,172 |
-| 2026-10 | 4 | 50 | 7,208 | 1,802 | 14.56 | -20,964 |
+| 2024-01 | 3 | 0 | -1,667 | -556 | 0 | -1,667 |
+| 2024-02 | 4 | 25 | -1,200 | -300 | 0.01 | -2,867 |
+| 2024-03 | 4 | 25 | -3,277 | -819 | 0.01 | -6,144 |
+| 2024-04 | 2 | 0 | -1,972 | -986 | 0 | -8,116 |
+| 2024-05 | 7 | 0 | -4,932 | -705 | 0 | -13,048 |
+| 2024-06 | 1 | 0 | -279 | -279 | 0 | -13,327 |
+| 2024-07 | 4 | 0 | -2,334 | -583 | 0 | -15,661 |
+| 2024-08 | 5 | 0 | -1,466 | -293 | 0 | -17,127 |
+| 2024-09 | 4 | 25 | 2,627 | 657 | 7.19 | -14,500 |
+| 2024-10 | 11 | 9.10 | -6,687 | -608 | 0.13 | -21,187 |
+| 2024-11 | 6 | 50 | 10,914 | 1,819 | 14.40 | -10,273 |
+| 2024-12 | 5 | 40 | 0 | 0 | 1 | -10,273 |
+| 2025-01 | 2 | 50 | 8,459 | 4,229 | 21.72 | -1,814 |
+| 2025-02 | 4 | 25 | 2,628 | 657 | 4.58 | 814 |
+| 2025-03 | 3 | 33.30 | 3,561 | 1,187 | 3.65 | 4,375 |
+| 2025-04 | 8 | 12.50 | -4,427 | -553 | 0 | -52 |
+| 2025-05 | 6 | 0 | -5,169 | -861 | 0 | -5,221 |
+| 2025-06 | 4 | 0 | -2,211 | -553 | 0 | -7,432 |
+| 2025-07 | 4 | 25 | -1,262 | -316 | 0.45 | -8,694 |
+| 2025-08 | 8 | 12.50 | -4,278 | -535 | 0.29 | -12,972 |
+| 2025-09 | 5 | 0 | -3,587 | -717 | 0 | -16,559 |
+| 2025-10 | 1 | 100 | 26 | 26 | inf | -16,533 |
+| 2025-11 | 4 | 0 | -995 | -249 | 0 | -17,528 |
+| 2025-12 | 2 | 0 | -1,102 | -551 | 0 | -18,630 |
+| 2026-01 | 6 | 50 | 6,478 | 1,080 | 15.39 | -12,152 |
+| 2026-02 | 7 | 28.60 | 21 | 3 | 1.01 | -12,131 |
+| 2026-03 | 1 | 100 | 3,484 | 3,484 | inf | -8,647 |
+| 2026-05 | 5 | 20 | -2,063 | -413 | 0.10 | -10,710 |
+| 2026-06 | 5 | 20 | -3,880 | -776 | 0.13 | -14,590 |
+| 2026-07 | 2 | 50 | 1,400 | 700 | 3.21 | -13,190 |
+| 2026-08 | 4 | 50 | 2,246 | 562 | 15.04 | -10,944 |
+| 2026-09 | 2 | 50 | 2,774 | 1,387 | 5.70 | -8,170 |
+| 2026-10 | 2 | 100 | 7,452 | 3,726 | inf | -718 |
 
 
-35% of months were profitable.
+39% of months were profitable.
 
 
 ## Timing
@@ -155,31 +152,29 @@ Every exit carries the reason recorded by the bot itself (`trades.exit_reason`).
 
 | entry_hour | Trades | Win % | Net Rs | Avg Rs | PF |
 |---|---:|---:|---:|---:|---:|
-| 09:00 | 50 | 24 | 6,113 | 122 | 1.23 |
-| 10:00 | 41 | 22 | -4,344 | -106 | 0.74 |
-| 11:00 | 27 | 7.40 | -12,836 | -475 | 0.20 |
-| 12:00 | 35 | 25.70 | 160 | 5 | 1.01 |
-| 13:00 | 32 | 28.10 | 5,252 | 164 | 1.39 |
-| 14:00 | 39 | 17.90 | -15,308 | -393 | 0.22 |
+| 09:00 | 25 | 32 | 13,248 | 530 | 2 |
+| 10:00 | 38 | 18.40 | -8,845 | -233 | 0.51 |
+| 11:00 | 22 | 9.10 | -11,101 | -505 | 0.21 |
+| 12:00 | 31 | 22.60 | 235 | 8 | 1.02 |
+| 13:00 | 25 | 24 | 5,748 | 230 | 1.70 |
 
 
 ### Weekday
 
 | weekday | Trades | Win % | Net Rs | Avg Rs | PF |
 |---|---:|---:|---:|---:|---:|
-| Mon | 34 | 23.50 | -9,549 | -281 | 0.55 |
-| Tue | 58 | 25.90 | 9,031 | 156 | 1.40 |
-| Wed | 57 | 15.80 | -13,149 | -231 | 0.55 |
-| Thu | 42 | 23.80 | 249 | 6 | 1.01 |
-| Fri | 33 | 18.20 | -7,544 | -229 | 0.55 |
+| Mon | 21 | 19 | -4,972 | -237 | 0.65 |
+| Tue | 46 | 28.30 | 12,252 | 266 | 1.76 |
+| Wed | 43 | 16.30 | -6,783 | -158 | 0.68 |
+| Thu | 31 | 19.40 | -1,212 | -39 | 0.92 |
 
 
 ### Expiry day vs other days
 
 | expiry_day | Trades | Win % | Net Rs | Avg Rs | PF |
 |---:|---:|---:|---:|---:|---:|
-| no | 194 | 22.20 | -28,576 | -147 | 0.70 |
-| yes | 30 | 16.70 | 7,614 | 254 | 1.74 |
+| no | 122 | 21.30 | -9,800 | -80 | 0.84 |
+| yes | 19 | 21.10 | 9,085 | 478 | 2.51 |
 
 
 ## Signal funnel
@@ -189,15 +184,17 @@ Raw signals are strategy conditions that fired on a closed candle; most are remo
 
 | Signal | Raw signals |
 |---|---:|
-| PE_PIVOT | 258 |
-| CE_PIVOT | 253 |
+| CE_PIVOT | 163 |
+| PE_PIVOT | 146 |
 
 
 ### Top reasons signals were blocked
 
 | Block (event: reason) | Count |
 |---|---:|
-| BACKTEST_FILTER_BLOCKED: signal CE_PIVOT skipped | 252 |
+| PIVOT_BLOCKED_FRIDAY | 9,768 |
+| PIVOT_BLOCKED_TIME | 9,765 |
+| BACKTEST_FILTER_BLOCKED: signal CE_PIVOT skipped | 163 |
 | ENTRY_BLOCKED_MAX_RISK | 2 |
 
 
@@ -207,32 +204,32 @@ Raw signals are strategy conditions that fired on a closed candle; most are remo
 
 | entry_dt | strategy | side | entry_price | exit_price | exit_reason | stage_at_exit | net_pnl |
 |---|---|---|---:|---:|---|---|---:|
-| 2025-01-21 09:45:00 | PIVOT | PE | 133 | 655 | PIVOT_TARGET_T3 | T2 | 10,332 |
-| 2025-03-03 09:35:00 | PIVOT | PE | 215 | 480 | PIVOT_TSL_HIT | T2 | 5,199 |
-| 2026-10-14 12:50:00 | PIVOT | PE | 242 | 501 | PIVOT_TSL_HIT | T1 | 5,086 |
-| 2024-11-07 09:35:00 | PIVOT | PE | 268 | 508 | PIVOT_TSL_HIT | T1 | 4,706 |
-| 2024-11-12 12:00:00 | PIVOT | PE | 340 | 573 | PIVOT_TSL_HIT | T1 | 4,550 |
-| 2026-03-11 09:35:00 | PIVOT | PE | 359 | 550 | PIVOT_TSL_HIT | T2 | 3,710 |
-| 2024-11-14 10:20:00 | PIVOT | PE | 103 | 289 | PIVOT_TSL_HIT | T1 | 3,624 |
-| 2026-09-15 13:10:00 | PIVOT | PE | 290 | 472 | PIVOT_TSL_HIT | T1 | 3,529 |
-| 2025-02-13 13:10:00 | PIVOT | PE | 490 | 665 | PIVOT_TSL_HIT | T1 | 3,406 |
-| 2024-09-18 13:25:00 | PIVOT | PE | 324 | 485 | PIVOT_TARGET_T3 | T2 | 3,113 |
+| 2025-01-21 09:45:00 | PIVOT | PE | 233 | 682 | PIVOT_TARGET_T3 | T2 | 8,867 |
+| 2025-03-03 09:35:00 | PIVOT | PE | 274 | 524 | PIVOT_TSL_HIT | T2 | 4,904 |
+| 2026-10-14 12:50:00 | PIVOT | PE | 282 | 531 | PIVOT_TSL_HIT | T1 | 4,870 |
+| 2024-11-07 09:35:00 | PIVOT | PE | 338 | 563 | PIVOT_TSL_HIT | T1 | 4,394 |
+| 2024-11-12 12:00:00 | PIVOT | PE | 391 | 616 | PIVOT_TSL_HIT | T1 | 4,389 |
+| 2026-03-11 09:35:00 | PIVOT | PE | 446 | 626 | PIVOT_TSL_HIT | T2 | 3,484 |
+| 2026-09-15 13:10:00 | PIVOT | PE | 328 | 501 | PIVOT_TSL_HIT | T1 | 3,364 |
+| 2025-02-13 13:10:00 | PIVOT | PE | 481 | 655 | PIVOT_TSL_HIT | T1 | 3,363 |
+| 2024-09-18 13:25:00 | PIVOT | PE | 366 | 524 | PIVOT_TARGET_T3 | T2 | 3,051 |
+| 2024-11-14 10:20:00 | PIVOT | PE | 189 | 341 | PIVOT_TSL_HIT | T1 | 2,946 |
 
 
 ### Worst 10
 
 | entry_dt | strategy | side | entry_price | exit_price | exit_reason | stage_at_exit | net_pnl |
 |---|---|---|---:|---:|---|---|---:|
-| 2026-06-24 09:50:00 | PIVOT | PE | 233 | 127 | PIVOT_SL_HIT | INITIAL | -2,226 |
-| 2025-05-21 14:05:00 | PIVOT | PE | 709 | 609 | PIVOT_SL_HIT | INITIAL | -2,101 |
-| 2026-02-20 13:10:00 | PIVOT | PE | 575 | 480 | PIVOT_SL_HIT | INITIAL | -2,006 |
-| 2024-10-08 10:15:00 | PIVOT | PE | 454 | 368 | PIVOT_SL_HIT | INITIAL | -1,828 |
-| 2026-06-05 14:40:00 | PIVOT | PE | 550 | 464 | PIVOT_SL_HIT | INITIAL | -1,816 |
-| 2024-05-06 10:00:00 | PIVOT | PE | 492 | 407 | PIVOT_SL_HIT | INITIAL | -1,797 |
-| 2024-05-10 11:00:00 | PIVOT | PE | 145 | 65.50 | PIVOT_SL_HIT | INITIAL | -1,681 |
-| 2024-06-05 09:30:00 | PIVOT | PE | 476 | 398 | PIVOT_BE_STOP | BE | -1,678 |
-| 2024-05-06 11:25:00 | PIVOT | PE | 492 | 414 | PIVOT_SL_HIT | INITIAL | -1,655 |
-| 2024-12-02 09:30:00 | PIVOT | PE | 482 | 406 | PIVOT_SL_HIT | INITIAL | -1,627 |
+| 2026-06-24 09:50:00 | PIVOT | PE | 293 | 180 | PIVOT_SL_HIT | INITIAL | -2,359 |
+| 2024-05-06 10:00:00 | PIVOT | PE | 564 | 474 | PIVOT_SL_HIT | INITIAL | -1,891 |
+| 2024-10-08 10:15:00 | PIVOT | PE | 522 | 433 | PIVOT_SL_HIT | INITIAL | -1,869 |
+| 2024-05-06 11:25:00 | PIVOT | PE | 557 | 475 | PIVOT_SL_HIT | INITIAL | -1,731 |
+| 2024-03-12 11:45:00 | PIVOT | PE | 394 | 316 | PIVOT_SL_HIT | INITIAL | -1,661 |
+| 2025-05-21 12:55:00 | PIVOT | PE | 711 | 636 | PIVOT_SL_HIT | INITIAL | -1,625 |
+| 2024-10-10 09:45:00 | PIVOT | PE | 316 | 241 | PIVOT_SL_HIT | INITIAL | -1,596 |
+| 2025-09-03 12:55:00 | PIVOT | PE | 220 | 149 | PIVOT_SL_HIT | INITIAL | -1,510 |
+| 2024-10-01 11:15:00 | PIVOT | PE | 395 | 325 | PIVOT_SL_HIT | INITIAL | -1,501 |
+| 2025-04-02 13:00:00 | PIVOT | PE | 523 | 455 | PIVOT_SL_HIT | INITIAL | -1,468 |
 
 
 ## Configuration tested
@@ -258,7 +255,7 @@ Raw signals are strategy conditions that fired on a closed candle; most are remo
 | MAX_RISK_RUPEES_PER_TRADE | 2,000 |
 | TREND_GATE_15M | yes |
 | TREND_GATE_DAILY | yes |
-| TREND_GATE_STRATEGIES | frozenset({'TRB', 'VWAP', 'EMA', 'NATR'}) |
+| TREND_GATE_STRATEGIES | frozenset({'VWAP', 'EMA', 'TRB', 'NATR'}) |
 | GENERIC_INDEX_EXITS | yes |
 | PIVOT_BE_TRIGGER_R | 0.75 |
 | PIVOT_BE_BUFFER_PTS | 12 |
@@ -282,7 +279,7 @@ Raw signals are strategy conditions that fired on a closed candle; most are remo
 - **Production code, not a re-implementation.** Each session runs `main.BotContext`, `main.bootstrap_session`, the live tick handler, `execute_entry`, the Pivot / EMA / Index trade managers (SL, break-even, T1/T2 locks, chandelier trailing stop, targets), smart exits, the paper-broker SL backstop and `main._run_eod_exit`.  Signal de-duplication, daily caps, cooldowns, the trend gates, the rupee-risk cap and the daily loss limit all run from the bot's own SQLite tables.
 - **No look-ahead.** The simulated Kite API only returns bars that had completed by the simulated time; signals fire on the first tick after a 5-minute candle closes, as live.
 - **Price path.** Each 1-minute SENSEX bar is replayed as four ticks (up bar O,L,H,C; down bar O,H,L,C).  Intra-minute order beyond that is unknown.
-- **Options are modelled, not historical.** Black-Scholes, IV = India VIX (minute), r = 6.5%.  Strike selection, ITM fallback and expiry-day rollover use the bot's own selector on a synthetic chain; weekly expiry calendar [['2000-01-01', 4], ['2025-01-01', 1], ['2025-09-01', 3]] (weekday 0 = Monday), moved to the previous session on holidays.  The model has no volatility smile, no intraday IV crush beyond VIX moves, and VIX (30-day, NIFTY) is a proxy for weekly SENSEX IV — expect real premiums, especially on expiry days, to differ.
+- **Options are modelled, not historical.** Black-Scholes in trading time (weeknight = 176 min, weekend = 609 min), IV = India VIX (minute), r = 6.5%.  Strike selection, ITM fallback and expiry-day rollover use the bot's own selector on a synthetic chain; weekly expiry calendar [['2000-01-01', 4], ['2025-01-01', 1], ['2025-09-01', 3]] (weekday 0 = Monday), moved to the previous session on holidays.  The model has no volatility smile, no intraday IV crush beyond VIX moves, and VIX (30-day, NIFTY) is a proxy for weekly SENSEX IV — expect real premiums, especially on expiry days, to differ.
 - **Fills and costs.** SHADOW-mode paper fills at the modelled premium, then 1.0 option point(s) of slippage per side plus brokerage, STT, exchange, SEBI, stamp duty and GST are deducted per trade.  Quantity is today's lot (20) throughout.
 - **Not modelled:** order rejections, partial fills, feed outages, margin limits.
 

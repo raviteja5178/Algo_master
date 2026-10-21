@@ -383,11 +383,11 @@ SMART_ENTRY_SQUEEZE_BODY_ATR_RATIO: float = _getfloat("SMART_ENTRY_SQUEEZE_BODY_
 # (body/ATR ratio, EMA gap magnitude, EMA gap widening).
 # These are "bounce" strategies whose own structural level already confirms the
 # entry — the EMA gap is expected to be flat at a VWAP retest or NATR crossover.
-# Default: "VWAP,NATR" — skip body + EMA-gap filters for CE_VWAP / PE_VWAP /
-#   CE_NATR / PE_NATR signals.
+# Default: "VWAP,NATR,ORB" — skip body + EMA-gap filters for CE_VWAP / PE_VWAP /
+#   CE_NATR / PE_NATR / CE_ORB / PE_ORB signals.
 # "" = disable (all strategies subject to body/EMA-gap filters equally).
-# Example: SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES=VWAP,NATR,OB
-_BOUNCE_EXEMPT_RAW: str = _get("SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES", "VWAP,NATR")
+# Example: SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES=VWAP,NATR,ORB,OB
+_BOUNCE_EXEMPT_RAW: str = _get("SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES", "VWAP,NATR,ORB")
 SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES: set[str] = (
     {s.strip().upper() for s in _BOUNCE_EXEMPT_RAW.split(",") if s.strip()}
     if _BOUNCE_EXEMPT_RAW.strip()
@@ -455,8 +455,8 @@ SMART_ENTRY_MAX_PREMIUM_EXTENSION_PCT: float = _getfloat("SMART_ENTRY_MAX_PREMIU
 # ORB_REQUIRE_15M_TREND: if true, CE_ORB only fires when 15m close > 15m EMA21,
 #                        PE_ORB only when 15m close < 15m EMA21.
 ORB_MIN_BODY_RATIO: float   = _getfloat("ORB_MIN_BODY_RATIO",   0.0)
-ORB_BUFFER_ATR_MULT: float  = _getfloat("ORB_BUFFER_ATR_MULT",  0.0)
-ORB_REQUIRE_15M_TREND: bool = _getbool("ORB_REQUIRE_15M_TREND", False)
+ORB_BUFFER_ATR_MULT: float  = _getfloat("ORB_BUFFER_ATR_MULT",  0.1)
+ORB_REQUIRE_15M_TREND: bool = _getbool("ORB_REQUIRE_15M_TREND", True)
 # ORB only fires for candles whose timestamp is at or before this time.
 # After this time ORB is silently skipped and EMA takes over.
 # "" = no cutoff (active all day).  Default: "11:00"
@@ -466,6 +466,9 @@ ORB_ACTIVE_UNTIL: str       = _get("ORB_ACTIVE_UNTIL", "09:40")
 # (EMA, TRB, OB, VWAP, PDHL) are unaffected and continue to trade normally.
 # true = skip ORB + MOMENTUM on Mondays (recommended).  false = no restriction.
 ORB_MOMENTUM_SKIP_MONDAY: bool = _getbool("ORB_MOMENTUM_SKIP_MONDAY", True)
+# ORB_NO_THURSDAY: when true, no new ORB entries are allowed on Thursdays (expiry day).
+# Backtest shows Thursdays: 7 trades, 0% WR, −₹3,671 (PF 0.00).
+ORB_NO_THURSDAY: bool       = _getbool("ORB_NO_THURSDAY", False)
 # ORB Session Qualifier — data-driven sideways-day filter
 #
 # When ORB_SESSION_QUALIFIER=true, at 10:00 the bot checks whether the
@@ -574,6 +577,12 @@ VWAP_MAX_SUBMERGED_CANDLES: int = _getint("VWAP_MAX_SUBMERGED_CANDLES", 3)
 VWAP_SLOPE_LOOKBACK: int      = _getint("VWAP_SLOPE_LOOKBACK", 3)
 # No new VWAP entries on candles starting at/after this time ("" = no cut-off).
 VWAP_NO_NEW_ENTRY_AFTER: str  = _get("VWAP_NO_NEW_ENTRY_AFTER", "")
+# VWAP_CROSS_EXIT: while a CE_VWAP or PE_VWAP trade is open, exit on the first
+# completed 5m candle that closes back through VWAP — the structural thesis
+# (price above VWAP for CE / below for PE) is invalidated.  This fires before
+# the ATR-based option SL backstop and keeps losses small.
+# true = enabled (recommended).  false = rely on ATR SL only (legacy behaviour).
+VWAP_CROSS_EXIT: bool = _getbool("VWAP_CROSS_EXIT", True)
 
 # ── Higher-timeframe trend gate (strategies/trend_gate.py) ─────────────────────
 # Blocks signals that fight the 15m trend and/or the daily trend, for the
@@ -764,6 +773,13 @@ PIVOT_T2_TRAIL_ATR_MULT: float  = _getfloat("PIVOT_T2_TRAIL_ATR_MULT", 0.75)   #
 PIVOT_HARD_SL_CUSHION: float    = _getfloat("PIVOT_HARD_SL_CUSHION", 1.75)     # broker SL backstop width
 PIVOT_OPTION_DELTA: float       = _getfloat("PIVOT_OPTION_DELTA", 0.4)
 PIVOT_MAX_TRADES_PER_DAY: int   = _getint("PIVOT_MAX_TRADES_PER_DAY", 3)
+# PIVOT_NO_NEW_ENTRY_AFTER: block new pivot entries at or after this time (HH:MM).
+# Backtest shows 14:00+ entries: 17 trades, 0 wins, −₹11,841 (PF 0.00).
+# Empty string = disabled (use global NO_NEW_ENTRY_AFTER).
+PIVOT_NO_NEW_ENTRY_AFTER: str   = _get("PIVOT_NO_NEW_ENTRY_AFTER", "")
+# PIVOT_NO_FRIDAY: when true, no new pivot entries are allowed on Fridays.
+# Backtest shows Fridays: 20 trades, 15% WR, −₹9,096 (PF 0.37).
+PIVOT_NO_FRIDAY: bool           = _getbool("PIVOT_NO_FRIDAY", False)
 
 
 # ── PDHL (Previous Day High/Low) Breakout strategy ───────────────────────────
@@ -884,11 +900,41 @@ ORDERFLOW_RECORD_DIR: str                  = _get("ORDERFLOW_RECORD_DIR", "")
 ORDERFLOW_DEPTH_SAMPLE_SECONDS: float      = _getfloat("ORDERFLOW_DEPTH_SAMPLE_SECONDS", 1.0)
 ORDERFLOW_FUT_MIN_DAYS_TO_EXPIRY: int      = _getint("ORDERFLOW_FUT_MIN_DAYS_TO_EXPIRY", 3)
 
+# ── Expiry-day iron butterfly (SHADOW only) ───────────────────────────────────
+# Research strategy (research/output/strategy_lab/STRATEGY_REPORT.md): on SENSEX
+# weekly expiry day, sell the ATM CE+PE and buy CE/PE FLY_WING_POINTS away, then
+# stop at a FLY_STOP_PCT loss of the credit or exit at FLY_EXIT_TIME.  It trades
+# four legs at once, which the live order path does not support, so it runs ONLY
+# in SHADOW: fills are simulated at the real bid/ask, and every entry stores the
+# real quotes so they can be compared with the backtest's modelled prices
+# (python -m research.fly_vs_model).  ENABLE_EXPIRY_FLY with TRADING_MODE=LIVE is
+# refused at startup.
+#   FLY_QUANTITY          : units per leg (one SENSEX lot = 20)
+#   FLY_MIN_CREDIT        : skip entry if the net credit (points) is below this
+#   FLY_SKIP_DATES        : comma list of YYYY-MM-DD event days to sit out
+#   FLY_EXTRA_SLIPPAGE_PTS: extra points per leg per side on top of bid/ask
+ENABLE_EXPIRY_FLY: bool        = _getbool("ENABLE_EXPIRY_FLY", False)
+FLY_ENTRY_TIME: str            = _get("FLY_ENTRY_TIME", "10:30")
+FLY_EXIT_TIME: str             = _get("FLY_EXIT_TIME", "15:10")
+FLY_WING_POINTS: int           = _getint("FLY_WING_POINTS", 1000)
+FLY_STOP_PCT: float            = _getfloat("FLY_STOP_PCT", 0.5)
+FLY_QUANTITY: int              = _getint("FLY_QUANTITY", 20)
+FLY_MIN_CREDIT: float          = _getfloat("FLY_MIN_CREDIT", 50.0)
+FLY_SKIP_DATES: str            = _get("FLY_SKIP_DATES", "")
+FLY_EXTRA_SLIPPAGE_PTS: float  = _getfloat("FLY_EXTRA_SLIPPAGE_PTS", 0.0)
+
 # ── Validation ────────────────────────────────────────────────────────────────
 ALLOWED_MODES = {"PAPER", "SHADOW", "LIVE"}
 
 
 def validate() -> None:
+    if ENABLE_EXPIRY_FLY and TRADING_MODE == "LIVE":
+        raise RuntimeError(
+            "ENABLE_EXPIRY_FLY is SHADOW-only: the live order path cannot place a "
+            "four-leg position safely.  Set TRADING_MODE=SHADOW or disable it."
+        )
+    if ENABLE_EXPIRY_FLY and (FLY_WING_POINTS <= 0 or FLY_QUANTITY <= 0 or FLY_STOP_PCT <= 0):
+        raise ValueError("FLY_WING_POINTS, FLY_QUANTITY and FLY_STOP_PCT must be positive.")
     if TRADING_MODE not in ALLOWED_MODES:
         raise ValueError(f"TRADING_MODE must be one of {ALLOWED_MODES}, got '{TRADING_MODE}'")
     if TRADING_MODE == "LIVE" and not ENABLE_LIVE_TRADING:

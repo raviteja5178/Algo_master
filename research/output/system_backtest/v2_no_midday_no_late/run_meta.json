@@ -6,20 +6,21 @@
     "NO_NEW_ENTRY_AFTER": "14:00"
   },
   "halted_days": [],
+  "mode": "SHADOW",
   "experiments": {
     "block_entry_windows": [
       "11:00-12:00"
     ],
     "skip_signals": []
   },
-  "runtime_s": 302.1,
+  "runtime_s": 294.4,
   "settings": {
     "AI_CONFIRMATION_MODEL": "gpt-4o-mini",
     "AI_CONFIRMATION_OLLAMA_HOST": "http://localhost:11434",
     "AI_CONFIRMATION_PROVIDER": "openai",
     "AI_ENTRY_SCORE_THRESHOLD": 6,
     "AI_EXIT_SCORE_THRESHOLD": 7,
-    "ALLOWED_MODES": "{'PAPER', 'LIVE', 'SHADOW'}",
+    "ALLOWED_MODES": "{'SHADOW', 'LIVE', 'PAPER'}",
     "ATM_DELTA": 0.5,
     "ATR_COPILOT_BAND_MULT": 2.0,
     "ATR_COPILOT_BREAKOUT_BUFFER": 0.25,
@@ -31,7 +32,7 @@
     "BREAK_EVEN_TRIGGER_POINTS": 63.0,
     "CONFIGURED_EXPIRY": "2026-10-01",
     "DAILY_LOSS_LIMIT_RUPEES": 5000.0,
-    "DB_PATH": "C:\\Users\\RAVI\\AppData\\Local\\Temp\\sysbt_01n1si6t\\backtest_trades.db",
+    "DB_PATH": "C:\\Users\\RAVI\\AppData\\Local\\Temp\\sysbt_i5px13p8\\backtest_trades.db",
     "EMA_BE_BUFFER_PTS": 4.0,
     "EMA_BE_TRIGGER_R": 1.0,
     "EMA_COLLAPSE_CLOSES": 2,
@@ -165,8 +166,10 @@
     "PIVOT_HARD_SL_CUSHION": 1.75,
     "PIVOT_MAX_TRADES_PER_DAY": 3,
     "PIVOT_MIN_ROOM_R": 1.0,
-    "PIVOT_MIN_TODAY_CANDLES": 3,
+    "PIVOT_MIN_TODAY_CANDLES": 4,
     "PIVOT_MODE": "BOTH",
+    "PIVOT_NO_FRIDAY": true,
+    "PIVOT_NO_NEW_ENTRY_AFTER": "14:00",
     "PIVOT_OD_FIRST_CANDLE_CONFIRM": true,
     "PIVOT_OD_MAX_FIRST_WICK_ATR": 0.25,
     "PIVOT_OD_MIN_GAP_ATR": 0.4,
@@ -201,7 +204,7 @@
     "REGIME_VIX_OVERRIDE": 0.0,
     "SMART_ENTRY_15M_MAX_GAP_PTS": 150.0,
     "SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES": "{'NATR'}",
-    "SMART_ENTRY_COOLDOWN_CANDLES": 1,
+    "SMART_ENTRY_COOLDOWN_CANDLES": 2,
     "SMART_ENTRY_GAP_CLOSE_RATE": 15.0,
     "SMART_ENTRY_MAX_PREMIUM_EXTENSION_PCT": 1.0,
     "SMART_ENTRY_MIN_BODY_ATR_RATIO": 0.35,
@@ -246,6 +249,7 @@
     "USE_SPOT_ATR_RISK": true,
     "USE_SWING_SL": true,
     "USE_TRAILING_STOP_EXIT": true,
+    "VWAP_CROSS_EXIT": true,
     "VWAP_LEVEL_MIN_ROOM_ATR": 1.0,
     "VWAP_LEVEL_USE_DAY_EXTREMES": true,
     "VWAP_LEVEL_USE_PIVOTS": true,
@@ -257,7 +261,7 @@
   },
   "model": {
     "tick_path": "1m bar -> O,L,H,C (up) / O,H,L,C (down)",
-    "option_pricing": "Black-Scholes, IV = India VIX (minute), r = 6.5%",
+    "option_pricing": "Black-Scholes in trading time (weeknight = 176 min, weekend = 609 min), IV = India VIX (minute), r = 6.5%",
     "expiry_schedule": [
       [
         "2000-01-01",

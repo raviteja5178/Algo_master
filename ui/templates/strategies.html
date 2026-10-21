@@ -326,6 +326,28 @@
     </ul>
   </div>
 
+  <!-- Expiry Iron Butterfly Card -->
+  <div class="card">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="card-title">&#x1F98B; Expiry Iron Butterfly</span>
+        <span class="pill" style="background:rgba(99,102,241,0.1);color:#6366f1;border:1px solid rgba(99,102,241,0.25);">SHADOW Only &middot; Expiry Day</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="chk-ENABLE_EXPIRY_FLY" onchange="toggleStrategy('ENABLE_EXPIRY_FLY', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-desc">Sells ATM CE + ATM PE and buys wings <span id="fly-wing">1000</span> pts out at <span id="fly-entry">10:30</span> AM on SENSEX weekly expiry day. Premium decay strategy running exclusively in SHADOW mode to validate real live bid/ask spreads vs Black-Scholes pricing.</div>
+    <ul class="feature-list">
+      <li>Legs: Short ATM CE + Short ATM PE | Long CE + Long PE at ATM &plusmn; <span id="fly-wing2">1000</span> pts</li>
+      <li>Entry Time: <span id="fly-entry2">10:30</span> AM IST on weekly expiry sessions</li>
+      <li>Stop Loss: <span id="fly-stop">50</span>% loss of total collected credit (monitored on mid prices)</li>
+      <li>Exit: <span id="fly-exit">15:10</span> PM IST forced square-off</li>
+      <li>Safety Note: Runs in SHADOW only (multi-leg live execution is safety-locked)</li>
+    </ul>
+  </div>
+
   <div style="text-align:right;">
     <button class="btn btn-save" onclick="saveAll()">Save Configurations</button>
   </div>
@@ -355,6 +377,7 @@
       document.getElementById('chk-ENABLE_NATR_STRATEGY').checked          = (_config.ENABLE_NATR_STRATEGY          === 'true');
       document.getElementById('chk-ENABLE_ATR_COPILOT_STRATEGY').checked   = (_config.ENABLE_ATR_COPILOT_STRATEGY   === 'true');
       document.getElementById('chk-ENABLE_PIVOT_STRATEGY').checked         = (_config.ENABLE_PIVOT_STRATEGY         === 'true');
+      document.getElementById('chk-ENABLE_EXPIRY_FLY').checked             = (_config.ENABLE_EXPIRY_FLY             === 'true');
 
       // Populate Pivot Sustain parameter display values
       const _pv = (k, id, f) => { if (_config[k]) document.getElementById(id).textContent = f ? f(_config[k]) : _config[k]; };
@@ -402,6 +425,22 @@
       if (_config.ATR_COPILOT_BAND_MULT)    document.getElementById('atr-cop-mult').textContent     = _config.ATR_COPILOT_BAND_MULT;
       if (_config.ATR_COPILOT_MIN_RR)       document.getElementById('atr-cop-rr').textContent       = _config.ATR_COPILOT_MIN_RR;
       if (_config.ATR_COPILOT_LONG_MIN_RR)  document.getElementById('atr-cop-long-rr').textContent  = _config.ATR_COPILOT_LONG_MIN_RR;
+
+      // Populate Expiry Iron Fly parameter display values
+      if (_config.FLY_WING_POINTS) {
+        ['fly-wing', 'fly-wing2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = _config.FLY_WING_POINTS; });
+      }
+      if (_config.FLY_ENTRY_TIME) {
+        ['fly-entry', 'fly-entry2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = _config.FLY_ENTRY_TIME; });
+      }
+      if (_config.FLY_STOP_PCT) {
+        const el = document.getElementById('fly-stop');
+        if (el) el.textContent = Math.round(parseFloat(_config.FLY_STOP_PCT) * 100);
+      }
+      if (_config.FLY_EXIT_TIME) {
+        const el = document.getElementById('fly-exit');
+        if (el) el.textContent = _config.FLY_EXIT_TIME;
+      }
     } catch(err) {
       console.error("Failed to load configs", err);
     }
@@ -427,6 +466,7 @@
       ENABLE_NATR_STRATEGY:         document.getElementById('chk-ENABLE_NATR_STRATEGY').checked         ? 'true' : 'false',
       ENABLE_ATR_COPILOT_STRATEGY:  document.getElementById('chk-ENABLE_ATR_COPILOT_STRATEGY').checked  ? 'true' : 'false',
       ENABLE_PIVOT_STRATEGY:        document.getElementById('chk-ENABLE_PIVOT_STRATEGY').checked        ? 'true' : 'false',
+      ENABLE_EXPIRY_FLY:            document.getElementById('chk-ENABLE_EXPIRY_FLY').checked            ? 'true' : 'false',
     };
     try {
       const res = await fetch('/api/env', {

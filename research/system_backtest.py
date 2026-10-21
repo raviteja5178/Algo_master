@@ -71,6 +71,17 @@ VIX_CSV = DATA_DIR / "india_vix_1m_full.csv"
 
 RISK_FREE = 0.065
 EXPIRY_CLOSE = dtime(15, 30)
+SESSION_OPEN = dtime(9, 15)
+SESSION_MIN = 375
+
+# Option time is measured in TRADING time: decay happens during the session,
+# and each close-to-open gap counts as the trading minutes that carry the same
+# SENSEX variance.  Measured on Jan 2024 - Oct 2026 (gap variance / intraday
+# variance x 375): a weeknight ~ 176 minutes, a weekend or holiday ~ 609.
+# Calendar time (the earlier model) put most decay overnight, understating the
+# intraday theta that option buyers pay and option sellers earn.
+WEEKNIGHT_MIN = 176
+WEEKEND_MIN = 609
 
 # SENSEX weekly expiry weekday by period (Mon=0).  BSE moved SENSEX weeklies
 # from Friday to Tuesday on 2025-01-01 and to Thursday on 2025-09-01.  A
@@ -204,6 +215,42 @@ class Contracts:
         self.md = md
         self.by_token: dict[int, dict] = {}
         self.by_symbol: dict[str, dict] = {}
+        self._future_min: dict[tuple[date, date], float] = {}
+        # One year of variance-time: 252 sessions plus the average gap before each.
+        gaps = [self._gap_min(a, b) for a, b in zip(md.sessions, md.sessions[1:])]
+        self.year_min = 252 * (SESSION_MIN + (sum(gaps) / len(gaps) if gaps else WEEKNIGHT_MIN))
+
+    @staticmethod
+    def _gap_min(prev: date, nxt: date) -> float:
+        return WEEKNIGHT_MIN if (nxt - prev).days == 1 else WEEKEND_MIN
+
+    def _sessions_after(self, d: date, until: date) -> list[date]:
+        out = [s for s in self.md.sessions if d < s <= until]
+        last = out[-1] if out else d
+        cur = max(last, self.md.sessions[-1])
+        while cur < until:                      # beyond the data: assume weekdays trade
+            cur += timedelta(days=1)
+            if cur.weekday() < 5 and cur > last:
+                out.append(cur)
+        return out
+
+    def trading_years(self, at: datetime, expiry: date) -> float:
+        """Variance-time to expiry (15:30) in years."""
+        today = at.date()
+        if expiry < today:
+            return 0.0
+        close = _REAL_DATETIME.combine(today, EXPIRY_CLOSE)
+        opened = _REAL_DATETIME.combine(today, SESSION_OPEN)
+        mins = max(0.0, (close - max(at, opened)).total_seconds() / 60)
+        key = (today, expiry)
+        fut = self._future_min.get(key)
+        if fut is None:
+            fut, prev = 0.0, today
+            for s in self._sessions_after(today, expiry):
+                fut += self._gap_min(prev, s) + SESSION_MIN
+                prev = s
+            self._future_min[key] = fut
+        return (mins + fut) / self.year_min
 
     def expiry_weekday(self, d: date) -> int:
         wd = EXPIRY_SCHEDULE[0][1]
@@ -246,8 +293,7 @@ class Contracts:
 
     def premium(self, c: dict, spot: float, at: datetime) -> float:
         """Premium of contract *c* at naive-IST time *at* with SENSEX at *spot*."""
-        exp_dt = _REAL_DATETIME.combine(c["expiry"], EXPIRY_CLOSE)
-        years = max((exp_dt - at).total_seconds(), 0.0) / (365.0 * 86400)
+        years = self.trading_years(at, c["expiry"])
         vol = self.md.vix_at(at) / 100.0
         return tick_round(bs_price(spot, c["strike"], years, vol, c["instrument_type"]))
 
@@ -560,7 +606,9 @@ def run(md: MarketData, start: date, end: date, overrides: dict[str, str], out_d
         "settings": {k: (v if isinstance(v, (int, float, str, bool)) or v is None else str(v))
                      for k in snap_keys for v in [getattr(settings, k)]},
         "model": {"tick_path": "1m bar -> O,L,H,C (up) / O,H,L,C (down)",
-                  "option_pricing": "Black-Scholes, IV = India VIX (minute), r = 6.5%",
+                  "option_pricing": "Black-Scholes in trading time (weeknight = "
+                                    f"{WEEKNIGHT_MIN} min, weekend = {WEEKEND_MIN} min), "
+                                    "IV = India VIX (minute), r = 6.5%",
                   "expiry_schedule": [(str(d), w) for d, w in EXPIRY_SCHEDULE]},
     }
     (out_dir / "run_meta.json").write_text(json.dumps(meta, indent=2, default=str), encoding="utf-8")

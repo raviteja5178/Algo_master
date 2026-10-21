@@ -26,13 +26,13 @@ echo.
 
 :: ── Start the UI dashboard in a separate background window ───────────────────
 echo [%date% %time%] Starting UI dashboard...
-start "SENSEX UI [Dashboard]" /min cmd /c "cd /d "%~dp0" && python ui\app.py"
+start "SENSEX UI [Dashboard]" /min cmd /c "cd /d "%~dp0" && py ui\app.py"
 timeout /t 2 /nobreak >nul
 
 :: ── Start the trading bot (persistent, auto-restart) in this window ───────────
 echo [%date% %time%] Starting trading bot (auto-restart active)...
 echo.
-python run_bot.py
+py run_bot.py
 
 :: ── If run_bot.py exits (should not happen), pause so the window stays open ──
 echo.

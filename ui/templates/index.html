@@ -1042,6 +1042,23 @@
             </div>
           </div>
 
+          <!-- Expiry Iron Butterfly (SHADOW only) -->
+          <div class="card" style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                  <span style="font-weight:700;font-size:13px">&#x1F98B; Expiry Iron Butterfly</span>
+                  <span class="pill" style="background:rgba(99,102,241,0.15);color:#818cf8;border:1px solid rgba(99,102,241,0.3);font-size:9px">SHADOW Only &middot; Expiry Day</span>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Sells ATM CE + ATM PE and buys wings 1000 pts out at 10:30 AM on Thursday expiry days. 50% credit SL / 15:10 exit. Non-directional theta decay research running exclusively in SHADOW mode.</div>
+              </div>
+              <label class="st-switch">
+                <input type="checkbox" id="st-ENABLE_EXPIRY_FLY" onchange="stToggle('ENABLE_EXPIRY_FLY',this.checked)">
+                <span class="st-slider"></span>
+              </label>
+            </div>
+          </div>
+
           <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
             <button class="btn btn-blue" onclick="stSaveAll()" style="padding:6px 16px">💾 Save</button>
             <span id="st-save-msg" style="font-size:10px;color:var(--green);display:none">&#10003; Saved</span>
@@ -2029,6 +2046,13 @@ const FIELDS=[
   {key:'PIVOT_T1_LOCK_PCT',label:'Pivot T1 Lock %',type:'number'},
   {key:'PIVOT_TRAIL_ATR_MULT',label:'Pivot Trail ATR Mult',type:'number'},
   {key:'PIVOT_MAX_TRADES_PER_DAY',label:'Pivot Max Trades/Day',type:'number'},
+  {key:'ENABLE_EXPIRY_FLY',label:'Expiry Iron Butterfly (SHADOW)',type:'select',options:['false','true']},
+  {key:'FLY_ENTRY_TIME',label:'Fly Entry Time',type:'text'},
+  {key:'FLY_EXIT_TIME',label:'Fly Exit Time',type:'text'},
+  {key:'FLY_WING_POINTS',label:'Fly Wing Points',type:'number'},
+  {key:'FLY_STOP_PCT',label:'Fly Stop % (Loss of Credit)',type:'number'},
+  {key:'FLY_QUANTITY',label:'Fly Quantity',type:'number'},
+  {key:'FLY_MIN_CREDIT',label:'Fly Min Credit Pts',type:'number'},
   {key:'SMART_ENTRY_MIN_BODY_ATR_RATIO',label:'Entry: Min Body/ATR',type:'number'},
   {key:'SMART_ENTRY_REQUIRE_EMA_SLOPE',label:'Entry: Req EMA Slope',type:'select',options:['false','true']},
   {key:'SMART_ENTRY_COOLDOWN_CANDLES',label:'Entry: Cooldown Candles',type:'number'},
@@ -2168,7 +2192,7 @@ pollOptLtp();setInterval(pollOptLtp,2000);
 poll();setInterval(poll,3000);
 
 // ── Strategies panel ─────────────────────────────────────────
-const ST_KEYS=['ENABLE_EMA_STRATEGY','ENABLE_ORB_STRATEGY','ENABLE_TRB_STRATEGY','ENABLE_OB_STRATEGY','ENABLE_MOMENTUM_PHASE','ENABLE_VWAP_STRATEGY','ENABLE_CE_VWAP','ENABLE_PE_VWAP','ENABLE_PDHL_STRATEGY','ENABLE_NATR_STRATEGY','ENABLE_ATR_COPILOT_STRATEGY','ENABLE_PIVOT_STRATEGY'];
+const ST_KEYS=['ENABLE_EMA_STRATEGY','ENABLE_ORB_STRATEGY','ENABLE_TRB_STRATEGY','ENABLE_OB_STRATEGY','ENABLE_MOMENTUM_PHASE','ENABLE_VWAP_STRATEGY','ENABLE_CE_VWAP','ENABLE_PE_VWAP','ENABLE_PDHL_STRATEGY','ENABLE_NATR_STRATEGY','ENABLE_ATR_COPILOT_STRATEGY','ENABLE_PIVOT_STRATEGY','ENABLE_EXPIRY_FLY'];
 let _stLoaded=false;
 async function loadStrategies(){if(_stLoaded)return;try{const env=await fetch('/api/env').then(r=>r.json());_envCache=env;ST_KEYS.forEach(k=>{const el=document.getElementById('st-'+k);if(el)el.checked=(k==='ENABLE_CE_VWAP'||k==='ENABLE_PE_VWAP'||k==='ENABLE_EMA_STRATEGY')?(env[k]!=='false'):(env[k]==='true');});_stLoaded=true;}catch(e){console.error('loadStrategies:',e);}}
 function stToggle(key,val){/* state held in checkbox — no extra cache needed */}

@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 import threading
 from collections.abc import Sequence
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from utils.time_utils import today_ist
 from strategies.trend_gate import daily_trend_ok, strategy_key, trend_15m_ok
 from typing import Literal
@@ -494,24 +494,27 @@ def evaluate_signals(
             pass   # bad config — fail open (allow ORB)
 
     if settings.ENABLE_ORB_STRATEGY and _orb_cutoff_ok and not _skip_on_monday and not _candle_already_attempted():
-        from strategies.orb_strategy import is_orb_ce_signal, is_orb_pe_signal
+        if settings.ORB_NO_THURSDAY and latest_5m_ts.weekday() == 3:
+            log_event(logger, "ORB_BLOCKED_THURSDAY", candle=latest_5m_ts)
+        else:
+            from strategies.orb_strategy import is_orb_ce_signal, is_orb_pe_signal
 
-        _orb_15m = candles_15m_orb if candles_15m_orb is not None else candles_15m
-        _orb_kwargs = dict(
-            min_body_ratio=settings.ORB_MIN_BODY_RATIO,
-            buffer_atr_mult=settings.ORB_BUFFER_ATR_MULT,
-            require_15m_trend=settings.ORB_REQUIRE_15M_TREND,
-        )
+            _orb_15m = candles_15m_orb if candles_15m_orb is not None else candles_15m
+            _orb_kwargs = dict(
+                min_body_ratio=settings.ORB_MIN_BODY_RATIO,
+                buffer_atr_mult=settings.ORB_BUFFER_ATR_MULT,
+                require_15m_trend=settings.ORB_REQUIRE_15M_TREND,
+            )
 
-        if is_orb_ce_signal(candles_5m, _orb_15m, **_orb_kwargs):
-            log_event(logger, "CE_ORB_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("CE_ORB")) is not None:
-                return sig
+            if is_orb_ce_signal(candles_5m, _orb_15m, **_orb_kwargs):
+                log_event(logger, "CE_ORB_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
+                if (sig := _gate("CE_ORB")) is not None:
+                    return sig
 
-        if not _candle_already_attempted() and is_orb_pe_signal(candles_5m, _orb_15m, **_orb_kwargs):
-            log_event(logger, "PE_ORB_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("PE_ORB")) is not None:
-                return sig
+            if not _candle_already_attempted() and is_orb_pe_signal(candles_5m, _orb_15m, **_orb_kwargs):
+                log_event(logger, "PE_ORB_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
+                if (sig := _gate("PE_ORB")) is not None:
+                    return sig
 
     # ── Pivot Sustain strategy ─────────────────────────────────────────────────
     # Own risk engine — deliberately bypasses SmartEntry (the sustain + room
@@ -529,66 +532,78 @@ def evaluate_signals(
         # mid-day restart does not reset the max-trades guard to 0.
         _seed_pivot_count(_day)
         if _pivot_trades_today.get(_day, 0) < settings.PIVOT_MAX_TRADES_PER_DAY:
-            _accept_on = settings.PIVOT_ACCEPTANCE
-            if (
-                _accept_on
-                and intraday_regime
-                and intraday_regime.upper() in settings.PIVOT_ACCEPT_BLOCK_REGIMES
+            # ── Pivot-specific time and day gates ──────────────────────────
+            if settings.PIVOT_NO_FRIDAY and latest_5m_ts.weekday() == 4:
+                log_event(logger, "PIVOT_BLOCKED_FRIDAY", candle=latest_5m_ts)
+            elif (
+                settings.PIVOT_NO_NEW_ENTRY_AFTER
+                and (latest_5m_ts + timedelta(minutes=5)).time()
+                    >= _parse_time(settings.PIVOT_NO_NEW_ENTRY_AFTER)
             ):
-                _accept_on = False
-                log_event(logger, "PIVOT_ACCEPT_BLOCKED_REGIME",
-                          candle=latest_5m_ts, regime=intraday_regime)
-            setup = find_pivot_setup(
-                candles_5m, pivot_levels,
-                sustain_candles=settings.PIVOT_SUSTAIN_CANDLES,
-                atr_period=settings.PIVOT_ATR_PERIOD,
-                sl_mode=settings.PIVOT_SL_MODE,
-                sl_atr_mult=settings.PIVOT_SL_ATR_MULT,
-                sl_buffer_atr=settings.PIVOT_SL_BUFFER_ATR,
-                min_room_r=settings.PIVOT_MIN_ROOM_R,
-                min_today_candles=settings.PIVOT_MIN_TODAY_CANDLES,
-                pivot_mode=settings.PIVOT_MODE,
-                od_window_start=_parse_time(settings.PIVOT_OD_WINDOW_START),
-                od_window_end=_parse_time(settings.PIVOT_OD_WINDOW_END),
-                rejection_zone_atr=settings.PIVOT_REJECTION_ZONE_ATR,
-                min_od_gap_atr=settings.PIVOT_OD_MIN_GAP_ATR,
-                first_candle_confirm=settings.PIVOT_OD_FIRST_CANDLE_CONFIRM,
-                max_first_wick_atr=settings.PIVOT_OD_MAX_FIRST_WICK_ATR,
-                enable_acceptance=_accept_on,
-                acceptance_min_dist_atr=settings.PIVOT_ACCEPT_MIN_DIST_ATR,
-                acceptance_min_room_r=settings.PIVOT_ACCEPT_MIN_ROOM_R,
-                acceptance_blocked_sides=_pivot_accept_blocked_sides(_day),
-                bounce_zone_atr=settings.PIVOT_BOUNCE_ZONE_ATR,
-                bounce_min_range_atr=settings.PIVOT_BOUNCE_MIN_RANGE_ATR,
-                bounce_min_wick_pct=settings.PIVOT_BOUNCE_MIN_WICK_PCT,
-                bounce_trend_ema=settings.PIVOT_BOUNCE_TREND_EMA,
-                bounce_confirm_next=settings.PIVOT_BOUNCE_CONFIRM_NEXT,
-            )
-            if setup is not None:
-                sig_name = f"{setup.side}_PIVOT"
-                log_event(logger, f"{sig_name}_SIGNAL", candle=latest_5m_ts,
-                          mode=setup.mode, entry=setup.entry,
-                          stop=setup.stop, risk=setup.risk,
-                          t1=setup.t1, t2=setup.t2, t3=setup.t3, atr=setup.atr)
-                # Global per-side cap also applies to pivot signals.
-                if (_side_blk := side_block_reason(setup.side, _day)):
-                    log_event(logger, "GLOBAL_SIDE_CAP_BLOCKED",
-                              signal=sig_name, side=setup.side, reason=_side_blk)
-                else:
-                    sig_id = _signal_id(sig_name, latest_5m_ts)
-                    # Atomically claim the pivot signal — same race-condition guard as
-                    # _gate().  claim_signal_atomic returns True only for the first
-                    # writer, so a concurrent bot process that races here is blocked.
-                    if claim_signal_atomic(sig_id, sig_name, latest_5m_ts.isoformat()):
-                        _candle_attempted = True
-                        if setup.mode == "ACCEPTANCE":
-                            _k = (_day, setup.side)
-                            _pivot_accept_count[_k] = _pivot_accept_count.get(_k, 0) + 1
-                        # FIX (Flaw 15): write setup under the lock so consume_pivot_setup()
-                        # in execute_entry always sees a consistent value.
-                        with _pivot_setup_lock:
-                            _last_pivot_setup = setup
-                        return sig_name  # type: ignore[return-value]
+                log_event(logger, "PIVOT_BLOCKED_TIME",
+                          candle=latest_5m_ts, after=settings.PIVOT_NO_NEW_ENTRY_AFTER)
+            else:
+                # ── end pivot gates ─────────────────────────────────────────
+                _accept_on = settings.PIVOT_ACCEPTANCE
+                if (
+                    _accept_on
+                    and intraday_regime
+                    and intraday_regime.upper() in settings.PIVOT_ACCEPT_BLOCK_REGIMES
+                ):
+                    _accept_on = False
+                    log_event(logger, "PIVOT_ACCEPT_BLOCKED_REGIME",
+                              candle=latest_5m_ts, regime=intraday_regime)
+                setup = find_pivot_setup(
+                    candles_5m, pivot_levels,
+                    sustain_candles=settings.PIVOT_SUSTAIN_CANDLES,
+                    atr_period=settings.PIVOT_ATR_PERIOD,
+                    sl_mode=settings.PIVOT_SL_MODE,
+                    sl_atr_mult=settings.PIVOT_SL_ATR_MULT,
+                    sl_buffer_atr=settings.PIVOT_SL_BUFFER_ATR,
+                    min_room_r=settings.PIVOT_MIN_ROOM_R,
+                    min_today_candles=settings.PIVOT_MIN_TODAY_CANDLES,
+                    pivot_mode=settings.PIVOT_MODE,
+                    od_window_start=_parse_time(settings.PIVOT_OD_WINDOW_START),
+                    od_window_end=_parse_time(settings.PIVOT_OD_WINDOW_END),
+                    rejection_zone_atr=settings.PIVOT_REJECTION_ZONE_ATR,
+                    min_od_gap_atr=settings.PIVOT_OD_MIN_GAP_ATR,
+                    first_candle_confirm=settings.PIVOT_OD_FIRST_CANDLE_CONFIRM,
+                    max_first_wick_atr=settings.PIVOT_OD_MAX_FIRST_WICK_ATR,
+                    enable_acceptance=_accept_on,
+                    acceptance_min_dist_atr=settings.PIVOT_ACCEPT_MIN_DIST_ATR,
+                    acceptance_min_room_r=settings.PIVOT_ACCEPT_MIN_ROOM_R,
+                    acceptance_blocked_sides=_pivot_accept_blocked_sides(_day),
+                    bounce_zone_atr=settings.PIVOT_BOUNCE_ZONE_ATR,
+                    bounce_min_range_atr=settings.PIVOT_BOUNCE_MIN_RANGE_ATR,
+                    bounce_min_wick_pct=settings.PIVOT_BOUNCE_MIN_WICK_PCT,
+                    bounce_trend_ema=settings.PIVOT_BOUNCE_TREND_EMA,
+                    bounce_confirm_next=settings.PIVOT_BOUNCE_CONFIRM_NEXT,
+                )
+                if setup is not None:
+                    sig_name = f"{setup.side}_PIVOT"
+                    log_event(logger, f"{sig_name}_SIGNAL", candle=latest_5m_ts,
+                              mode=setup.mode, entry=setup.entry,
+                              stop=setup.stop, risk=setup.risk,
+                              t1=setup.t1, t2=setup.t2, t3=setup.t3, atr=setup.atr)
+                    # Global per-side cap also applies to pivot signals.
+                    if (_side_blk := side_block_reason(setup.side, _day)):
+                        log_event(logger, "GLOBAL_SIDE_CAP_BLOCKED",
+                                  signal=sig_name, side=setup.side, reason=_side_blk)
+                    else:
+                        sig_id = _signal_id(sig_name, latest_5m_ts)
+                        # Atomically claim the pivot signal — same race-condition guard as
+                        # _gate().  claim_signal_atomic returns True only for the first
+                        # writer, so a concurrent bot process that races here is blocked.
+                        if claim_signal_atomic(sig_id, sig_name, latest_5m_ts.isoformat()):
+                            _candle_attempted = True
+                            if setup.mode == "ACCEPTANCE":
+                                _k = (_day, setup.side)
+                                _pivot_accept_count[_k] = _pivot_accept_count.get(_k, 0) + 1
+                            # FIX (Flaw 15): write setup under the lock so consume_pivot_setup()
+                            # in execute_entry always sees a consistent value.
+                            with _pivot_setup_lock:
+                                _last_pivot_setup = setup
+                            return sig_name  # type: ignore[return-value]
 
     # ── VWAP Retest strategy ───────────────────────────────────────────────────
     # VWAP_NO_NEW_ENTRY_AFTER: afternoon VWAP crosses are mostly chop + theta

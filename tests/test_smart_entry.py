@@ -691,13 +691,14 @@ class TestBounceExemptStrategies:
         # CE_VWAP should be blocked when exemption is explicitly disabled
         assert flt.allow("CE_VWAP", candles) is False
 
-    def test_default_exempt_set_includes_vwap_and_natr(self) -> None:
-        """Default SmartEntryFilter exempt set is VWAP and NATR (body bypass)."""
+    def test_default_exempt_set_includes_vwap_natr_orb(self) -> None:
+        """Default SmartEntryFilter exempt set is VWAP, NATR, and ORB (body bypass)."""
         flt = SmartEntryFilter(min_body_atr_ratio=0.5)  # no bounce_exempt_strategies → default
         candles = _candles_with_body_and_atr(body=1, atr_range=20)
         assert flt.allow("CE_VWAP", candles) is True
         assert flt.allow("PE_NATR", candles) is True
-        # EMA/ORB are NOT in default exempt set
+        assert flt.allow("CE_ORB", candles) is True
+        # EMA is NOT in default exempt set
         assert flt.allow("CE_EMA", candles) is False
 
 

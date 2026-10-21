@@ -171,9 +171,8 @@ class SmartEntryFilter:
                                           0 = disabled.
     structure_bypass_ema_confirm: bool  — when structure bypass is active, still require
                                           EMA9 slope alignment as a minimum confirmation.
-    bounce_exempt_strategies   : set    — strategy names (e.g. {'NATR','VWAP'}) that skip
-                                          the 15m trend / gap-widening filters. These
-                                          strategies trade bounces/retests, not trends.
+    bounce_exempt_strategies   : set    — strategy names (e.g. {'NATR','VWAP','ORB'}) that skip
+                                          the body/ATR and EMA gap filters.
     slope_exempt_strategies    : set    — strategy names that skip the EMA9 slope filter.
     squeeze_exempt_strategies  : set    — strategy names that are EXCLUDED from the squeeze
                                           bypass even when squeeze_bypass=True. Use this for
@@ -219,7 +218,7 @@ class SmartEntryFilter:
         self._structure_bypass_n = max(0, structure_bypass_candles)
         self._structure_bypass_ema_confirm = structure_bypass_ema_confirm
         # None → documented defaults; an explicit empty set disables the exemption.
-        self._bounce_exempt      = {"VWAP", "NATR"} if bounce_exempt_strategies is None else set(bounce_exempt_strategies)
+        self._bounce_exempt      = {"VWAP", "NATR", "ORB"} if bounce_exempt_strategies is None else set(bounce_exempt_strategies)
         self._slope_exempt       = {"NATR"} if slope_exempt_strategies is None else set(slope_exempt_strategies)
         # Strategies excluded from squeeze bypass — defaults to same set as bounce_exempt
         # because bounce/retest setups should never be accelerated by a squeeze signal.

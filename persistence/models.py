@@ -79,6 +79,31 @@ CREATE TABLE IF NOT EXISTS order_actions (
     status              TEXT NOT NULL DEFAULT 'SENT',
     created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
+
+-- Expiry-day iron butterfly (SHADOW).  One row per expiry day; legs are JSON.
+CREATE TABLE IF NOT EXISTS fly_trades (
+    day                 TEXT PRIMARY KEY,        -- YYYY-MM-DD (IST), one fly per day
+    status              TEXT NOT NULL,           -- OPEN | CLOSED | SKIPPED
+    mode                TEXT NOT NULL,
+    expiry              TEXT,
+    entry_time          TEXT,
+    spot_entry          REAL,
+    vix_entry           REAL,
+    legs                TEXT,                    -- JSON: symbol/strike/type/side/entry_px/bid/ask/last
+    quantity            INTEGER,
+    credit              REAL,                    -- net credit per unit at the simulated fills
+    credit_mid          REAL,                    -- same, at mid prices (compare with the model)
+    stop_value          REAL,                    -- buy-back cost that triggers the stop
+    exit_time           TEXT,
+    exit_reason         TEXT,                    -- STOP | TIME | TIME_STALE
+    exit_legs           TEXT,                    -- JSON: symbol/exit_px
+    exit_value          REAL,
+    gross_pnl           REAL,
+    charges             REAL,
+    net_pnl             REAL,
+    peak_value          REAL,                    -- highest buy-back cost seen (worst point)
+    note                TEXT
+);
 """
 
 
@@ -531,3 +556,33 @@ def fetch_today_side_trade_count(side: str, day: str) -> int:
             (prefix, f"{day}%", f"{day}%"),
         ).fetchone()
     return int(row[0]) if row else 0
+
+
+# ── Expiry-day iron butterfly (SHADOW) ─────────────────────────────────────────
+
+def fly_get(day: str) -> dict | None:
+    with _conn() as con:
+        row = con.execute("SELECT * FROM fly_trades WHERE day = ?", (day,)).fetchone()
+        return dict(row) if row else None
+
+
+def fly_insert(row: dict) -> bool:
+    """Insert a day's fly row. False if that day already has one (restart-safe)."""
+    cols = ", ".join(row)
+    marks = ", ".join(f":{k}" for k in row)
+    with _conn() as con:
+        cur = con.execute(f"INSERT OR IGNORE INTO fly_trades ({cols}) VALUES ({marks})", row)
+        return cur.rowcount == 1
+
+
+def fly_update(day: str, fields: dict) -> None:
+    if not fields:
+        return
+    sets = ", ".join(f"{k} = :{k}" for k in fields)
+    with _conn() as con:
+        con.execute(f"UPDATE fly_trades SET {sets} WHERE day = :_day", {**fields, "_day": day})
+
+
+def fly_all() -> list[dict]:
+    with _conn() as con:
+        return [dict(r) for r in con.execute("SELECT * FROM fly_trades ORDER BY day")]
