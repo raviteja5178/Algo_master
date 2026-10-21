@@ -218,7 +218,7 @@ EMA_PULLBACK_TOL_PTS: float  = _getfloat("EMA_PULLBACK_TOL_PTS", 10.0)
 # EMA_SKIP_SMART_FILTERS: true = EMA CE/PE bypass SmartEntry candle filters
 #   (body/ATR, EMA9 slope, EMA gap, gap widening, 15m trend) — the rule-set has its
 #   own trend + RSI logic. Post-loss cooldown and premium-extension guard still apply.
-EMA_SKIP_SMART_FILTERS: bool = _getbool("EMA_SKIP_SMART_FILTERS", True)
+EMA_SKIP_SMART_FILTERS: bool = _getbool("EMA_SKIP_SMART_FILTERS", False)
 # EMA_OPTION_EMA_CHECK: true = only buy when option premium > EMA9 of the option's
 #   own 5m chart. Skipped in PAPER mode (no option data). Fails open on data errors.
 EMA_OPTION_EMA_CHECK: bool   = _getbool("EMA_OPTION_EMA_CHECK", True)
