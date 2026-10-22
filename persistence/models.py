@@ -188,20 +188,43 @@ def upsert_trade(row: dict) -> None:
             con.execute(sql, row)
 
 
-def fetch_active_trade() -> dict | None:
+def _strategy_types(strategy_key: str) -> tuple[str, str]:
+    """Trade ``strategy_type`` values owned by a strategy key ('EMA' = plain CE/PE)."""
+    if strategy_key == "EMA":
+        return ("CE", "PE")
+    return (f"CE_{strategy_key}", f"PE_{strategy_key}")
+
+
+def fetch_active_trade(strategy_key: str | None = None) -> dict | None:
     """Return the most recent OPEN or PENDING trade, or None.
+
+    With *strategy_key* (e.g. 'ORB', 'EMA') only that strategy's trades count,
+    so one strategy's open position never blocks another strategy's entry.
 
     PENDING rows are written atomically by claim_entry_slot_atomic() before
     the order is placed, so a concurrent process that races through the
     fetch_active_trade() check will see the row and block itself even if
     the first process hasn't received a fill yet.
     """
+    sql = "SELECT * FROM trades WHERE status IN ('OPEN','PENDING')"
+    params: tuple = ()
+    if strategy_key:
+        sql += " AND strategy_type IN (?, ?)"
+        params = _strategy_types(strategy_key)
+    sql += " ORDER BY created_at DESC LIMIT 1"
     with _conn() as con:
-        row = con.execute(
-            "SELECT * FROM trades WHERE status IN ('OPEN','PENDING') "
-            "ORDER BY created_at DESC LIMIT 1"
-        ).fetchone()
+        row = con.execute(sql, params).fetchone()
     return dict(row) if row else None
+
+
+def fetch_active_trades() -> list[dict]:
+    """Return every OPEN or PENDING trade (one per running strategy), oldest first."""
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT * FROM trades WHERE status IN ('OPEN','PENDING') "
+            "ORDER BY created_at ASC"
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def claim_entry_slot_atomic(trade_id: str, signal_type: str,

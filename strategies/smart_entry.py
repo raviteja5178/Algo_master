@@ -206,6 +206,9 @@ class SmartEntryFilter:
         self._require_slope      = require_ema_slope
         self._cooldown_max       = max(0, cooldown_candles)
         self._cooldown_left: int = 0
+        # Per-strategy post-loss cooldowns ('ORB', 'EMA', ...): a loss in one
+        # strategy must not stop the others from trading.
+        self._strategy_cooldown: dict[str, int] = {}
         self._min_ema_gap        = min_ema_gap_pts
         self._gap_close_rate     = max(0.0, gap_close_rate)
         self._require_gap_wide   = require_ema_gap_widening
@@ -283,20 +286,29 @@ class SmartEntryFilter:
             day_high = high[1]
         return day_low, day_high
 
-    def on_trade_closed(self, realised_pnl_pts: float) -> None:
+    def on_trade_closed(self, realised_pnl_pts: float, strategy: str | None = None) -> None:
         """
         Call when a trade closes.  A negative P&L (loss) starts the cooldown;
         breakeven or profit resets it immediately.
+
+        With *strategy* ('ORB', 'EMA', ...) the cooldown applies to that strategy
+        only; without it the cooldown is global (blocks every strategy).
         """
         if realised_pnl_pts < 0 and self._cooldown_max > 0:
-            self._cooldown_left = self._cooldown_max
+            if strategy is None:
+                self._cooldown_left = self._cooldown_max
+            else:
+                self._strategy_cooldown[strategy] = self._cooldown_max
             log_event(
                 logger, "SMART_ENTRY_COOLDOWN_STARTED",
                 pnl_pts=round(realised_pnl_pts, 2),
                 cooldown_candles=self._cooldown_max,
+                strategy=strategy,
             )
-        else:
+        elif strategy is None:
             self._cooldown_left = 0
+        else:
+            self._strategy_cooldown.pop(strategy, None)
 
     def on_candle(self) -> None:
         """
@@ -307,6 +319,15 @@ class SmartEntryFilter:
             self._cooldown_left -= 1
             if self._cooldown_left == 0:
                 log_event(logger, "SMART_ENTRY_COOLDOWN_EXPIRED")
+        for key in list(self._strategy_cooldown):
+            self._strategy_cooldown[key] -= 1
+            if self._strategy_cooldown[key] <= 0:
+                del self._strategy_cooldown[key]
+                log_event(logger, "SMART_ENTRY_COOLDOWN_EXPIRED", strategy=key)
+
+    def cooldown_remaining_for(self, strategy: str) -> int:
+        """Candles of post-loss cooldown left for *strategy* (global one included)."""
+        return max(self._cooldown_left, self._strategy_cooldown.get(strategy or "EMA", 0))
 
     # ── Gate ──────────────────────────────────────────────────────────────────
 
@@ -483,11 +504,12 @@ class SmartEntryFilter:
                     return False
 
         # ── Filter 3: post-loss cooldown ──────────────────────────────────────
-        if self._cooldown_left > 0 and not self._structure_bypass(side, candles_5m, direction):
+        _cd_left = self.cooldown_remaining_for(strategy)
+        if _cd_left > 0 and not self._structure_bypass(side, candles_5m, direction):
             log_event(
                 logger, "SMART_ENTRY_BLOCKED_COOLDOWN",
                 direction=direction,
-                candles_remaining=self._cooldown_left,
+                candles_remaining=_cd_left,
             )
             return False
 
@@ -661,8 +683,8 @@ class SmartEntryFilter:
 
     @property
     def cooldown_active(self) -> bool:
-        return self._cooldown_left > 0
+        return self._cooldown_left > 0 or bool(self._strategy_cooldown)
 
     @property
     def cooldown_remaining(self) -> int:
-        return self._cooldown_left
+        return max([self._cooldown_left, *self._strategy_cooldown.values()])

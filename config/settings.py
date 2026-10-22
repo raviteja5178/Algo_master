@@ -1,4 +1,4 @@
-"""
+﻿"""
 Central configuration loaded from environment variables / .env file.
 All trading parameters are read here — no magic numbers anywhere else.
 """
@@ -500,7 +500,7 @@ ORB_QUALIFIER_UNBLOCK_TIME: str  = _get("ORB_QUALIFIER_UNBLOCK_TIME", "13:30")
 # ── Momentum (Phase 2) strategy ───────────────────────────────────────────────
 # When enabled, a second entry path fires during the afternoon breakout window
 # on large-body candles even if close does not exceed the previous candle high.
-ENABLE_MOMENTUM_PHASE: bool = _getbool("ENABLE_MOMENTUM_PHASE", False)
+ENABLE_MOMENTUM_PHASE: bool = _getbool("ENABLE_MOMENTUM_PHASE", True)
 MOMENTUM_MIN_BODY_PTS: float = _getfloat("MOMENTUM_MIN_BODY_PTS", 40.0)
 MOMENTUM_WINDOW_START: str = _get("MOMENTUM_WINDOW_START", "13:30")
 MOMENTUM_WINDOW_END: str   = _get("MOMENTUM_WINDOW_END",   "14:30")
@@ -528,7 +528,7 @@ MOMENTUM_MIN_ROOM_ATR: float           = _getfloat("MOMENTUM_MIN_ROOM_ATR", 0.0)
 # OB_ATR_PERIOD       : ATR period for the size cap (Pine default 10)
 # OB_MAX_BLOCKS       : max OBs to track per side ("Low"=3, "Medium"=5, "High"=10)
 # OB_INVALIDATION     : "Wick" (wick pierces OB bottom/top) or "Close" (close pierces)
-ENABLE_OB_STRATEGY: bool  = _getbool("ENABLE_OB_STRATEGY", False)
+ENABLE_OB_STRATEGY: bool  = _getbool("ENABLE_OB_STRATEGY", True)
 OB_SWING_LENGTH: int      = _getint("OB_SWING_LENGTH", 10)
 OB_MAX_ATR_MULT: float    = _getfloat("OB_MAX_ATR_MULT", 3.5)
 OB_ATR_PERIOD: int        = _getint("OB_ATR_PERIOD", 10)
@@ -548,7 +548,7 @@ OB_INVALIDATION: str      = _get("OB_INVALIDATION", "Wick")
 OB_APPROACH_BUFFER_ATR_MULT: float = _getfloat("OB_APPROACH_BUFFER_ATR_MULT", 0.0)
 
 # ── TRB (Time Range Breakout) strategy ─────────────────────────────────────────
-ENABLE_TRB_STRATEGY: bool      = _getbool("ENABLE_TRB_STRATEGY", False)
+ENABLE_TRB_STRATEGY: bool      = _getbool("ENABLE_TRB_STRATEGY", True)
 TRB_CANDLE_START_TIME: str     = _get("TRB_CANDLE_START_TIME", "09:45")
 TRB_CANDLE_DURATION_MINS: int  = _getint("TRB_CANDLE_DURATION_MINS", 15)
 TRB_MIN_BODY_RATIO: float      = _getfloat("TRB_MIN_BODY_RATIO", 0.0)
@@ -562,7 +562,7 @@ TRB_WINDOW_END: str            = _get("TRB_WINDOW_END", "11:30")
 # ── VWAP Retest strategy ──────────────────────────────────────────────────────
 # Fires CE_VWAP/PE_VWAP when price retests VWAP and bounces back.
 # VWAP is calculated intraday from completed 5m candles (resets at 09:15).
-ENABLE_VWAP_STRATEGY: bool    = _getbool("ENABLE_VWAP_STRATEGY", False)
+ENABLE_VWAP_STRATEGY: bool    = _getbool("ENABLE_VWAP_STRATEGY", True)
 # Enable / disable CE (Call) and PE (Put) VWAP entries independently (default True)
 ENABLE_CE_VWAP: bool          = _getbool("ENABLE_CE_VWAP", True)
 ENABLE_PE_VWAP: bool          = _getbool("ENABLE_PE_VWAP", True)
@@ -668,7 +668,7 @@ PIVOT_BREAKOUT_CONFIRM: bool    = _getbool("PIVOT_BREAKOUT_CONFIRM", False)
 # Has its OWN SL/BE/TSL/target engine (execution/pivot_trade_manager.py) —
 # the generic TSL/target/smart-exit logic is bypassed.
 # Requires ENABLE_PIVOT_LEVELS=true.
-ENABLE_PIVOT_STRATEGY: bool     = _getbool("ENABLE_PIVOT_STRATEGY", False)
+ENABLE_PIVOT_STRATEGY: bool     = _getbool("ENABLE_PIVOT_STRATEGY", True)
 # Entry mode: "OPEN_DIRECTION" | "REJECTION" | "BOTH"
 PIVOT_MODE: str                 = _get("PIVOT_MODE", "BOTH").upper()
 PIVOT_SUSTAIN_CANDLES: int      = _getint("PIVOT_SUSTAIN_CANDLES", 2)
@@ -785,7 +785,7 @@ PIVOT_NO_FRIDAY: bool           = _getbool("PIVOT_NO_FRIDAY", False)
 # ── PDHL (Previous Day High/Low) Breakout strategy ───────────────────────────
 # Fires CE_PDHL/PE_PDHL when price breaks convincingly above PDH or below PDL.
 # PDH/PDL are fetched from Zerodha daily historical data at bot startup.
-ENABLE_PDHL_STRATEGY: bool    = _getbool("ENABLE_PDHL_STRATEGY", False)
+ENABLE_PDHL_STRATEGY: bool    = _getbool("ENABLE_PDHL_STRATEGY", True)
 # Extra buffer beyond PDH/PDL the close must clear to avoid noise breakouts (0 = disabled)
 PDHL_BUFFER_PTS: float        = _getfloat("PDHL_BUFFER_PTS", 0.0)
 
@@ -795,7 +795,7 @@ PDHL_BUFFER_PTS: float        = _getfloat("PDHL_BUFFER_PTS", 0.0)
 # The trailing stop ratchets up in uptrends and down in downtrends; a crossover
 # signals a trend flip.
 # NOTE: This is a SEPARATE strategy from ATR Copilot (band breakout).
-ENABLE_NATR_STRATEGY: bool    = _getbool("ENABLE_NATR_STRATEGY", False)
+ENABLE_NATR_STRATEGY: bool    = _getbool("ENABLE_NATR_STRATEGY", True)
 NATR_PERIOD: int              = _getint("NATR_PERIOD", 21)
 NATR_MULT: float              = _getfloat("NATR_MULT", 3.0)
 
@@ -805,7 +805,7 @@ NATR_MULT: float              = _getfloat("NATR_MULT", 3.0)
 # Bands: EMA(ema_period) ± ATR(atr_period) × band_mult
 # Signal fires on the first bar where price closes outside the band (prev close
 # was inside, current close is outside).
-ENABLE_ATR_COPILOT_STRATEGY: bool  = _getbool("ENABLE_ATR_COPILOT_STRATEGY", False)
+ENABLE_ATR_COPILOT_STRATEGY: bool  = _getbool("ENABLE_ATR_COPILOT_STRATEGY", True)
 ATR_COPILOT_PERIOD: int            = _getint("ATR_COPILOT_PERIOD", 5)
 ATR_COPILOT_EMA_PERIOD: int        = _getint("ATR_COPILOT_EMA_PERIOD", 21)
 ATR_COPILOT_BAND_MULT: float       = _getfloat("ATR_COPILOT_BAND_MULT", 3.0)

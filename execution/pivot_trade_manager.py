@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from pathlib import Path
 
 from utils.logging_config import log_event
@@ -46,6 +47,47 @@ from utils.price_utils import round_to_tick
 logger = logging.getLogger(__name__)
 
 _STATE_FILE = Path(__file__).resolve().parent.parent / ".pivot_trade.json"
+
+# ── Per-trade state files ─────────────────────────────────────────────────────
+# Several strategies can hold a trade of the same manager class at once, so a
+# state file holds {"trades": {trade_id: state}} instead of a single trade.
+_state_io_lock = threading.Lock()
+
+
+def _read_states(path: Path) -> dict[str, dict]:
+    try:
+        d = json.loads(path.read_text())
+    except Exception:
+        return {}
+    if "trade_id" in d:   # legacy single-trade file
+        return {d["trade_id"]: {k: v for k, v in d.items() if k != "trade_id"}}
+    return d.get("trades", {})
+
+
+def save_trade_state(path: Path, trade_id: str, state: dict) -> None:
+    with _state_io_lock:
+        states = _read_states(path)
+        states[trade_id] = state
+        path.write_text(json.dumps({"trades": states}))
+
+
+def load_trade_state(path: Path, trade_id: str) -> dict | None:
+    with _state_io_lock:
+        return _read_states(path).get(trade_id)
+
+
+def clear_trade_state(path: Path, trade_id: str | None = None) -> None:
+    """Drop one trade's state (or the whole file when *trade_id* is None)."""
+    with _state_io_lock:
+        if trade_id is None:
+            path.unlink(missing_ok=True)
+            return
+        states = _read_states(path)
+        states.pop(trade_id, None)
+        if states:
+            path.write_text(json.dumps({"trades": states}))
+        else:
+            path.unlink(missing_ok=True)
 
 # Minimum favourable distance (index pts) below the stop before we trigger.
 # Prevents floating-point epsilon from causing spurious exits near the stop.
@@ -225,25 +267,25 @@ class PivotTradeManager:
     # ── persistence (restart recovery) ────────────────────────────────────────
     def save(self, trade_id: str) -> None:
         try:
-            _STATE_FILE.write_text(json.dumps({"trade_id": trade_id, **self.__dict__}))
+            save_trade_state(_STATE_FILE, trade_id, dict(self.__dict__))
         except Exception as exc:
             logger.warning("Pivot trade state save failed: %s", exc)
 
     @classmethod
     def load(cls, trade_id: str) -> "PivotTradeManager | None":
         try:
-            d = json.loads(_STATE_FILE.read_text())
+            d = load_trade_state(_STATE_FILE, trade_id)
         except Exception:
             return None
-        if d.pop("trade_id", None) != trade_id:
+        if d is None:
             return None
         obj = cls.__new__(cls)
         obj.__dict__.update(d)
         return obj
 
     @staticmethod
-    def clear() -> None:
+    def clear(trade_id: str | None = None) -> None:
         try:
-            _STATE_FILE.unlink(missing_ok=True)
+            clear_trade_state(_STATE_FILE, trade_id)
         except Exception:
             pass

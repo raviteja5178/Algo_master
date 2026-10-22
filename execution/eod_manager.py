@@ -27,7 +27,13 @@ class EODManager:
         self._broker = broker
         self._store = trade_store
         self._force_exit_time = parse_time_ist(settings.FORCE_EXIT_TIME)
-        self._executed_today = False
+        # One entry per trade: strategies run side by side, so an EOD exit of one
+        # trade must never mark another trade's square-off as already done.
+        self._executed_trades: set[str] = set()
+
+    @property
+    def _executed_today(self) -> bool:
+        return bool(self._executed_trades)
 
     def is_force_exit_time(self) -> bool:
         return is_after_or_equal(now_ist().time(), self._force_exit_time)
@@ -45,7 +51,7 @@ class EODManager:
         Force-close the open position and reconcile.
         Returns True if position is confirmed closed.
         """
-        if self._executed_today:
+        if trade_id in self._executed_trades:
             logger.info("EOD exit already executed for %s today.", trade_id)
             return True
 
@@ -93,7 +99,7 @@ class EODManager:
                         trade_id=trade_id, symbol=tradingsymbol,
                         exit_price=exit_price, pnl=pnl, reason="EOD",
                     )
-                    self._executed_today = True
+                    self._executed_trades.add(trade_id)
                     return True
             except Exception as exc:
                 logger.error("EOD exit attempt %d failed: %s", attempt, exc)

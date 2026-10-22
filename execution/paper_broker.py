@@ -44,9 +44,15 @@ class PaperBroker:
 
     # ── Price feed ─────────────────────────────────────────────────────────────
 
-    def update_ltp(self, tradingsymbol: str, ltp: float) -> None:
+    def update_ltp(self, tradingsymbol: str, ltp: float, order_id: str | None = None) -> None:
+        """Record *ltp* and trigger pending stops on the symbol.
+
+        With *order_id* only that stop is checked: PAPER prices each trade off
+        the index with its own mirror, so two trades on one symbol must not
+        trigger each other's stop with the wrong price.
+        """
         self._last_ltp[tradingsymbol] = ltp
-        self._check_stops(tradingsymbol, ltp)
+        self._check_stops(tradingsymbol, ltp, order_id)
 
     # ── Order placement ────────────────────────────────────────────────────────
 
@@ -202,8 +208,10 @@ class PaperBroker:
 
     # ── Internal stop-loss simulation ──────────────────────────────────────────
 
-    def _check_stops(self, tradingsymbol: str, ltp: float) -> None:
+    def _check_stops(self, tradingsymbol: str, ltp: float, only_order_id: str | None = None) -> None:
         for order_id, order in list(self._open_orders.items()):
+            if only_order_id is not None and order_id != only_order_id:
+                continue
             if (
                 order["type"] == "SL"
                 and order["tradingsymbol"] == tradingsymbol

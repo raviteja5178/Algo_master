@@ -569,15 +569,17 @@ def run(md: MarketData, start: date, end: date, overrides: dict[str, str], out_d
                 kite.spot = float(px)
                 handler(SENSEX_TOKEN, float(px))
                 # PAPER has no option feed: the bot prices the option off the index itself.
-                if mode != "PAPER" and ctx.instrument_token and ctx.tradingsymbol in chain.by_symbol:
-                    prem = chain.premium(chain.by_symbol[ctx.tradingsymbol], kite.spot,
-                                         _CLOCK[0].replace(tzinfo=None))
-                    handler(ctx.instrument_token, prem)
+                if mode != "PAPER":
+                    for slot in list(ctx.slots.values()):
+                        if slot.instrument_token and slot.tradingsymbol in chain.by_symbol:
+                            prem = chain.premium(chain.by_symbol[slot.tradingsymbol], kite.spot,
+                                                 _CLOCK[0].replace(tzinfo=None))
+                            handler(slot.instrument_token, prem)
                 if not eod_done and _CLOCK[0].time() >= force_exit:
                     main._run_eod_exit(ctx)
                     eod_done = True
 
-        if ctx.sm.state == State.HALTED:
+        if ctx.is_halted():
             halted_days.append(str(day))
         if n % 20 == 0 or n == len(days):
             print(f"  {n}/{len(days)} sessions  ({day})  {_wall.monotonic() - t0:.0f}s", flush=True)

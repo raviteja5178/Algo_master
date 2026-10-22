@@ -16,12 +16,17 @@ The broker protective SL (option premium) is only a disaster backstop.
 
 from __future__ import annotations
 
-import json
 import logging
 from collections.abc import Sequence
 from pathlib import Path
 
-from execution.pivot_trade_manager import PivotTradeManager, _STOP_EPSILON
+from execution.pivot_trade_manager import (
+    PivotTradeManager,
+    _STOP_EPSILON,
+    clear_trade_state,
+    load_trade_state,
+    save_trade_state,
+)
 from utils.logging_config import log_event
 
 logger = logging.getLogger(__name__)
@@ -147,26 +152,26 @@ class EmaTradeManager(PivotTradeManager):
 
     def save(self, trade_id: str) -> None:
         try:
-            self._state_file().write_text(json.dumps({"trade_id": trade_id, **self.__dict__}))
+            save_trade_state(self._state_file(), trade_id, dict(self.__dict__))
         except Exception as exc:
             logger.warning("%s state save failed: %s", type(self).__name__, exc)
 
     @classmethod
     def load(cls, trade_id: str) -> "EmaTradeManager | None":
         try:
-            d = json.loads(cls._state_file().read_text())
+            d = load_trade_state(cls._state_file(), trade_id)
         except Exception:
             return None
-        if d.pop("trade_id", None) != trade_id:
+        if d is None:
             return None
         obj = cls.__new__(cls)
         obj.__dict__.update(d)
         return obj
 
     @classmethod
-    def clear(cls) -> None:
+    def clear(cls, trade_id: str | None = None) -> None:
         try:
-            cls._state_file().unlink(missing_ok=True)
+            clear_trade_state(cls._state_file(), trade_id)
         except Exception:
             pass
 

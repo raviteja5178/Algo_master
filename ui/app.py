@@ -2004,5 +2004,8 @@ if __name__ == "__main__":
     if not acquire_process_lock("dashboard"):
         print("[FATAL] Another dashboard is already running. Exiting.", flush=True)
         sys.exit(1)
+    # Load .env so DASHBOARD_PORT (and other overrides) are available.
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv(ENV_FILE)
     # Loopback only by default — the dashboard can switch the bot to LIVE.
-    app.run(host=DASHBOARD_HOST, port=5000, debug=False)
+    app.run(host=DASHBOARD_HOST, port=int(os.getenv("DASHBOARD_PORT", "5000")), debug=False)

@@ -290,7 +290,23 @@ def _parse_time(hhmm: str) -> time:
     return time(int(h), int(m))
 
 
-def evaluate_signals(
+def evaluate_signals(*args, **kwargs) -> SignalType:
+    """First valid signal for the latest candle (or None) — see _evaluate_core."""
+    found = _evaluate_core(*args, collect=False, **kwargs)
+    return found[0] if found else None  # type: ignore[return-value]
+
+
+def evaluate_all_signals(*args, **kwargs) -> list[str]:
+    """
+    Every valid signal for the latest candle, one per strategy at most, in
+    strategy priority order.  Strategies run side by side: one strategy firing
+    does not hide another's signal, and the caller decides per strategy whether
+    to enter or (if that strategy already holds a position) to ignore it.
+    """
+    return _evaluate_core(*args, collect=True, **kwargs)
+
+
+def _evaluate_core(
     candles_5m: Sequence[Candle],
     candles_15m: Sequence[Candle],
     candles_15m_orb: Sequence[Candle] | None = None,
@@ -318,22 +334,26 @@ def evaluate_signals(
     option_day_high: float | None = None,
     # Higher-timeframe trend from main ("UP" / "DOWN" / "UNKNOWN" / None)
     daily_trend: str | None = None,
-) -> SignalType:
+    collect: bool = False,
+    busy_strategies: Sequence[str] = (),
+) -> list[str]:
     """
     Evaluate CE and PE rules on the latest completed candles.
 
-    Returns the signal string or None.
-    Only one signal is emitted per completed candle (de-duplication).
-    Phase 1 (standard) is evaluated first; Phase 2 (momentum) only runs if
-    Phase 1 produced no signal for this candle and momentum is enabled.
+    Returns the list of signals found.
+    collect=False: evaluation stops at the first signal (one per candle) and
+    Phase 2 (momentum) only runs if Phase 1 produced no signal for the candle.
+    collect=True : every strategy is evaluated independently (one signal per
+    strategy per candle at most, e.g. CE_ORB and PE_VWAP can both be returned).
 
     smart_entry : optional SmartEntryFilter instance.  When provided, every
     candidate signal is passed through the quality gate before being returned.
     A blocked signal is discarded (None) so the candle can still generate a
     signal from a later strategy phase.
     """
+    found: list[str] = []
     if not candles_5m or not candles_15m:
-        return None
+        return found
 
     latest_5m_ts = candles_5m[-1].timestamp
 
@@ -342,7 +362,7 @@ def evaluate_signals(
     # Never evaluate signals on a candle whose date is not today — that would
     # mean firing on yesterday's EMA state rather than the live session.
     if latest_5m_ts.date() != today_ist():
-        return None
+        return found
 
     # ── ORB Session Qualifier update ───────────────────────────────────────────
     # Feed the qualifier BEFORE any signal evaluation so it can lock the verdict
@@ -369,22 +389,36 @@ def evaluate_signals(
     # strategies on the same candle.  This prevents PE_ORB being blocked by
     # body filter and then PE on the same candle slipping through with a
     # slightly different body measurement.
+    # collect=True: the guard is per strategy instead — each strategy gets its
+    # own attempt (so CE and PE of ONE strategy still cannot both fire).
     _candle_attempted = False
+    # busy_strategies (collect only): strategies that already hold a position are
+    # not evaluated, so they neither claim a signal id nor burn AI/filter calls.
+    _attempted_keys: set[str] = set(busy_strategies) if collect else set()
 
     # Inline helper: apply smart-entry gate if provided, then atomically
     # claim the signal in the DB so no second process can take it.
     # INSERT OR IGNORE means the first writer wins; any concurrent call
     # that races to the same signal_id will get 0 rows inserted and
     # has_processed_signal() will return True, blocking the duplicate.
-    def _gate(sig: str) -> SignalType:
+    def _mark_attempted(key: str) -> None:
         nonlocal _candle_attempted
+        _candle_attempted = True
+        _attempted_keys.add(key)
+
+    def _emit(sig: str) -> bool:
+        """Record an accepted signal; True when evaluation should stop here."""
+        found.append(sig)
+        return not collect
+
+    def _gate(sig: str) -> SignalType:
         sig_id = _signal_id(sig, latest_5m_ts)
         # Fast-path dedup: already taken (by a prior fill or a racing process)
         if has_processed_signal(sig_id):
             return None
         # Mark that this candle has been attempted regardless of Smart Entry outcome.
         # Subsequent strategies on the same candle are blocked even if this one fails.
-        _candle_attempted = True
+        _mark_attempted(strategy_key(sig))
         # ── Global per-side daily cap ──────────────────────────────────────────
         # Derive side from the signal name prefix ("CE" or "PE").
         _sig_side = "CE" if sig.startswith("CE") else "PE"
@@ -393,6 +427,15 @@ def evaluate_signals(
             log_event(logger, "GLOBAL_SIDE_CAP_BLOCKED",
                       signal=sig, side=_sig_side, reason=_side_blk)
             return None
+        # Several strategies can fire on one candle before any fill is counted,
+        # so signals already accepted on this candle count toward the cap too.
+        if collect and settings.MAX_TRADES_PER_SIDE > 0:
+            _pending = sum(1 for s in found if s.startswith(_sig_side))
+            _filled = _side_trades_today.get(_gate_day, {}).get(_sig_side, 0)
+            if _filled + _pending >= settings.MAX_TRADES_PER_SIDE:
+                log_event(logger, "GLOBAL_SIDE_CAP_BLOCKED", signal=sig, side=_sig_side,
+                          reason=f"global {_sig_side} cap reached ({_filled}+{_pending} pending)")
+                return None
         # ── Higher-timeframe trend gate (trend-following strategies only) ──────
         if (settings.TREND_GATE_15M or settings.TREND_GATE_DAILY) \
                 and strategy_key(sig) in settings.TREND_GATE_STRATEGIES:
@@ -410,9 +453,10 @@ def evaluate_signals(
         # rule-set has its own 15m trend + RSI) but keep the post-loss cooldown.
         if smart_entry is not None:
             if sig in ("CE", "PE") and settings.EMA_SKIP_SMART_FILTERS:
-                if smart_entry.cooldown_active:
+                if smart_entry.cooldown_remaining_for("EMA") > 0:
                     log_event(logger, "SMART_ENTRY_BLOCKED_COOLDOWN",
-                              direction=sig, candles_remaining=smart_entry.cooldown_remaining)
+                              direction=sig,
+                              candles_remaining=smart_entry.cooldown_remaining_for("EMA"))
                     return None
             elif not smart_entry.allow(sig, candles_5m, candles_15m=candles_15m):
                 return None
@@ -443,9 +487,9 @@ def evaluate_signals(
             return None
         return sig  # type: ignore[return-value]
 
-    def _candle_already_attempted() -> bool:
-        """True if any strategy already fired (and was blocked or taken) on this candle."""
-        return _candle_attempted
+    def _candle_already_attempted(key: str) -> bool:
+        """True if this candle was already attempted (collect: by this strategy only)."""
+        return (key in _attempted_keys) if collect else _candle_attempted
 
     # ── Session qualifier gate (non-momentum strategies) ───────────────────────
     # When ORB_SESSION_QUALIFIER is on and the ORB was not sustained at 10:00,
@@ -458,7 +502,7 @@ def evaluate_signals(
     )
 
     # ── Order Block (OB) strategy ──────────────────────────────────────────────
-    if settings.ENABLE_OB_STRATEGY and not _sq_blocked and not _candle_already_attempted():
+    if settings.ENABLE_OB_STRATEGY and not _sq_blocked and not _candle_already_attempted("OB"):
         from strategies.ob_strategy import is_ob_ce_signal, is_ob_pe_signal
 
         _ob_kwargs = dict(
@@ -472,13 +516,13 @@ def evaluate_signals(
 
         if is_ob_ce_signal(candles_5m, **_ob_kwargs):
             log_event(logger, "CE_OB_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("CE_OB")) is not None:
-                return sig
+            if (sig := _gate("CE_OB")) is not None and _emit(sig):
+                return found
 
-        if not _candle_already_attempted() and is_ob_pe_signal(candles_5m, **_ob_kwargs):
+        if not _candle_already_attempted("OB") and is_ob_pe_signal(candles_5m, **_ob_kwargs):
             log_event(logger, "PE_OB_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("PE_OB")) is not None:
-                return sig
+            if (sig := _gate("PE_OB")) is not None and _emit(sig):
+                return found
 
     # ── Opening Range Breakout (ORB) strategy ──────────────────────────────────
     # ORB is only valid up to ORB_ACTIVE_UNTIL (default 11:00).
@@ -493,7 +537,7 @@ def evaluate_signals(
         except (ValueError, AttributeError):
             pass   # bad config — fail open (allow ORB)
 
-    if settings.ENABLE_ORB_STRATEGY and _orb_cutoff_ok and not _skip_on_monday and not _candle_already_attempted():
+    if settings.ENABLE_ORB_STRATEGY and _orb_cutoff_ok and not _skip_on_monday and not _candle_already_attempted("ORB"):
         if settings.ORB_NO_THURSDAY and latest_5m_ts.weekday() == 3:
             log_event(logger, "ORB_BLOCKED_THURSDAY", candle=latest_5m_ts)
         else:
@@ -508,13 +552,13 @@ def evaluate_signals(
 
             if is_orb_ce_signal(candles_5m, _orb_15m, **_orb_kwargs):
                 log_event(logger, "CE_ORB_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-                if (sig := _gate("CE_ORB")) is not None:
-                    return sig
+                if (sig := _gate("CE_ORB")) is not None and _emit(sig):
+                    return found
 
-            if not _candle_already_attempted() and is_orb_pe_signal(candles_5m, _orb_15m, **_orb_kwargs):
+            if not _candle_already_attempted("ORB") and is_orb_pe_signal(candles_5m, _orb_15m, **_orb_kwargs):
                 log_event(logger, "PE_ORB_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-                if (sig := _gate("PE_ORB")) is not None:
-                    return sig
+                if (sig := _gate("PE_ORB")) is not None and _emit(sig):
+                    return found
 
     # ── Pivot Sustain strategy ─────────────────────────────────────────────────
     # Own risk engine — deliberately bypasses SmartEntry (the sustain + room
@@ -524,7 +568,8 @@ def evaluate_signals(
     # candle guard with EMA/VWAP/ORB would silently skip valid pivot setups whenever
     # another strategy fired first on the same candle.  Pivot DOES set
     # _candle_attempted=True after firing so it blocks other strategies.
-    if settings.ENABLE_PIVOT_STRATEGY and pivot_levels is not None:
+    if (settings.ENABLE_PIVOT_STRATEGY and pivot_levels is not None
+            and not (collect and "PIVOT" in _attempted_keys)):
         global _last_pivot_setup
         from strategies.pivot_strategy import find_pivot_setup
         _day = str(latest_5m_ts.date())
@@ -595,7 +640,7 @@ def evaluate_signals(
                         # _gate().  claim_signal_atomic returns True only for the first
                         # writer, so a concurrent bot process that races here is blocked.
                         if claim_signal_atomic(sig_id, sig_name, latest_5m_ts.isoformat()):
-                            _candle_attempted = True
+                            _mark_attempted("PIVOT")
                             if setup.mode == "ACCEPTANCE":
                                 _k = (_day, setup.side)
                                 _pivot_accept_count[_k] = _pivot_accept_count.get(_k, 0) + 1
@@ -603,7 +648,8 @@ def evaluate_signals(
                             # in execute_entry always sees a consistent value.
                             with _pivot_setup_lock:
                                 _last_pivot_setup = setup
-                            return sig_name  # type: ignore[return-value]
+                            if _emit(sig_name):
+                                return found
 
     # ── VWAP Retest strategy ───────────────────────────────────────────────────
     # VWAP_NO_NEW_ENTRY_AFTER: afternoon VWAP crosses are mostly chop + theta
@@ -611,7 +657,7 @@ def evaluate_signals(
     if (settings.ENABLE_VWAP_STRATEGY
             and (not settings.VWAP_NO_NEW_ENTRY_AFTER
                  or latest_5m_ts.time() < _parse_time(settings.VWAP_NO_NEW_ENTRY_AFTER))
-            and not _sq_blocked and not _candle_already_attempted()):
+            and not _sq_blocked and not _candle_already_attempted("VWAP")):
         from strategies.vwap_strategy import is_vwap_ce_signal, is_vwap_pe_signal
 
         _vwap_kwargs = dict(
@@ -648,36 +694,36 @@ def evaluate_signals(
             log_event(logger, "CE_VWAP_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close,
                       vwap=round(vwap, 2) if vwap else None)
             if _vwap_level_blocked("CE"):
-                _candle_attempted = True
-            elif (sig := _gate("CE_VWAP")) is not None:
-                return sig
+                _mark_attempted("VWAP")
+            elif (sig := _gate("CE_VWAP")) is not None and _emit(sig):
+                return found
 
-        if not _candle_already_attempted() and settings.ENABLE_PE_VWAP and is_vwap_pe_signal(candles_5m, vwap, **_vwap_kwargs):
+        if not _candle_already_attempted("VWAP") and settings.ENABLE_PE_VWAP and is_vwap_pe_signal(candles_5m, vwap, **_vwap_kwargs):
             log_event(logger, "PE_VWAP_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close,
                       vwap=round(vwap, 2) if vwap else None)
             if _vwap_level_blocked("PE"):
-                _candle_attempted = True
-            elif (sig := _gate("PE_VWAP")) is not None:
-                return sig
+                _mark_attempted("VWAP")
+            elif (sig := _gate("PE_VWAP")) is not None and _emit(sig):
+                return found
 
     # ── PDHL (Previous Day High/Low) Breakout strategy ─────────────────────────
-    if settings.ENABLE_PDHL_STRATEGY and not _sq_blocked and not _candle_already_attempted():
+    if settings.ENABLE_PDHL_STRATEGY and not _sq_blocked and not _candle_already_attempted("PDHL"):
         from strategies.pdhl_strategy import is_pdhl_ce_signal, is_pdhl_pe_signal
 
         if is_pdhl_ce_signal(candles_5m, prev_day_high, buffer_pts=settings.PDHL_BUFFER_PTS):
             log_event(logger, "CE_PDHL_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close,
                       pdh=prev_day_high)
-            if (sig := _gate("CE_PDHL")) is not None:
-                return sig
+            if (sig := _gate("CE_PDHL")) is not None and _emit(sig):
+                return found
 
-        if not _candle_already_attempted() and is_pdhl_pe_signal(candles_5m, prev_day_low, buffer_pts=settings.PDHL_BUFFER_PTS):
+        if not _candle_already_attempted("PDHL") and is_pdhl_pe_signal(candles_5m, prev_day_low, buffer_pts=settings.PDHL_BUFFER_PTS):
             log_event(logger, "PE_PDHL_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close,
                       pdl=prev_day_low)
-            if (sig := _gate("PE_PDHL")) is not None:
-                return sig
+            if (sig := _gate("PE_PDHL")) is not None and _emit(sig):
+                return found
 
     # ── NATR Trailing Stop strategy ────────────────────────────────────────────
-    if settings.ENABLE_NATR_STRATEGY and not _sq_blocked and not _candle_already_attempted():
+    if settings.ENABLE_NATR_STRATEGY and not _sq_blocked and not _candle_already_attempted("NATR"):
         from strategies.natr_strategy import is_natr_ce_signal, is_natr_pe_signal
 
         _natr_kwargs = dict(
@@ -687,16 +733,16 @@ def evaluate_signals(
 
         if is_natr_ce_signal(candles_5m, **_natr_kwargs):
             log_event(logger, "CE_NATR_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("CE_NATR")) is not None:
-                return sig
+            if (sig := _gate("CE_NATR")) is not None and _emit(sig):
+                return found
 
-        if not _candle_already_attempted() and is_natr_pe_signal(candles_5m, **_natr_kwargs):
+        if not _candle_already_attempted("NATR") and is_natr_pe_signal(candles_5m, **_natr_kwargs):
             log_event(logger, "PE_NATR_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("PE_NATR")) is not None:
-                return sig
+            if (sig := _gate("PE_NATR")) is not None and _emit(sig):
+                return found
 
     # ── ATR Copilot strategy ───────────────────────────────────────────────────
-    if settings.ENABLE_ATR_COPILOT_STRATEGY and not _sq_blocked and not _candle_already_attempted():
+    if settings.ENABLE_ATR_COPILOT_STRATEGY and not _sq_blocked and not _candle_already_attempted("ATR"):
         from strategies.atr_copilot_strategy import is_atr_copilot_ce_signal, is_atr_copilot_pe_signal
 
         _atr_copilot_kwargs = dict(
@@ -708,16 +754,16 @@ def evaluate_signals(
 
         if is_atr_copilot_ce_signal(candles_5m, **_atr_copilot_kwargs):
             log_event(logger, "CE_ATR_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("CE_ATR")) is not None:
-                return sig
+            if (sig := _gate("CE_ATR")) is not None and _emit(sig):
+                return found
 
-        if not _candle_already_attempted() and is_atr_copilot_pe_signal(candles_5m, **_atr_copilot_kwargs):
+        if not _candle_already_attempted("ATR") and is_atr_copilot_pe_signal(candles_5m, **_atr_copilot_kwargs):
             log_event(logger, "PE_ATR_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("PE_ATR")) is not None:
-                return sig
+            if (sig := _gate("PE_ATR")) is not None and _emit(sig):
+                return found
 
     # ── Time Range Breakout (TRB) strategy ─────────────────────────────────────
-    if settings.ENABLE_TRB_STRATEGY and not _sq_blocked and not _candle_already_attempted():
+    if settings.ENABLE_TRB_STRATEGY and not _sq_blocked and not _candle_already_attempted("TRB"):
         from strategies.trb_strategy import is_trb_ce_signal, is_trb_pe_signal
 
         _trb_kwargs = dict(
@@ -729,13 +775,13 @@ def evaluate_signals(
 
         if is_trb_ce_signal(candles_5m, candles_15m, **_trb_kwargs):
             log_event(logger, "CE_TRB_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("CE_TRB")) is not None:
-                return sig
+            if (sig := _gate("CE_TRB")) is not None and _emit(sig):
+                return found
 
-        if not _candle_already_attempted() and is_trb_pe_signal(candles_5m, candles_15m, **_trb_kwargs):
+        if not _candle_already_attempted("TRB") and is_trb_pe_signal(candles_5m, candles_15m, **_trb_kwargs):
             log_event(logger, "PE_TRB_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-            if (sig := _gate("PE_TRB")) is not None:
-                return sig
+            if (sig := _gate("PE_TRB")) is not None and _emit(sig):
+                return found
 
     # ── Phase 1: EMA 9/21 + RSI strategy ───────────────────────────────────────
     # Pivot filters are intentionally NOT applied to EMA (rule-set has its own
@@ -753,7 +799,7 @@ def evaluate_signals(
     except (ValueError, AttributeError, TypeError):
         pass   # bad config — fail open
 
-    if settings.ENABLE_EMA_STRATEGY and _ema_window_ok and not _sq_blocked and not _candle_already_attempted():
+    if settings.ENABLE_EMA_STRATEGY and _ema_window_ok and not _sq_blocked and not _candle_already_attempted("EMA"):
         _ema_kwargs = dict(
             rsi_period=settings.EMA_RSI_PERIOD,
             pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS,
@@ -767,19 +813,19 @@ def evaluate_signals(
         else:
             if is_ce_signal(candles_5m, candles_15m, rsi_min=settings.EMA_RSI_CE_MIN, **_ema_kwargs):
                 log_event(logger, "CE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-                if (sig := _gate("CE")) is not None:
-                    return sig
+                if (sig := _gate("CE")) is not None and _emit(sig):
+                    return found
 
-            if not _candle_already_attempted() and is_pe_signal(
+            if not _candle_already_attempted("EMA") and is_pe_signal(
                 candles_5m, candles_15m, rsi_max=settings.EMA_RSI_PE_MAX, **_ema_kwargs
             ):
                 log_event(logger, "PE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-                if (sig := _gate("PE")) is not None:
-                    return sig
+                if (sig := _gate("PE")) is not None and _emit(sig):
+                    return found
 
     # ── Phase 2: Momentum strategy (opt-in) ────────────────────────────────────
-    if not settings.ENABLE_MOMENTUM_PHASE or _skip_on_monday or _candle_already_attempted():
-        return None
+    if not settings.ENABLE_MOMENTUM_PHASE or _skip_on_monday or _candle_already_attempted("MOM"):
+        return found
 
     from strategies.ce_momentum import is_ce_momentum_signal
     from strategies.pe_momentum import is_pe_momentum_signal
@@ -789,7 +835,7 @@ def evaluate_signals(
         win_end   = _parse_time(settings.MOMENTUM_WINDOW_END)
     except (ValueError, AttributeError):
         logger.warning("Invalid MOMENTUM_WINDOW_START/END in config — skipping phase 2.")
-        return None
+        return found
 
     min_body = float(settings.MOMENTUM_MIN_BODY_PTS)
 
@@ -804,10 +850,10 @@ def evaluate_signals(
                   body=round(candles_5m[-1].close - candles_5m[-1].open, 2))
         if (_blk := mom_block_reason("CE", _mom_day)):
             log_event(logger, "MOM_BLOCKED", signal="CE_MOM", candle=latest_5m_ts, reason=_blk)
-        elif (sig := _gate("CE_MOM")) is not None:
-            return sig
+        elif (sig := _gate("CE_MOM")) is not None and _emit(sig):
+            return found
 
-    if not _candle_already_attempted() and is_pe_momentum_signal(candles_5m, candles_15m,
+    if not _candle_already_attempted("MOM") and is_pe_momentum_signal(candles_5m, candles_15m,
                               min_body_pts=min_body,
                               window_start=win_start,
                               window_end=win_end):
@@ -816,7 +862,7 @@ def evaluate_signals(
                   body=round(candles_5m[-1].open - candles_5m[-1].close, 2))
         if (_blk := mom_block_reason("PE", _mom_day)):
             log_event(logger, "MOM_BLOCKED", signal="PE_MOM", candle=latest_5m_ts, reason=_blk)
-        elif (sig := _gate("PE_MOM")) is not None:
-            return sig
+        elif (sig := _gate("PE_MOM")) is not None and _emit(sig):
+            return found
 
-    return None
+    return found

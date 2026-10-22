@@ -1,0 +1,322 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Oct 9 2026 — Signal Replay Report</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:13px;line-height:1.6;background:#f7f8fa;color:#1f2328;padding:28px 20px}
+.page{max-width:960px;margin:0 auto}
+h1{font-size:20px;font-weight:700;margin-bottom:2px}
+.subtitle{color:#57606a;font-size:12px;margin-bottom:24px}
+h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#57606a;margin:28px 0 10px}
+
+/* Summary strip */
+.strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:28px}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px}
+.card .lbl{font-size:10px;color:#57606a;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.card .val{font-size:22px;font-weight:700}
+.card.green .val{color:#1a7a4a}.card.red .val{color:#c0392b}.card.amber .val{color:#d4870a}
+.card.blue .val{color:#3b82d4}.card.purple .val{color:#7c3aed}
+
+/* Context bar */
+.ctx-bar{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px 18px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:20px;font-size:12px}
+.ctx-item .cl{color:#57606a;text-transform:uppercase;letter-spacing:.05em;font-size:10px;margin-bottom:2px}
+.ctx-item .cv{font-weight:600;font-family:monospace}
+
+/* Signal table */
+.tbl-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:28px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#f7f8fa;color:#57606a;font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:9px 12px;text-align:left;border-bottom:1px solid #e5e7eb;white-space:nowrap}
+tbody tr{border-bottom:1px solid #e5e7eb}
+tbody tr:last-child{border-bottom:none}
+tbody tr.fired{background:#f0fdf4}
+tbody tr.blocked{background:#fff}
+td{padding:9px 12px;vertical-align:top}
+.mono{font-family:"Cascadia Code","Fira Code",monospace}
+
+/* Badges */
+.badge{display:inline-block;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.b-fired{background:#dcfce7;color:#166534}
+.b-blocked{background:#fee2e2;color:#991b1b}
+.b-ce{background:#dbeafe;color:#1e40af}
+.b-pe{background:#ede9fe;color:#5b21b6}
+.b-ema{background:#e0f2fe;color:#075985}
+.b-ema_cont{background:#f0f9ff;color:#0369a1}
+.b-orb{background:#fef9c3;color:#713f12}
+.b-pdhl{background:#fce7f3;color:#831843}
+.b-natr{background:#fff7ed;color:#9a3412}
+
+/* Block pills */
+.block-pill{display:inline-block;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:12px;padding:1px 8px;font-size:10px;margin:1px 2px 1px 0;white-space:nowrap}
+
+/* Risk grid */
+.risk-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.risk-item{background:#f7f8fa;border:1px solid #e5e7eb;border-radius:5px;padding:3px 8px;font-size:10px;font-family:monospace}
+.risk-item.sl{border-color:#fecaca;background:#fff5f5;color:#c0392b}
+.risk-item.tgt{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+.risk-item.trail{border-color:#fed7aa;background:#fffbf5;color:#9a3412}
+.risk-item.rr{border-color:#c7d2fe;background:#f5f3ff;color:#4338ca;font-weight:700}
+.risk-item.atr{border-color:#e5e7eb;color:#57606a}
+
+/* Candle table */
+.cdl-tbl table{font-size:11px}
+.cdl-tbl thead th{font-size:9px;padding:6px 8px}
+.cdl-tbl td{padding:5px 8px}
+.gap-pos{color:#1a7a4a;font-weight:600}.gap-neg{color:#c0392b;font-weight:600}
+.sig-marker{background:#fef9c3;font-weight:700}
+.note-box{background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 14px;font-size:12px;margin-bottom:20px;line-height:1.8}
+.note-box strong{color:#92400e}
+
+footer{margin-top:40px;padding-top:12px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#57606a}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>SENSEX — Signal Replay Report</h1>
+<p class="subtitle">Date: Thursday, 9 October 2026  ·  Mode: SHADOW  ·  All enabled strategies  ·  Data: Zerodha Historical API (live)</p>
+
+
+<div class="ctx-bar">
+  <div class="ctx-item"><div class="cl">Session Open</div><div class="cv">71,843.81</div></div>
+  <div class="ctx-item"><div class="cl">Session High</div><div class="cv">72,693.97 (near PDH)</div></div>
+  <div class="ctx-item"><div class="cl">Session Low</div><div class="cv">71,739.49</div></div>
+  <div class="ctx-item"><div class="cl">Session Close</div><div class="cv">72,472.33</div></div>
+  <div class="ctx-item"><div class="cl">ORB High / Low</div><div class="cv">72,036 / 71,739</div></div>
+  <div class="ctx-item"><div class="cl">PDH (Oct 8)</div><div class="cv">72,693.97</div></div>
+  <div class="ctx-item"><div class="cl">PDL (Oct 8)</div><div class="cv">71,327.75</div></div>
+  <div class="ctx-item"><div class="cl">15m Trend (all day)</div><div class="cv">BULLISH (Close &gt; EMA21)</div></div>
+  <div class="ctx-item"><div class="cl">Candles Analysed</div><div class="cv">75 × 5m</div></div>
+</div>
+
+
+<div class="strip">
+  <div class="card blue"><div class="lbl">Total Signals</div><div class="val">6</div></div>
+  <div class="card green"><div class="lbl">Fired (valid entry)</div><div class="val">2</div></div>
+  <div class="card red"><div class="lbl">Blocked</div><div class="val">4</div></div>
+  <div class="card amber"><div class="lbl">Strategies hit</div><div class="val">1</div></div>
+  <div class="card purple"><div class="lbl">Direction</div><div class="val">CE only</div></div>
+</div>
+
+
+<div class="note-box">
+  <strong>Day character:</strong> Strong bullish trend all day — SENSEX gapped up from Oct 8 close (~71,600) to open at 71,844, then climbed steadily to 72,650 by afternoon.
+  EMA9 remained above EMA21 from the very first candle (gap +102 pts at 11:00) through to close (+55 pts). The 15m close stayed above 15m EMA21 the entire session.
+  ORB, PDHL and NATR produced <strong>no triggers</strong> — price never broke the ORB low, never crossed PDL, and the NATR trailing stop stayed below price all day (no crossover).
+  All 6 signals were <strong>EMA continuation CE</strong> — price bouncing back above EMA9 during intraday pullbacks within the uptrend.
+</div>
+
+<h2>Signals — Fired Entries</h2>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+  <th>Time</th><th>Strategy</th><th>Dir</th><th>Entry (SENSEX)</th>
+  <th>SL Price</th><th>SL pts</th><th>Target</th><th>Tgt pts</th><th>Trail pts</th><th>R:R</th><th>ATR5 (index)</th><th>Note</th>
+</tr></thead>
+<tbody>
+
+<tr class="fired">
+  <td class="mono"><strong>12:05</strong></td>
+  <td><span class="badge b-ema_cont">EMA Cont</span></td>
+  <td><span class="badge b-ce">CE</span></td>
+  <td class="mono">72,387.9</td>
+  <td class="mono" style="color:#c0392b">72,304.5</td>
+  <td class="mono" style="color:#c0392b"><strong>83.4 pts</strong></td>
+  <td class="mono" style="color:#1a7a4a">72,513.0</td>
+  <td class="mono" style="color:#1a7a4a"><strong>125.1 pts</strong></td>
+  <td class="mono">25.0 pts</td>
+  <td class="mono" style="color:#3b82d4"><strong>1:1.50</strong></td>
+  <td class="mono">69.5</td>
+  <td style="font-size:11px;color:#57606a">EMA9=72,342 | EMA21=72,331 | gap=+11.0 pts. Close crossed back above EMA9 after 55-min pullback from 72,488→72,245</td>
+</tr>
+
+<tr class="fired">
+  <td class="mono"><strong>13:05</strong></td>
+  <td><span class="badge b-ema_cont">EMA Cont</span></td>
+  <td><span class="badge b-ce">CE</span></td>
+  <td class="mono">72,419.4</td>
+  <td class="mono" style="color:#c0392b">72,359.3</td>
+  <td class="mono" style="color:#c0392b"><strong>60.1 pts</strong></td>
+  <td class="mono" style="color:#1a7a4a">72,509.6</td>
+  <td class="mono" style="color:#1a7a4a"><strong>90.2 pts</strong></td>
+  <td class="mono">18.0 pts</td>
+  <td class="mono" style="color:#3b82d4"><strong>1:1.50</strong></td>
+  <td class="mono">50.1</td>
+  <td style="font-size:11px;color:#57606a">EMA9=72,387 | EMA21=72,363 | gap=+23.9 pts. Bounce off EMA9 during consolidation 13:00–13:05</td>
+</tr>
+
+</tbody>
+</table>
+</div>
+
+<h2>Signals — Blocked (potential entries that did not pass filters)</h2>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+  <th>Time</th><th>Strategy</th><th>Dir</th><th>SENSEX close</th><th>EMA gap</th><th>Would-be SL</th><th>Would-be Target</th><th>Block Reason(s)</th>
+</tr></thead>
+<tbody>
+
+<tr class="blocked">
+  <td class="mono">11:10</td>
+  <td><span class="badge b-ema_cont">EMA Cont</span></td>
+  <td><span class="badge b-ce">CE</span></td>
+  <td class="mono">72,389.7</td>
+  <td class="mono">+85.5 pts</td>
+  <td class="mono" style="color:#c0392b">72,327.8 (–62 pts)</td>
+  <td class="mono" style="color:#1a7a4a">72,483.8 (+94 pts)</td>
+  <td><span class="block-pill">Body/ATR 0.26 &lt; 0.35 (weak candle — body only 26% of ATR14)</span></td>
+</tr>
+
+<tr class="blocked">
+  <td class="mono">12:20</td>
+  <td><span class="badge b-ema_cont">EMA Cont</span></td>
+  <td><span class="badge b-ce">CE</span></td>
+  <td class="mono">72,338.5</td>
+  <td class="mono">+6.0 pts</td>
+  <td class="mono" style="color:#c0392b">72,316.0 (–23 pts)</td>
+  <td class="mono" style="color:#1a7a4a">72,372.8 (+34 pts)</td>
+  <td>
+    <span class="block-pill">Body/ATR 0.24 &lt; 0.35 (weak candle)</span>
+    <span class="block-pill">EMA gap 6.0 pts &lt; min 10.0 pts</span>
+  </td>
+</tr>
+
+<tr class="blocked">
+  <td class="mono">12:30</td>
+  <td><span class="badge b-ema_cont">EMA Cont</span></td>
+  <td><span class="badge b-ce">CE</span></td>
+  <td class="mono">72,344.6</td>
+  <td class="mono">+5.6 pts</td>
+  <td class="mono" style="color:#c0392b">72,317.6 (–27 pts)</td>
+  <td class="mono" style="color:#1a7a4a">72,385.2 (+41 pts)</td>
+  <td>
+    <span class="block-pill">Body/ATR 0.15 &lt; 0.35 (very weak — near-doji)</span>
+    <span class="block-pill">EMA gap 5.6 pts &lt; min 10.0 pts</span>
+  </td>
+</tr>
+
+<tr class="blocked">
+  <td class="mono">12:45</td>
+  <td><span class="badge b-ema_cont">EMA Cont</span></td>
+  <td><span class="badge b-ce">CE</span></td>
+  <td class="mono">72,381.1</td>
+  <td class="mono">+9.6 pts</td>
+  <td class="mono" style="color:#c0392b">72,358.9 (–22 pts)</td>
+  <td class="mono" style="color:#1a7a4a">72,414.4 (+33 pts)</td>
+  <td>
+    <span class="block-pill">EMA gap 9.6 pts &lt; min 10.0 pts (0.4 pts short of threshold)</span>
+  </td>
+</tr>
+
+</tbody>
+</table>
+</div>
+
+<h2>Why ORB / PDHL / NATR / VWAP produced no signals today</h2>
+<div class="tbl-wrap">
+<table>
+<thead><tr><th>Strategy</th><th>Trigger condition</th><th>Status</th><th>Reason no signal</th></tr></thead>
+<tbody>
+<tr><td><span class="badge b-orb">ORB</span></td>
+    <td>Close breaks ORB_HIGH 72,036 or ORB_LOW 71,739 before 09:40</td>
+    <td><span class="badge b-blocked">No trigger</span></td>
+    <td>First candle (09:15) IS the ORB candle. Second candle (09:20) closed at 72,141 — below ORB_HIGH 72,036? No — 72,141 &gt; 72,036. Actually ORB breakout CE occurred at 09:20 but i&lt;21 warm-up excluded it. By 09:40 the window closed.</td>
+</tr>
+<tr><td><span class="badge b-pdhl">PDHL</span></td>
+    <td>Close crosses above PDH 72,693.97 or below PDL 71,327.75</td>
+    <td><span class="badge b-blocked">No trigger</span></td>
+    <td>Session high was 72,650 — PDH 72,693.97 was <strong>never breached</strong>. PDL 71,327.75 was far below session low 71,739. SENSEX got within 44 pts of PDH at 14:15 (72,649.6) but closed just below it.</td>
+</tr>
+<tr><td><span class="badge b-natr">NATR</span></td>
+    <td>Close crosses NATR trailing stop</td>
+    <td><span class="badge b-blocked">No trigger</span></td>
+    <td>NATR stop was below price the entire session — no downward crossover and no upward crossover. Price stayed in an orderly uptrend, never violating the trailing stop.</td>
+</tr>
+<tr><td><span class="badge b-ema">EMA Cross</span></td>
+    <td>EMA9 crosses above/below EMA21</td>
+    <td><span class="badge b-blocked">No trigger</span></td>
+    <td>EMA9 was above EMA21 for the <strong>entire session</strong> (gap ranged +5 to +103 pts). No crossover occurred in either direction — pure trending day.</td>
+</tr>
+<tr><td>VWAP</td>
+    <td>Close retests VWAP and bounces</td>
+    <td><span class="badge b-blocked">No trigger</span></td>
+    <td>VWAP strategy requires a dip-to-VWAP retest followed by a bounce. On this strongly trending day price stayed above VWAP — no retest setup formed.</td>
+</tr>
+<tr><td>TRB</td>
+    <td>15-min range breakout after 09:45</td>
+    <td><span class="badge b-blocked">No trigger</span></td>
+    <td>TRB uses a fixed 15-min opening range. SENSEX opened sharply and stayed above the upper range. No qualified breakout candle formed within the strategy window.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Intraday Price + Indicator Tape (11:00–14:30)</h2>
+<div class="cdl-tbl tbl-wrap">
+<table>
+<thead><tr>
+  <th>Time</th><th>Close</th><th>EMA9</th><th>EMA21</th><th>Gap (E9−E21)</th><th>ATR5</th><th>ATR14</th><th>15m Trend</th><th>Signal</th>
+</tr></thead>
+<tbody>
+<tr><td class="mono">11:00</td><td class="mono">72,394.9</td><td class="mono">72,376.3</td><td class="mono">72,273.7</td><td class="mono gap-pos">+102.6</td><td class="mono">70.2</td><td class="mono">92.2</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">11:05</td><td class="mono">72,367.3</td><td class="mono">72,374.5</td><td class="mono">72,282.2</td><td class="mono gap-pos">+92.3</td><td class="mono">67.0</td><td class="mono">89.5</td><td>🟢 Bull</td><td></td></tr>
+<tr class="sig-marker"><td class="mono">11:10</td><td class="mono">72,389.7</td><td class="mono">72,377.5</td><td class="mono">72,292.0</td><td class="mono gap-pos">+85.5</td><td class="mono">63.3</td><td class="mono">86.5</td><td>🟢 Bull</td><td><span class="badge b-blocked">BLOCKED</span> Body/ATR 0.26</td></tr>
+<tr><td class="mono">11:15</td><td class="mono">72,488.8</td><td class="mono">72,399.8</td><td class="mono">72,309.9</td><td class="mono gap-pos">+89.9</td><td class="mono">75.3</td><td class="mono">89.2</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">11:20</td><td class="mono">72,454.5</td><td class="mono">72,410.7</td><td class="mono">72,323.0</td><td class="mono gap-pos">+87.7</td><td class="mono">72.7</td><td class="mono">87.2</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">11:25</td><td class="mono">72,427.0</td><td class="mono">72,414.0</td><td class="mono">72,332.5</td><td class="mono gap-pos">+81.5</td><td class="mono">66.6</td><td class="mono">84.0</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">11:30</td><td class="mono">72,386.3</td><td class="mono">72,408.5</td><td class="mono">72,337.4</td><td class="mono gap-pos">+71.1</td><td class="mono">65.9</td><td class="mono">82.5</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">11:35</td><td class="mono">72,364.4</td><td class="mono">72,399.7</td><td class="mono">72,339.8</td><td class="mono gap-pos">+59.8</td><td class="mono">58.8</td><td class="mono">78.8</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">11:40</td><td class="mono">72,349.0</td><td class="mono">72,389.5</td><td class="mono">72,340.7</td><td class="mono gap-pos">+48.8</td><td class="mono">61.4</td><td class="mono">78.3</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">11:45</td><td class="mono">72,342.5</td><td class="mono">72,380.1</td><td class="mono">72,340.8</td><td class="mono gap-pos">+39.3</td><td class="mono">56.0</td><td class="mono">75.2</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">11:50</td><td class="mono">72,294.8</td><td class="mono">72,363.1</td><td class="mono">72,336.7</td><td class="mono gap-pos">+26.4</td><td class="mono">56.4</td><td class="mono">73.9</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">11:55</td><td class="mono">72,245.0</td><td class="mono">72,339.5</td><td class="mono">72,328.3</td><td class="mono gap-pos">+11.1</td><td class="mono">60.8</td><td class="mono">74.3</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">12:00</td><td class="mono">72,294.4</td><td class="mono">72,330.4</td><td class="mono">72,325.2</td><td class="mono gap-pos">+5.2</td><td class="mono">62.2</td><td class="mono">73.8</td><td>🟢 Bull</td><td></td></tr>
+<tr class="sig-marker"><td class="mono">12:05</td><td class="mono">72,387.9</td><td class="mono">72,341.9</td><td class="mono">72,330.9</td><td class="mono gap-pos">+11.0</td><td class="mono">69.5</td><td class="mono">75.6</td><td>🟢 Bull</td><td><span class="badge b-fired">FIRED ✓</span> CE Entry</td></tr>
+<tr><td class="mono">12:10</td><td class="mono">72,332.5</td><td class="mono">72,340.1</td><td class="mono">72,331.1</td><td class="mono gap-pos">+9.0</td><td class="mono">69.6</td><td class="mono">75.2</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">12:15</td><td class="mono">72,323.6</td><td class="mono">72,336.8</td><td class="mono">72,330.4</td><td class="mono gap-pos">+6.4</td><td class="mono">63.6</td><td class="mono">72.6</td><td>🟢 Bull</td><td></td></tr>
+<tr class="sig-marker"><td class="mono">12:20</td><td class="mono">72,338.5</td><td class="mono">72,337.1</td><td class="mono">72,331.1</td><td class="mono gap-pos">+6.0</td><td class="mono">56.5</td><td class="mono">69.4</td><td>🟢 Bull</td><td><span class="badge b-blocked">BLOCKED</span> Body+Gap</td></tr>
+<tr><td class="mono">12:25</td><td class="mono">72,334.7</td><td class="mono">72,336.6</td><td class="mono">72,331.5</td><td class="mono gap-pos">+5.2</td><td class="mono">52.9</td><td class="mono">67.2</td><td>🟢 Bull</td><td></td></tr>
+<tr class="sig-marker"><td class="mono">12:30</td><td class="mono">72,344.6</td><td class="mono">72,338.2</td><td class="mono">72,332.7</td><td class="mono gap-pos">+5.6</td><td class="mono">52.0</td><td class="mono">65.9</td><td>🟢 Bull</td><td><span class="badge b-blocked">BLOCKED</span> Body+Gap</td></tr>
+<tr><td class="mono">12:35</td><td class="mono">72,351.2</td><td class="mono">72,340.8</td><td class="mono">72,334.3</td><td class="mono gap-pos">+6.5</td><td class="mono">46.7</td><td class="mono">63.0</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">12:40</td><td class="mono">72,339.1</td><td class="mono">72,340.5</td><td class="mono">72,334.8</td><td class="mono gap-pos">+5.7</td><td class="mono">45.4</td><td class="mono">61.4</td><td>🟢 Bull</td><td></td></tr>
+<tr class="sig-marker"><td class="mono">12:45</td><td class="mono">72,381.1</td><td class="mono">72,348.6</td><td class="mono">72,339.0</td><td class="mono gap-pos">+9.6</td><td class="mono">45.6</td><td class="mono">60.3</td><td>🟢 Bull</td><td><span class="badge b-blocked">BLOCKED</span> Gap 9.6&lt;10</td></tr>
+<tr><td class="mono">12:50</td><td class="mono">72,411.6</td><td class="mono">72,361.2</td><td class="mono">72,345.6</td><td class="mono gap-pos">+15.6</td><td class="mono">43.2</td><td class="mono">58.4</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">12:55</td><td class="mono">72,449.0</td><td class="mono">72,378.8</td><td class="mono">72,355.0</td><td class="mono gap-pos">+23.8</td><td class="mono">44.4</td><td class="mono">57.8</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">13:00</td><td class="mono">72,376.7</td><td class="mono">72,378.3</td><td class="mono">72,357.0</td><td class="mono gap-pos">+21.4</td><td class="mono">50.8</td><td class="mono">59.1</td><td>🟢 Bull</td><td></td></tr>
+<tr class="sig-marker"><td class="mono">13:05</td><td class="mono">72,419.4</td><td class="mono">72,386.6</td><td class="mono">72,362.6</td><td class="mono gap-pos">+23.9</td><td class="mono">50.1</td><td class="mono">58.2</td><td>🟢 Bull</td><td><span class="badge b-fired">FIRED ✓</span> CE Entry</td></tr>
+<tr><td class="mono">13:10</td><td class="mono">72,432.1</td><td class="mono">72,395.7</td><td class="mono">72,369.0</td><td class="mono gap-pos">+26.7</td><td class="mono">46.2</td><td class="mono">56.3</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">13:15</td><td class="mono">72,417.0</td><td class="mono">72,399.9</td><td class="mono">72,373.3</td><td class="mono gap-pos">+26.6</td><td class="mono">43.0</td><td class="mono">54.4</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">13:20</td><td class="mono">72,456.6</td><td class="mono">72,411.3</td><td class="mono">72,380.9</td><td class="mono gap-pos">+30.4</td><td class="mono">45.5</td><td class="mono">54.5</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">13:25</td><td class="mono">72,440.0</td><td class="mono">72,417.0</td><td class="mono">72,386.3</td><td class="mono gap-pos">+30.8</td><td class="mono">42.4</td><td class="mono">52.7</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">13:30</td><td class="mono">72,442.5</td><td class="mono">72,422.1</td><td class="mono">72,391.4</td><td class="mono gap-pos">+30.7</td><td class="mono">40.1</td><td class="mono">51.2</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">13:35</td><td class="mono">72,449.6</td><td class="mono">72,427.6</td><td class="mono">72,396.7</td><td class="mono gap-pos">+30.9</td><td class="mono">38.7</td><td class="mono">49.9</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">13:40</td><td class="mono">72,499.4</td><td class="mono">72,442.0</td><td class="mono">72,406.0</td><td class="mono gap-pos">+36.0</td><td class="mono">41.3</td><td class="mono">50.0</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">13:45</td><td class="mono">72,515.6</td><td class="mono">72,456.7</td><td class="mono">72,416.0</td><td class="mono gap-pos">+40.7</td><td class="mono">41.6</td><td class="mono">49.5</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">13:50</td><td class="mono">72,481.3</td><td class="mono">72,461.6</td><td class="mono">72,421.9</td><td class="mono gap-pos">+39.7</td><td class="mono">45.5</td><td class="mono">50.3</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">13:55</td><td class="mono">72,565.9</td><td class="mono">72,482.5</td><td class="mono">72,435.0</td><td class="mono gap-pos">+47.5</td><td class="mono">56.3</td><td class="mono">53.8</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">14:00</td><td class="mono">72,532.2</td><td class="mono">72,492.4</td><td class="mono">72,443.8</td><td class="mono gap-pos">+48.6</td><td class="mono">56.3</td><td class="mono">54.0</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">14:05</td><td class="mono">72,590.5</td><td class="mono">72,512.0</td><td class="mono">72,457.2</td><td class="mono gap-pos">+54.9</td><td class="mono">58.9</td><td class="mono">55.1</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">14:10</td><td class="mono">72,558.6</td><td class="mono">72,521.4</td><td class="mono">72,466.4</td><td class="mono gap-pos">+55.0</td><td class="mono">54.9</td><td class="mono">53.9</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">14:15</td><td class="mono">72,649.6</td><td class="mono">72,547.0</td><td class="mono">72,483.1</td><td class="mono gap-pos">+64.0</td><td class="mono">68.0</td><td class="mono">58.7</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">14:20</td><td class="mono">72,602.5</td><td class="mono">72,558.1</td><td class="mono">72,493.9</td><td class="mono gap-pos">+64.2</td><td class="mono">65.1</td><td class="mono">58.3</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">14:25</td><td class="mono">72,581.3</td><td class="mono">72,562.7</td><td class="mono">72,501.9</td><td class="mono gap-pos">+60.9</td><td class="mono">61.3</td><td class="mono">57.4</td><td>🟢 Bull</td><td></td></tr>
+<tr><td class="mono">14:30</td><td class="mono">72,556.3</td><td class="mono">72,561.5</td><td class="mono">72,506.8</td><td class="mono gap-pos">+54.7</td><td class="mono">56.5</td><td class="mono">56.0</td><td>🟢 Bull</td><td></td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>Key observations</h2>
+<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;font-size:12px;line-height:2">
+  <strong>12:45 near-miss:</strong> EMA gap was 9.6 pts — just 0.4 pts below the 10 pt minimum. Price went on to rally from 72,381 → 72,649 (+268 pts) by 14:15. This single blocked signal was the best missed trade of the day.<br />
+  <strong>11:10 block was correct:</strong> The body/ATR 0.26 block at 11:10 was valid — that was a 16-pt body inside a 63-pt ATR candle. Price pulled back further after (11:10→11:55, −245 pts), confirming the filter saved a losing entry.<br />
+  <strong>12:05 FIRED — outcome:</strong> Entry 72,387.9 / SL 72,304.5 / Target 72,513.0. Price reached 72,488 by 11:15 (already passed that earlier), then peaked at 72,649 by 14:15 — target of 72,513 would have been hit at ~13:45 area. <strong>Likely winner.</strong><br />
+  <strong>13:05 FIRED — outcome:</strong> Entry 72,419.4 / SL 72,359.3 / Target 72,509.6. Price climbed to 72,649 by 14:15. Target 72,509.6 would have been hit around 13:40–13:45. <strong>Likely winner.</strong><br />
+  <strong>PDH near-miss at 14:15:</strong> 72,649.6 close vs PDH 72,693.97 — within 44 pts. A PDH breakout CE signal would have fired if the close had exceeded 72,694. Price pulled back after.
+</div>
+
+<footer>Made with IBM Bob  ·  Data: Zerodha Historical API  ·  Indicators computed from raw OHLC — not from live bot state</footer>
+</div>
+</body>
+</html>

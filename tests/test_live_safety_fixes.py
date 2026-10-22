@@ -299,7 +299,7 @@ def _run_candle(ctx, signal):
         patch("main.market_open", return_value=True),
         patch("main.atr_at", return_value=55.0),
         patch("main.fetch_today_realised_pnl", return_value=0.0),
-        patch("main.evaluate_signals", return_value=signal) as mock_eval,
+        patch("main.evaluate_all_signals", return_value=[signal] if signal else []) as mock_eval,
         patch("main.execute_exit") as mock_exit,
         patch("main.execute_entry") as mock_entry,
     ):
@@ -310,9 +310,14 @@ def _run_candle(ctx, signal):
 class TestCandleHandlerInPosition:
     def test_reversal_smart_exit_fires_while_position_open(self) -> None:
         ctx = _candle_ctx(State.POSITION_OPEN)
-        _, mock_exit, mock_entry = _run_candle(ctx, "PE")
+        _, mock_exit, mock_entry = _run_candle(ctx, "PE_ORB")   # opposite side, same strategy
         mock_exit.assert_called_once_with(ctx, reason="REVERSAL_SIGNAL")
         mock_entry.assert_not_called()
+
+    def test_other_strategys_opposite_signal_does_not_close_position(self) -> None:
+        ctx = _candle_ctx(State.POSITION_OPEN)              # holds CE_ORB
+        _, mock_exit, _ = _run_candle(ctx, "PE_VWAP")
+        mock_exit.assert_not_called()
 
     def test_pivot_atr_and_delta_refreshed_while_position_open(self) -> None:
         pivot = MagicMock()
@@ -376,7 +381,7 @@ def entry_env(monkeypatch):
     for name, mock in store.items():
         monkeypatch.setattr(main, name, mock)
     monkeypatch.setattr(main, "has_action", lambda _id: False)
-    monkeypatch.setattr(main, "fetch_active_trade", lambda: None)
+    monkeypatch.setattr(main, "fetch_active_trade", lambda strategy_key=None: None)
     monkeypatch.setattr(main, "claim_entry_slot_atomic", MagicMock(return_value=True))
     monkeypatch.setattr(main, "select_atm_candidates", lambda ltp, ot: [
         {"tradingsymbol": SYM, "strike": 81000, "instrument_token": 1}])
@@ -393,7 +398,7 @@ def entry_env(monkeypatch):
         intraday_regime=None, trade_id=None, tradingsymbol=None, instrument_token=None,
         stop_order_id=None, trailing=None, target=None, latency=None,
         can_create_entry=lambda signal_type="": sm.can_enter(),
-        entry_block_reason=lambda: "",
+        entry_block_reason=lambda signal_type="": "",
     )
     return main, ctx, store
 

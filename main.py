@@ -17,6 +17,7 @@ Ties together all subsystems:
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import sys
@@ -65,6 +66,7 @@ from persistence.trade_store import (
     add_live_order_event,
     claim_entry_slot_atomic,
     fetch_active_trade,
+    fetch_active_trades,
     fetch_today_realised_pnl,
     has_action,
     init_db,
@@ -75,8 +77,9 @@ from persistence.trade_store import (
     upsert_trade,
 )
 from risk.safety_manager import SafetyManager
+from strategies.trend_gate import strategy_key
 from strategies.signal_engine import (
-    evaluate_signals, note_ema_result, note_ema_trade, tick_ema_cooldown,
+    evaluate_all_signals, note_ema_result, note_ema_trade, tick_ema_cooldown,
     note_mom_exit, note_mom_trade, tick_mom_cooldown,
     note_side_trade,
 )
@@ -116,21 +119,8 @@ class BotContext:
         self.safety = SafetyManager(self.sm)
         self.eod = EODManager(self.broker, _TradeStoreFacade())
 
-        # Active trade tracking
-        self.trade_id: str | None = None
-        self.tradingsymbol: str | None = None
-        self.instrument_token: int | None = None
-        self.quantity: int = settings.QUANTITY
-        self.entry_price: float = 0.0
-        # Last option premium seen by on_option_ltp (0 when flat)
-        self.last_option_ltp: float = 0.0
-        self.entry_atr: float | None = None    # ATR(14) at trade entry — for dynamic profit lock
-        self.stop_order_id: str | None = None
-        self.trailing: TrailingStopManager | None = None
-        self.target: DynamicTargetManager | None = None
-        self.strategy_type: str | None = None
-        # Pivot strategy owns its own SL/BE/TSL/target engine (None for other strategies)
-        self.pivot_mgr: PivotTradeManager | None = None
+        # Active-trade fields (trade_id, tradingsymbol, entry_price, trailing, ...)
+        # live on the per-strategy StrategySlot objects in self.slots, not here.
 
         # Last known SENSEX spot LTP (updated by every tick)
         self.sensex_ltp: float = 0.0
@@ -140,7 +130,8 @@ class BotContext:
         # This is the PRIMARY fill-confirmation mechanism in LIVE/SHADOW mode.
         self.order_fill_events: dict[str, dict] = {}
 
-        # Per-trade latency tracker (reset on each new entry attempt)
+        # Latency tracker of the most recent entry attempt (read by the order-update
+        # callback); each slot keeps its own tracker for its own entry.
         self.latency: LatencyTracker | None = None
 
         # Candle aggregators
@@ -251,37 +242,132 @@ class BotContext:
         # trades.smart_entry_flags) — never read by entry/exit logic.
         self.intraday_regime: dict | None = None
 
-    def can_create_entry(self, signal_type: str = "") -> bool:
+        # One independent trading slot per strategy key (EMA, ORB, VWAP, ...).
+        # Each slot owns its own state machine and open-trade fields, so a
+        # strategy holds its position to completion without ever blocking, or
+        # being blocked by, another strategy.  Created lazily by slot_for().
+        self.slots: dict[str, StrategySlot] = {}
+
+    # ── Strategy slots ─────────────────────────────────────────────────────────
+
+    def slot_for(self, key: str) -> "StrategySlot":
+        """The trading slot that owns strategy *key* (created on first use)."""
+        slot = self.slots.get(key)
+        if slot is None:
+            slot = self.slots.setdefault(key, StrategySlot(self, key))
+        return slot
+
+    def is_halted(self) -> bool:
+        """True when the bot or any strategy slot is HALTED (manual check needed)."""
+        return self.sm.state == State.HALTED or any(
+            s.sm.state == State.HALTED for s in list(self.slots.values())
+        )
+
+    def overall_state(self) -> State:
+        """Single bot-level state for the dashboard, derived from all slots."""
+        if self.is_halted():
+            return State.HALTED
+        states = [s.sm.state for s in list(self.slots.values())]
+        if State.POSITION_OPEN in states:
+            return State.POSITION_OPEN
+        return next((st for st in states if st != State.IDLE), self.sm.state)
+
+    def _window_block_reason(self, signal_type: str = "") -> str:
+        """Why entries are closed by time / daily-loss rules ('' when open)."""
+        _now = now_ist().time()
         # EMA-specific no-new-entry cutoff (overrides global when set)
-        _is_ema = signal_type in ("CE", "PE")
-        if _is_ema and settings.EMA_NO_NEW_ENTRY_AFTER:
-            from utils.time_utils import parse_time_ist
-            _ema_cutoff = parse_time_ist(settings.EMA_NO_NEW_ENTRY_AFTER)
-            if is_after_or_equal(now_ist().time(), _ema_cutoff):
-                return False
-        elif is_after_or_equal(now_ist().time(), self._no_entry_time):
-            return False
+        if signal_type in ("CE", "PE") and settings.EMA_NO_NEW_ENTRY_AFTER:
+            if is_after_or_equal(_now, parse_time_ist(settings.EMA_NO_NEW_ENTRY_AFTER)):
+                return f"past EMA_NO_NEW_ENTRY_AFTER {settings.EMA_NO_NEW_ENTRY_AFTER}"
+        elif is_after_or_equal(_now, self._no_entry_time):
+            return f"past NO_NEW_ENTRY_AFTER {settings.NO_NEW_ENTRY_AFTER} (now {_now.hour:02d}:{_now.minute:02d})"
         # Block new entries if daily loss limit is hit
         if self.smart_exit is not None:
             daily_pnl = fetch_today_realised_pnl()
             if self.smart_exit.is_daily_loss_limit_hit(daily_pnl):
-                logger.warning(
-                    "Daily loss limit hit (realised=Rs %.2f <= -Rs %.2f) - "
-                    "no new entries today.", daily_pnl, settings.DAILY_LOSS_LIMIT_RUPEES,
-                )
-                return False
-        return self.sm.can_enter()
-
-    def entry_block_reason(self) -> str:
-        """Return why can_create_entry() returned False (called only when it did)."""
-        _now = now_ist().time()
-        if is_after_or_equal(_now, self._no_entry_time):
-            return f"past NO_NEW_ENTRY_AFTER {settings.NO_NEW_ENTRY_AFTER} (now {_now.hour:02d}:{_now.minute:02d})"
-        if self.smart_exit is not None:
-            daily_pnl = fetch_today_realised_pnl()
-            if self.smart_exit.is_daily_loss_limit_hit(daily_pnl):
                 return f"daily loss limit hit (realised=Rs {daily_pnl:.2f} <= -Rs {settings.DAILY_LOSS_LIMIT_RUPEES:.2f})"
-        return f"state={self.sm.state} — position already open or bot not IDLE"
+        return ""
+
+    def can_create_entry(self, signal_type: str = "") -> bool:
+        return not self._window_block_reason(signal_type) and self.sm.can_enter()
+
+    def entry_block_reason(self, signal_type: str = "") -> str:
+        """Return why can_create_entry() returned False (called only when it did)."""
+        return self._window_block_reason(signal_type) or (
+            f"state={self.sm.state} — position already open or bot not IDLE")
+
+
+class StrategySlot:
+    """
+    One strategy's private trading lane: its own state machine and open-trade
+    fields.  The single-trade functions in this module (execute_entry,
+    execute_exit, on_option_ltp, ...) take a slot exactly as they once took the
+    whole bot context; everything shared (candles, broker, filters, ...) is read
+    through to the hub BotContext.
+
+    A slot holds its position until that trade completes, and its state never
+    affects any other slot.
+    """
+
+    def __init__(self, hub: BotContext, key: str) -> None:
+        self._hub = hub
+        self.key = key
+        self.sm = StateMachine()
+        self.safety = SafetyManager(self.sm)
+        # Per-trade engine state must not be shared between concurrent trades.
+        self.smart_exit: SmartExitEngine | None = (
+            copy.copy(hub.smart_exit) if hub.smart_exit is not None else None
+        )
+
+        self.trade_id: str | None = None
+        self.tradingsymbol: str | None = None
+        self.instrument_token: int | None = None
+        self.quantity: int = settings.QUANTITY
+        self.entry_price: float = 0.0
+        # Last option premium seen by on_option_ltp (0 when flat)
+        self.last_option_ltp: float = 0.0
+        self.entry_atr: float | None = None    # ATR(14) at trade entry — for dynamic profit lock
+        self.stop_order_id: str | None = None
+        self.trailing: TrailingStopManager | None = None
+        self.target: DynamicTargetManager | None = None
+        self.strategy_type: str | None = None
+        # Index-based SL/BE/TSL/target engine (Pivot/EMA/generic); None for plain option TSL
+        self.pivot_mgr: PivotTradeManager | None = None
+        # Per-trade latency tracker (reset on each new entry attempt)
+        self.latency: LatencyTracker | None = None
+
+    def __getattr__(self, name: str):
+        # Only reached when the slot has no such attribute: shared bot state.
+        if name.startswith("__") or name == "_hub":
+            raise AttributeError(name)
+        return getattr(self._hub, name)
+
+    def can_create_entry(self, signal_type: str = "") -> bool:
+        # A HALTED slot means an unresolved position somewhere: no new entries.
+        return (not self._hub.is_halted()
+                and not self._hub._window_block_reason(signal_type)
+                and self.sm.can_enter())
+
+    def entry_block_reason(self, signal_type: str = "") -> str:
+        if self._hub.is_halted():
+            return "bot halted — manual check required"
+        return self._hub._window_block_reason(signal_type) or (
+            f"state={self.sm.state} — {self.key} already has a position open")
+
+
+def _all_slots(ctx) -> list:
+    """Every trade-holding context: the hub's strategy slots, or *ctx* itself
+    when it is already a single-trade context."""
+    return list(ctx.slots.values()) if isinstance(ctx, BotContext) else [ctx]
+
+
+def _open_slots(ctx) -> list:
+    """Slots whose position is open (POSITION_OPEN)."""
+    return [s for s in _all_slots(ctx) if s.sm.state == State.POSITION_OPEN]
+
+
+def _bot_state(ctx) -> State:
+    return ctx.overall_state() if isinstance(ctx, BotContext) else ctx.sm.state
 
 
 class _TradeStoreFacade:
@@ -577,7 +663,7 @@ def _resolve_entry_fill(ctx: BotContext, fill: dict,
 def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
                   signal_candle_ts=None, candle_completed_ts: str | None = None) -> None:
     if not ctx.can_create_entry(signal_type=signal_type):
-        logger.warning("Entry blocked [%s]: %s.", signal_type, ctx.entry_block_reason())
+        logger.warning("Entry blocked [%s]: %s.", signal_type, ctx.entry_block_reason(signal_type))
         return
     # Apply EMA-specific quantity override
     _is_ema_signal = signal_type in ("CE", "PE")
@@ -595,10 +681,11 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     # the state machine above is in-memory and cannot protect across processes.
     # A DB check here catches the case where another process already opened a
     # trade (wrote it to DB) since the state-machine check above passed.
-    if fetch_active_trade() is not None:
+    # Scoped to this strategy: other strategies' open trades never block it.
+    if fetch_active_trade(strategy_key(signal_type)) is not None:
         logger.warning(
-            "Entry blocked [%s]: an OPEN trade already exists in DB "
-            "(concurrent process guard).", signal_type,
+            "Entry blocked [%s]: an OPEN %s trade already exists in DB "
+            "(concurrent process guard).", signal_type, strategy_key(signal_type),
         )
         return
 
@@ -610,6 +697,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     ctx.latency = LatencyTracker(
         trade_id=f"{signal_type}_{now_ist().strftime('%Y%m%d_%H%M%S')}"
     )
+    getattr(ctx, "_hub", ctx).latency = ctx.latency   # visible to the order-update callback
     # Back-fill CANDLE_COMPLETED using the timestamp recorded by the candle handler
     # The monotonic reading must come from the same instant as the wall-clock
     # string; a 0 here made signal_processing_ms equal the machine uptime.
@@ -1066,7 +1154,9 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     # FIX (Flaw 15): snapshot last_pivot_setup under the tick lock (already held
     # by the caller) rather than reading the module global twice.  The local
     # variable is immutable (frozen dataclass) so it is safe to use below.
-    _pv_setup = _se.consume_pivot_setup()
+    # Only a Pivot entry may consume it: other strategies entering on the same
+    # candle must not clear the setup before the Pivot entry runs.
+    _pv_setup = _se.consume_pivot_setup() if signal_type.endswith("_PIVOT") else None
     _is_pivot = signal_type.endswith("_PIVOT") and _pv_setup is not None and _pv_setup.side == _option_type
     if _is_pivot:
         ctx.pivot_mgr = PivotTradeManager(
@@ -1446,7 +1536,7 @@ def on_option_ltp(ctx: BotContext, ltp: float) -> None:
     # In both cases feed it to PaperBroker so _check_stops can compare against
     # the option-based SL trigger price.
     if settings.TRADING_MODE in ("PAPER", "SHADOW"):
-        ctx.broker.update_ltp(ctx.tradingsymbol, ltp)
+        ctx.broker.update_ltp(ctx.tradingsymbol, ltp, order_id=ctx.stop_order_id)
         # If the paper broker triggered the SL, execute_exit closes the trade.
         if ctx.broker.get_order_status(ctx.stop_order_id) == "COMPLETE":
             logger.info("%s SL triggered for %s at ltp=%.2f", settings.TRADING_MODE, ctx.tradingsymbol, ltp)
@@ -1606,6 +1696,12 @@ def _resolve_sl_fill_price(ctx: BotContext) -> float:
     return fallback
 
 
+def _strategy_of(ctx) -> str | None:
+    """Strategy key of the trade held by *ctx* (None when unknown)."""
+    st = getattr(ctx, "strategy_type", None)
+    return strategy_key(st) if isinstance(st, str) and st else None
+
+
 def _close_trade_context(ctx: BotContext) -> None:
     """Clear all active-trade fields on ctx after a confirmed exit."""
     if getattr(ctx, "strategy_type", None) in ("CE_MOM", "PE_MOM"):
@@ -1613,8 +1709,16 @@ def _close_trade_context(ctx: BotContext) -> None:
     # Unsubscribe option token from WebSocket so the stale monitor stops watching it.
     # Without this the option token stays in _option_tokens after trade close and the
     # stale alarm fires continuously after market hours with no ticks arriving.
-    if getattr(ctx, "ws", None) is not None and getattr(ctx, "instrument_token", None) is not None:
+    # Another strategy may hold the same option: keep the token until the last one is out.
+    _hub = getattr(ctx, "_hub", None)
+    _token_in_use = isinstance(_hub, BotContext) and any(
+        s is not ctx and s.instrument_token == ctx.instrument_token
+        for s in list(_hub.slots.values())
+    )
+    if (getattr(ctx, "ws", None) is not None and getattr(ctx, "instrument_token", None) is not None
+            and not _token_in_use):
         ctx.ws.remove_token(ctx.instrument_token)
+    _closed_id = ctx.trade_id
     ctx.trade_id = None
     ctx.tradingsymbol = None
     ctx.instrument_token = None
@@ -1623,7 +1727,7 @@ def _close_trade_context(ctx: BotContext) -> None:
     ctx.stop_order_id = None
     ctx.last_option_ltp = 0.0
     if getattr(ctx, "pivot_mgr", None) is not None:
-        type(ctx.pivot_mgr).clear()
+        type(ctx.pivot_mgr).clear(_closed_id)
     ctx.pivot_mgr = None
 
 
@@ -1837,7 +1941,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
                 break_even_activated=ctx.trailing.break_even_activated if ctx.trailing else None,
                 trail_steps=ctx.trailing.trail_steps_completed if ctx.trailing else None,
             )
-            ctx.smart_entry.on_trade_closed(pnl / max(ctx.quantity, 1))
+            ctx.smart_entry.on_trade_closed(pnl / max(ctx.quantity, 1), strategy=_strategy_of(ctx))
             if ctx.strategy_type in ("CE", "PE"):
                 note_ema_result(str(now_ist().date()), pnl)
             ctx.sm.transition(State.CLOSED, reason="SL filled at exchange")
@@ -1896,7 +2000,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
     )
 
     # Notify smart entry filter so cooldown starts on a loss
-    ctx.smart_entry.on_trade_closed(pnl / max(filled_qty, 1))
+    ctx.smart_entry.on_trade_closed(pnl / max(filled_qty, 1), strategy=_strategy_of(ctx))
     if ctx.strategy_type in ("CE", "PE"):
         note_ema_result(str(now_ist().date()), pnl)
 
@@ -1908,11 +2012,39 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
 # ── Restart recovery ──────────────────────────────────────────────────────────
 
 def recover_from_restart(ctx: BotContext) -> None:
-    active = fetch_active_trade()
-    if not active:
-        logger.info("No active trade found in DB — starting fresh.")
+    """Rebuild every open trade after a restart, one strategy slot per trade.
+
+    A plain single-trade context (anything that is not the BotContext hub) is
+    recovered directly from the latest active trade.
+    """
+    if not isinstance(ctx, BotContext):
+        active = fetch_active_trade()
+        if not active:
+            logger.info("No active trade found in DB — starting fresh.")
+            return
+        _recover_trade(ctx, active)
         return
 
+    trades = fetch_active_trades()
+    # The broker nets all strategies' lots on one symbol together.
+    symbol_qty: dict[str, int] = {}
+    for t in trades:
+        symbol_qty[t["option_symbol"]] = symbol_qty.get(t["option_symbol"], 0) + int(t["quantity"])
+    if not trades:
+        logger.info("No active trade found in DB — starting fresh.")
+        return
+    for active in trades:
+        slot = ctx.slot_for(strategy_key(active["strategy_type"] or ""))
+        if slot.trade_id:
+            logger.error(
+                "Two active trades for strategy %s (%s and %s) — recovering only the "
+                "first; close the other manually.", slot.key, slot.trade_id, active["trade_id"],
+            )
+            continue
+        _recover_trade(slot, active, broker_qty=symbol_qty[active["option_symbol"]])
+
+
+def _recover_trade(ctx, active: dict, broker_qty: int | None = None) -> None:
     logger.info("Active trade found: %s — reconciling with broker.", active["trade_id"])
     symbol = active["option_symbol"]
     expected_qty = active["quantity"]
@@ -1929,10 +2061,11 @@ def recover_from_restart(ctx: BotContext) -> None:
             "into paper broker (no real-broker reconciliation).",
             symbol, expected_qty,
         )
-        ctx.broker._positions[symbol] = expected_qty
+        # Accumulate: several strategies may hold the same option symbol.
+        ctx.broker._positions[symbol] = ctx.broker._positions.get(symbol, 0) + expected_qty
     else:
         # LIVE: verify the position still exists at Zerodha before restoring.
-        ok = ctx.safety.reconcile_position(symbol, expected_qty)
+        ok = ctx.safety.reconcile_position(symbol, broker_qty if broker_qty else expected_qty)
         if not ok:
             # Position is gone at the broker (qty=0). The DB record is stale.
             # Auto-close it using the best available exit price and start fresh.
@@ -2109,7 +2242,7 @@ def _write_ltp(ctx: BotContext) -> None:
         else:
             state = {}
         state["ltp"] = ctx.sensex_ltp
-        state["bot_state"] = ctx.sm.state.value
+        state["bot_state"] = _bot_state(ctx).value
         state["updated_at"] = now_ist().isoformat()
         _atomic_write(state_path, json.dumps(state))
     except Exception as exc:
@@ -2252,9 +2385,25 @@ def _write_state(ctx: BotContext) -> None:
         except Exception:
             trade_count_today = 0
 
+        def _trade_view(s) -> dict:
+            return {
+                "strategy":     s.strategy_type,
+                "trade_id":     s.trade_id,
+                "symbol":       s.tradingsymbol,
+                "entry":        s.entry_price,
+                "current_stop": s.trailing.current_stop if s.trailing else None,
+                "highest_ltp":  s.trailing.highest_ltp if s.trailing else None,
+                "target":       s.target.target_reference if s.target else None,
+                "break_even_activated": s.trailing.break_even_activated if s.trailing else False,
+                "trail_steps_completed": s.trailing.trail_steps_completed if s.trailing else 0,
+                "be_points":    s.trailing.break_even_trigger_points if s.trailing else None,
+            }
+
+        _held = [s for s in _all_slots(ctx) if s.trade_id]
+
         state = {
             "ltp": ctx.sensex_ltp,
-            "bot_state": ctx.sm.state.value,
+            "bot_state": _bot_state(ctx).value,
             "candles_5m":  _ser(candles_5m,  60),
             "candles_today": _ser(candles_5m_today, 999),   # today-only; no cross-day cut
             "ema9_5m":     _ema_series(c5,  9,  60),
@@ -2286,16 +2435,10 @@ def _write_state(ctx: BotContext) -> None:
             "atr_copilot_ema":          atr_copilot_ema_val,
             "atr_copilot_atr":          atr_copilot_atr_val,
             "trade_count_today":      trade_count_today,
-            "active_trade": {
-                "symbol":       ctx.tradingsymbol,
-                "entry":        ctx.entry_price,
-                "current_stop": ctx.trailing.current_stop if ctx.trailing else None,
-                "highest_ltp":  ctx.trailing.highest_ltp if ctx.trailing else None,
-                "target":       ctx.target.target_reference if ctx.target else None,
-                "break_even_activated": ctx.trailing.break_even_activated if ctx.trailing else False,
-                "trail_steps_completed": ctx.trailing.trail_steps_completed if ctx.trailing else 0,
-                "be_points":    ctx.trailing.break_even_trigger_points if ctx.trailing else None,
-            } if ctx.trade_id else None,
+            # "active_trade" = first open trade (kept for the single-trade UI);
+            # "active_trades" = every strategy's open trade.
+            "active_trade": _trade_view(_held[0]) if _held else None,
+            "active_trades": [_trade_view(s) for s in _held],
             "updated_at": now_ist().isoformat(),
         }
         _atomic_write(str(_STATE_FILE), json.dumps(state))
@@ -2354,13 +2497,15 @@ def _make_tick_handler(ctx: BotContext):
                 # VWAP is updated from completed candles (on_candle below) for
                 # accuracy — tick-level updates would double-count every price
                 # because the same data is also accumulated into the 5m candle.
-                # Pivot trades manage SL/BE/TSL/T2 on the SENSEX price
-                if ctx.pivot_mgr is not None and ctx.sm.state == State.POSITION_OPEN:
-                    on_pivot_index_price(ctx, ltp)
-                # In PAPER mode the option price IS the SENSEX spot price,
-                # so trail/SL checks run against the SENSEX LTP directly.
-                if settings.TRADING_MODE == "PAPER" and ctx.sm.state == State.POSITION_OPEN:
-                    on_option_ltp(ctx, _paper_option_price(ctx, ltp))
+                # Every strategy slot with an open position is driven independently.
+                for slot in _all_slots(ctx):
+                    # Pivot trades manage SL/BE/TSL/T2 on the SENSEX price
+                    if slot.pivot_mgr is not None and slot.sm.state == State.POSITION_OPEN:
+                        on_pivot_index_price(slot, ltp)
+                    # In PAPER mode the option price IS the SENSEX spot price,
+                    # so trail/SL checks run against the SENSEX LTP directly.
+                    if settings.TRADING_MODE == "PAPER" and slot.sm.state == State.POSITION_OPEN:
+                        on_option_ltp(slot, _paper_option_price(slot, ltp))
                 # After 15:30 only update the scalar LTP — never recompute bands/EMA
                 # from the candle buffer, which may contain post-market frozen candles.
                 _tick_counter += 1
@@ -2369,9 +2514,11 @@ def _make_tick_handler(ctx: BotContext):
                     _write_state(ctx)
                 else:
                     _write_ltp(ctx)
-            elif ctx.instrument_token and token == ctx.instrument_token:
-                # LIVE/SHADOW: option token tick
-                on_option_ltp(ctx, ltp)
+            else:
+                # LIVE/SHADOW: option token tick — every slot holding that option
+                for slot in _all_slots(ctx):
+                    if slot.instrument_token and token == slot.instrument_token:
+                        on_option_ltp(slot, ltp)
     return handler
 
 
@@ -2432,6 +2579,162 @@ def _refresh_intraday_regime(ctx: BotContext, *, log: bool = True) -> None:
         logger.debug("Intraday regime compute failed (non-critical): %s", exc)
 
 
+def _slot_key(slot) -> str | None:
+    """Strategy key that owns *slot* (the BotContext slot key, else from its trade)."""
+    return getattr(slot, "key", None) or _strategy_of(slot)
+
+
+def _is_halted(ctx) -> bool:
+    return ctx.is_halted() if isinstance(ctx, BotContext) else ctx.sm.state == State.HALTED
+
+
+def _slot_candle_exit_checks(slot, candle: Candle, candles_5m, candles_15m) -> bool:
+    """
+    Candle-close exit checks for ONE open strategy slot.  Returns True when the
+    slot's position was closed (so the slot does not re-enter on this candle).
+    """
+    # ── REST option LTP fallback when WebSocket option feed is dead ────────
+    if (
+        slot.ws is not None
+        and not slot.ws.option_feed_ok
+        and slot.sm.state == State.POSITION_OPEN
+        and slot.tradingsymbol
+    ):
+        try:
+            # LIVE mode uses broker._fetch_ltp(); PAPER/SHADOW use Kite directly
+            # because PaperBroker has no _fetch_ltp method.
+            if settings.TRADING_MODE == "LIVE":
+                rest_ltp = slot.broker._fetch_ltp(slot.tradingsymbol, "BFO")
+            else:
+                from broker.kite_client import get_kite as _gk
+                _qr = _gk().quote([f"BFO:{slot.tradingsymbol}"])
+                rest_ltp = float(_qr[f"BFO:{slot.tradingsymbol}"]["last_price"])
+            if rest_ltp and rest_ltp > 0:
+                log_event(logger, "OPTION_LTP_REST_FALLBACK",
+                          symbol=slot.tradingsymbol, ltp=rest_ltp)
+                on_option_ltp(slot, rest_ltp)
+        except Exception as exc:
+            logger.warning("REST option LTP fallback failed: %s", exc)
+
+    # ── VWAP cross-exit: close back through VWAP invalidates the thesis ──────
+    # CE_VWAP thesis = price above VWAP.  The moment a completed 5m candle
+    # closes below VWAP, the level has been surrendered — exit immediately,
+    # before the ATR-based option SL backstop fires.  Mirror for PE_VWAP.
+    # Only runs when VWAP_CROSS_EXIT=true and the strategy is CE_VWAP/PE_VWAP.
+    if (settings.VWAP_CROSS_EXIT
+            and slot.sm.state == State.POSITION_OPEN
+            and slot.strategy_type in ("CE_VWAP", "PE_VWAP")
+            and candles_5m
+            and slot.vwap.value is not None):
+        _vwap_val = slot.vwap.value
+        _latest_close = candles_5m[-1].close
+        _vwap_crossed = (
+            slot.strategy_type == "CE_VWAP" and _latest_close < _vwap_val
+        ) or (
+            slot.strategy_type == "PE_VWAP" and _latest_close > _vwap_val
+        )
+        if _vwap_crossed:
+            log_event(
+                logger, "VWAP_CROSS_EXIT",
+                side=slot.strategy_type,
+                close=round(_latest_close, 2),
+                vwap=round(_vwap_val, 2),
+                candle=candle.timestamp,
+            )
+            execute_exit(slot, reason="VWAP_CROSS_EXIT")
+            return True
+
+    # ── EMA index engine: trail ATR refresh, EMA9 trail exit, time stop, reversal ──
+    if isinstance(slot.pivot_mgr, EmaTradeManager) and slot.sm.state == State.POSITION_OPEN and candles_5m:
+        _emgr = slot.pivot_mgr
+        _tatr = atr_at(candles_5m, period=settings.TSL_ATR_PERIOD)
+        if _tatr:
+            _emgr.update_atr(_tatr)
+        _e9 = calc_ema(candles_5m, 9)[-1] if len(candles_5m) >= 9 else None
+        _ema_reason = _emgr.on_candle(candles_5m[-1].close, _e9)
+        # Reversal: opposite EMA signal on this candle (side-effect free check)
+        if _ema_reason is None and settings.ENABLE_REVERSAL_EXIT and market_open():
+            from strategies.ce_strategy import is_ce_signal as _ce_sig
+            from strategies.pe_strategy import is_pe_signal as _pe_sig
+            _kw = dict(rsi_period=settings.EMA_RSI_PERIOD, pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS)
+            if slot.strategy_type == "CE" and _pe_sig(candles_5m, candles_15m, rsi_max=settings.EMA_RSI_PE_MAX, **_kw):
+                _ema_reason = "REVERSAL_SIGNAL"
+            elif slot.strategy_type == "PE" and _ce_sig(candles_5m, candles_15m, rsi_min=settings.EMA_RSI_CE_MIN, **_kw):
+                _ema_reason = "REVERSAL_SIGNAL"
+        if _ema_reason:
+            execute_exit(slot, reason=_ema_reason)
+            return True
+        _emgr.save(slot.trade_id or "")
+
+    # ── Smart Exit candle-level checks (EMA collapse) ──────────────────────
+    if (slot.smart_exit is not None and slot.sm.state == State.POSITION_OPEN
+            and (slot.pivot_mgr is None or isinstance(slot.pivot_mgr, EmaTradeManager))):
+        smart_reason = slot.smart_exit.check_on_candle(
+            strategy_type = slot.strategy_type,
+            candles_5m    = candles_5m,
+            candles_15m   = candles_15m,
+        )
+        if smart_reason:
+            execute_exit(slot, reason=smart_reason)
+            return True   # position closed — this strategy does not re-enter this candle
+    return False
+
+
+def _slot_signal_exit_checks(slot, candles_5m, ema9, ema21, atr_val, signal: str | None) -> bool:
+    """
+    Exit checks that need this candle's signal evaluation, for ONE open slot.
+    *signal* is the signal of the slot's OWN strategy only: another strategy's
+    opposite-side signal never closes this strategy's position.
+    Returns True when the position was closed.
+    """
+    # ── AI exit suggestion (per-candle, only when position open) ──────────
+    if (
+        settings.ENABLE_AI_EXIT
+        and slot.ai_confirmation is not None
+        and slot.sm.state == State.POSITION_OPEN
+        and signal is None   # don't double-exit on reversal candle
+        and slot.strategy_type
+    ):
+        _opt_ltp = getattr(slot, "last_option_ltp", 0.0) or slot.entry_price
+        _unreal = (_opt_ltp - slot.entry_price) * slot.quantity
+        ai_exit = slot.ai_confirmation.confirm_exit(
+            signal              = slot.strategy_type,
+            candles_5m          = candles_5m,
+            entry_price         = slot.entry_price,
+            option_ltp          = _opt_ltp,
+            unrealised_pnl_pts  = _unreal,
+            ema9                = ema9,
+            ema21               = ema21,
+            atr                 = atr_val,
+        )
+        if ai_exit:
+            execute_exit(slot, reason=ai_exit)
+            return True
+
+    # Pass reversal signal to smart exit tick handler
+    if (
+        slot.smart_exit is not None
+        and slot.sm.state == State.POSITION_OPEN
+        and signal is not None
+        # Pivot / EMA trades: own exit engine only (generic index trades keep it)
+        and (slot.pivot_mgr is None or isinstance(slot.pivot_mgr, IndexTradeManager))
+    ):
+        daily_pnl = fetch_today_realised_pnl()
+        smart_reason = slot.smart_exit.check_on_tick(
+            strategy_type          = slot.strategy_type,
+            entry_price            = slot.entry_price,
+            option_ltp             = getattr(slot, "last_option_ltp", 0.0) or slot.entry_price,
+            qty                    = slot.quantity,
+            daily_realised_pnl_pts = daily_pnl,
+            pending_signal         = signal,
+            entry_atr              = slot.entry_atr,
+        )
+        if smart_reason:
+            execute_exit(slot, reason=smart_reason)
+            return True
+    return False
+
+
 def _make_candle_handler_5m(ctx: BotContext):
     def handler(candle: Candle) -> None:
         # Refresh the intraday regime first so the state file written just below
@@ -2459,100 +2762,20 @@ def _make_candle_handler_5m(ctx: BotContext):
         tick_ema_cooldown()
         tick_mom_cooldown()
 
-        # ── REST option LTP fallback when WebSocket option feed is dead ────────
-        if (
-            ctx.ws is not None
-            and not ctx.ws.option_feed_ok
-            and ctx.sm.state == State.POSITION_OPEN
-            and ctx.tradingsymbol
-        ):
-            try:
-                # LIVE mode uses broker._fetch_ltp(); PAPER/SHADOW use Kite directly
-                # because PaperBroker has no _fetch_ltp method.
-                if settings.TRADING_MODE == "LIVE":
-                    rest_ltp = ctx.broker._fetch_ltp(ctx.tradingsymbol, "BFO")
-                else:
-                    from broker.kite_client import get_kite as _gk
-                    _qr = _gk().quote([f"BFO:{ctx.tradingsymbol}"])
-                    rest_ltp = float(_qr[f"BFO:{ctx.tradingsymbol}"]["last_price"])
-                if rest_ltp and rest_ltp > 0:
-                    log_event(logger, "OPTION_LTP_REST_FALLBACK",
-                              symbol=ctx.tradingsymbol, ltp=rest_ltp)
-                    on_option_ltp(ctx, rest_ltp)
-            except Exception as exc:
-                logger.warning("REST option LTP fallback failed: %s", exc)
+        # ── Per-strategy exit checks: each open slot is managed on its own ──────
+        # A slot that exits here does not re-enter on this same candle; the other
+        # strategies carry on unaffected.
+        exited: set[int] = set()
+        for slot in _open_slots(ctx):
+            if _slot_candle_exit_checks(slot, candle, candles_5m, candles_15m):
+                exited.add(id(slot))
 
-        # ── VWAP cross-exit: close back through VWAP invalidates the thesis ──────
-        # CE_VWAP thesis = price above VWAP.  The moment a completed 5m candle
-        # closes below VWAP, the level has been surrendered — exit immediately,
-        # before the ATR-based option SL backstop fires.  Mirror for PE_VWAP.
-        # Only runs when VWAP_CROSS_EXIT=true and the strategy is CE_VWAP/PE_VWAP.
-        if (settings.VWAP_CROSS_EXIT
-                and ctx.sm.state == State.POSITION_OPEN
-                and ctx.strategy_type in ("CE_VWAP", "PE_VWAP")
-                and candles_5m
-                and ctx.vwap.value is not None):
-            _vwap_val = ctx.vwap.value
-            _latest_close = candles_5m[-1].close
-            _vwap_crossed = (
-                ctx.strategy_type == "CE_VWAP" and _latest_close < _vwap_val
-            ) or (
-                ctx.strategy_type == "PE_VWAP" and _latest_close > _vwap_val
-            )
-            if _vwap_crossed:
-                log_event(
-                    logger, "VWAP_CROSS_EXIT",
-                    side=ctx.strategy_type,
-                    close=round(_latest_close, 2),
-                    vwap=round(_vwap_val, 2),
-                    candle=candle.timestamp,
-                )
-                execute_exit(ctx, reason="VWAP_CROSS_EXIT")
-                return
-
-        # ── EMA index engine: trail ATR refresh, EMA9 trail exit, time stop, reversal ──
-        if isinstance(ctx.pivot_mgr, EmaTradeManager) and ctx.sm.state == State.POSITION_OPEN and candles_5m:
-            _emgr = ctx.pivot_mgr
-            _tatr = atr_at(candles_5m, period=settings.TSL_ATR_PERIOD)
-            if _tatr:
-                _emgr.update_atr(_tatr)
-            _e9 = calc_ema(candles_5m, 9)[-1] if len(candles_5m) >= 9 else None
-            _ema_reason = _emgr.on_candle(candles_5m[-1].close, _e9)
-            # Reversal: opposite EMA signal on this candle (side-effect free check)
-            if _ema_reason is None and settings.ENABLE_REVERSAL_EXIT and market_open():
-                from strategies.ce_strategy import is_ce_signal as _ce_sig
-                from strategies.pe_strategy import is_pe_signal as _pe_sig
-                _kw = dict(rsi_period=settings.EMA_RSI_PERIOD, pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS)
-                if ctx.strategy_type == "CE" and _pe_sig(candles_5m, candles_15m, rsi_max=settings.EMA_RSI_PE_MAX, **_kw):
-                    _ema_reason = "REVERSAL_SIGNAL"
-                elif ctx.strategy_type == "PE" and _ce_sig(candles_5m, candles_15m, rsi_min=settings.EMA_RSI_CE_MIN, **_kw):
-                    _ema_reason = "REVERSAL_SIGNAL"
-            if _ema_reason:
-                execute_exit(ctx, reason=_ema_reason)
-                return
-            _emgr.save(ctx.trade_id or "")
-
-        # ── Smart Exit candle-level checks (EMA collapse) ──────────────────────
-        if (ctx.smart_exit is not None and ctx.sm.state == State.POSITION_OPEN
-                and (ctx.pivot_mgr is None or isinstance(ctx.pivot_mgr, EmaTradeManager))):
-            smart_reason = ctx.smart_exit.check_on_candle(
-                strategy_type = ctx.strategy_type,
-                candles_5m    = candles_5m,
-                candles_15m   = candles_15m,
-            )
-            if smart_reason:
-                execute_exit(ctx, reason=smart_reason)
-                return   # position closed — don't evaluate entries this candle
-
-        # ── Reversal signal check (smart exit trigger 1) ────────────────────────
-        # evaluate_signals runs here for both entry AND reversal detection.
         # Skip signal evaluation outside market hours — post-15:30 flat candles
         # built from frozen PaperFeed LTP ticks must never reach strategy logic.
         if not market_open():
             return
-        # Nothing below applies while halted / mid-order; a POSITION_OPEN bot
-        # must still reach the exit checks, so entries are gated further down.
-        if ctx.sm.is_entry_blocked() and ctx.sm.state != State.POSITION_OPEN:
+        # A halted bot has an unresolved position somewhere: no new entries.
+        if _is_halted(ctx):
             return
 
         # Derive live EMA9/EMA21/ATR for AI context
@@ -2563,10 +2786,11 @@ def _make_candle_handler_5m(ctx: BotContext):
         # FIX (Flaw 9): refresh the pivot manager's ATR and delta on every candle
         # close so the chandelier trail uses current-session volatility rather than
         # the frozen entry-time ATR, and the option stop stays delta-accurate.
-        if (ctx.pivot_mgr is not None and ctx.sm.state == State.POSITION_OPEN
-                and not isinstance(ctx.pivot_mgr, EmaTradeManager)):
+        for slot in _open_slots(ctx):
+            if slot.pivot_mgr is None or isinstance(slot.pivot_mgr, EmaTradeManager):
+                continue
             if _atr_val:
-                ctx.pivot_mgr.update_atr(_atr_val)
+                slot.pivot_mgr.update_atr(_atr_val)
             # FIX (Flaw 10): re-derive delta from SENSEX distance to Pivot t1.
             # As price moves toward / past T1 the option becomes more ITM and
             # delta rises toward 0.5-0.6.  Use a simple linear interpolation:
@@ -2574,7 +2798,7 @@ def _make_candle_handler_5m(ctx: BotContext):
             #   at T1     → 0.5
             # beyond T1  → 0.6  (capped; we never reliably know actual greeks)
             if settings.TRADING_MODE != "PAPER":
-                _mgr = ctx.pivot_mgr
+                _mgr = slot.pivot_mgr
                 _fav_now = _mgr._fav(ctx.sensex_ltp) if ctx.sensex_ltp > 0 else 0.0
                 _t1_dist = _mgr._fav(_mgr.t1)
                 if _t1_dist > 0:
@@ -2614,7 +2838,16 @@ def _make_candle_handler_5m(ctx: BotContext):
             except Exception:
                 pass  # silently fall back to no option context
 
-        signal = evaluate_signals(
+        # Strategies already holding a position are not evaluated for entries —
+        # unless the reversal exit needs their opposite-side signal.
+        _busy = () if settings.ENABLE_REVERSAL_EXIT else tuple(
+            k for s in _all_slots(ctx)
+            if s.sm.state != State.IDLE and (k := _slot_key(s)) is not None
+        )
+
+        # Every strategy is evaluated independently: one strategy firing never
+        # hides another's signal.
+        signals = evaluate_all_signals(
             candles_5m, candles_15m,
             smart_entry=ctx.smart_entry,
             ai_confirmation=ctx.ai_confirmation,
@@ -2633,73 +2866,45 @@ def _make_candle_handler_5m(ctx: BotContext):
             option_day_low=_ai_option_day_low,
             option_day_high=_ai_option_day_high,
             daily_trend=ctx.daily_trend,
+            busy_strategies=_busy,
         )
+        signal_by_key: dict[str, str] = {}
+        for sig in signals:
+            signal_by_key.setdefault(strategy_key(sig), sig)
 
-        # ── AI exit suggestion (per-candle, only when position open) ──────────
-        if (
-            settings.ENABLE_AI_EXIT
-            and ctx.ai_confirmation is not None
-            and ctx.sm.state == State.POSITION_OPEN
-            and signal is None   # don't double-exit on reversal candle
-            and ctx.strategy_type
-        ):
-            _opt_ltp = getattr(ctx, "last_option_ltp", 0.0) or ctx.entry_price
-            _unreal = (_opt_ltp - ctx.entry_price) * ctx.quantity
-            ai_exit = ctx.ai_confirmation.confirm_exit(
-                signal              = ctx.strategy_type,
-                candles_5m          = candles_5m,
-                entry_price         = ctx.entry_price,
-                option_ltp          = _opt_ltp,
-                unrealised_pnl_pts  = _unreal,
-                ema9                = _ema9_val,
-                ema21               = _ema21_val,
-                atr                 = _atr_val,
-            )
-            if ai_exit:
-                execute_exit(ctx, reason=ai_exit)
-                return
+        # ── Signal-driven exits (AI exit, reversal), strictly per strategy ──────
+        for slot in _open_slots(ctx):
+            if id(slot) in exited:
+                continue
+            if _slot_signal_exit_checks(slot, candles_5m, _ema9_val, _ema21_val, _atr_val,
+                                        signal_by_key.get(_slot_key(slot))):
+                exited.add(id(slot))
 
-        # Pass reversal signal to smart exit tick handler before entering
-        if (
-            ctx.smart_exit is not None
-            and ctx.sm.state == State.POSITION_OPEN
-            and signal is not None
-            # Pivot / EMA trades: own exit engine only (generic index trades keep it)
-            and (ctx.pivot_mgr is None or isinstance(ctx.pivot_mgr, IndexTradeManager))
-        ):
-            daily_pnl = fetch_today_realised_pnl()
-            smart_reason = ctx.smart_exit.check_on_tick(
-                strategy_type          = ctx.strategy_type,
-                entry_price            = ctx.entry_price,
-                option_ltp             = getattr(ctx, "last_option_ltp", 0.0) or ctx.entry_price,
-                qty                    = ctx.quantity,
-                daily_realised_pnl_pts = daily_pnl,
-                pending_signal         = signal,
-                entry_atr              = ctx.entry_atr,
-            )
-            if smart_reason:
-                execute_exit(ctx, reason=smart_reason)
-                return
-
-        # Everything above (pivot ATR/delta refresh, AI exit, reversal smart
-        # exit) must run while a position is open; only new entries are gated.
-        if ctx.sm.is_entry_blocked():
-            return
-
-        if signal:
+        # ── Entries: each signal goes to its own strategy's slot ────────────────
+        for signal in signals:
+            target = ctx.slot_for(strategy_key(signal)) if isinstance(ctx, BotContext) else ctx
+            # Everything above must run while a position is open; only new entries
+            # are gated — and only by THIS strategy's own slot, never by another's.
+            if id(target) in exited or target.sm.is_entry_blocked():
+                continue
             # Track ORB fires so the session qualifier knows the day's character
             if signal in ("CE_ORB", "PE_ORB") and not ctx.orb_fired_today:
                 ctx.orb_fired_today = True
                 ctx.orb_direction_today = "CE" if signal == "CE_ORB" else "PE"
             # Use the latest live SENSEX LTP (or candle close as fallback)
             underlying_ltp = ctx.sensex_ltp if ctx.sensex_ltp > 0 else candle.close
-            execute_entry(ctx, signal, underlying_ltp, signal_candle_ts=candle.timestamp,
+            execute_entry(target, signal, underlying_ltp, signal_candle_ts=candle.timestamp,
                           candle_completed_ts=getattr(ctx, "_last_candle_completed_ts", None))
     return handler
 
 
 def _run_eod_exit(ctx: BotContext) -> None:
-    """Square off an open position at the force-exit time."""
+    """Square off every open position at the force-exit time."""
+    for slot in _all_slots(ctx):
+        _run_eod_exit_slot(slot)
+
+
+def _run_eod_exit_slot(ctx) -> None:
     if ctx.sm.state != State.POSITION_OPEN or not ctx.trade_id:
         return
     logger.warning(
@@ -2822,6 +3027,9 @@ def classify_session_regime(ctx: BotContext) -> None:
                 atr=atr,
             )
             ctx.regime_classifier.adjust_profit_lock(ctx.smart_exit, regime)
+            for slot in ctx.slots.values():   # slots recovered before classification
+                if slot.smart_exit is not None:
+                    ctx.regime_classifier.adjust_profit_lock(slot.smart_exit, regime)
             ctx.ai_regime = regime.value   # share with AI confirmation filter
             log_event(logger, "REGIME_CLASSIFIED", regime=regime.value,
                       atr_mult=ctx.smart_exit._profit_lock_atr_mult,
@@ -2831,6 +3039,60 @@ def classify_session_regime(ctx: BotContext) -> None:
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
+
+def _reconcile_slot(ctx: BotContext, slot) -> None:
+    """Detect a position closed outside the bot (manual exit, SL hit at broker, ...)."""
+    from broker.position_repository import get_net_position_qty
+    actual_qty = get_net_position_qty(slot.tradingsymbol)
+    if actual_qty is None:
+        # API failure — cannot determine if position is open or closed;
+        # do nothing and let the next reconcile cycle retry.
+        logger.warning(
+            "Reconciliation skipped — broker API unavailable for %s.",
+            slot.tradingsymbol,
+        )
+        return
+    # The broker nets every strategy's lots on one symbol together, so this
+    # slot is only "closed externally" when the whole symbol is flat.
+    if actual_qty != 0:
+        return
+    # Position closed externally (manual exit, SL hit at broker, etc.)
+    logger.warning(
+        "Position %s has qty=0 at broker — closed externally. "
+        "Reconciling DB and resetting state.",
+        slot.tradingsymbol,
+    )
+    # Fetch fill price from broker orders
+    exit_price = slot.entry_price  # fallback
+    try:
+        orders = slot.broker._kite.orders()
+        sells = [
+            o for o in orders
+            if o.get("tradingsymbol") == slot.tradingsymbol
+            and o.get("transaction_type") == "SELL"
+            and o.get("status") == "COMPLETE"
+        ]
+        if sells:
+            exit_price = float(sells[-1].get("average_price", exit_price))
+    except Exception:
+        pass
+    pnl = (exit_price - slot.entry_price) * slot.quantity
+    mark_trade_closed(slot.trade_id, exit_price, now_ist().isoformat(), pnl)
+    notify("EXIT_FILLED", symbol=slot.tradingsymbol,
+           exit_price=exit_price, pnl=pnl, reason="EXTERNAL_CLOSE")
+    log_event(logger, "EXTERNAL_CLOSE_DETECTED",
+              symbol=slot.tradingsymbol, exit_price=exit_price, pnl=pnl)
+    # Cancel any lingering stop order
+    if slot.stop_order_id:
+        slot.broker.cancel_order(slot.stop_order_id)
+    # POSITION_OPEN -> CLOSED is not a valid direct transition;
+    # must pass through EXIT_PENDING first.
+    slot.sm.transition(State.EXIT_PENDING, reason="external close detected")
+    slot.sm.transition(State.CLOSED, reason="external close detected")
+    slot.sm.transition(State.IDLE, reason="ready for next trade")
+    _close_trade_context(slot)
+    _write_state(ctx)
+
 
 def main() -> None:
     configure_logging()
@@ -2926,12 +3188,13 @@ def main() -> None:
         _start_orderflow_recorder(ctx)
 
         # If we recovered an open position on startup, subscribe its option token now.
-        if ctx.sm.state == State.POSITION_OPEN and ctx.instrument_token:
-            ctx.ws.add_token(ctx.instrument_token)
-            logger.info(
-                "Recovery: subscribed option token %d (%s) on WebSocket.",
-                ctx.instrument_token, ctx.tradingsymbol,
-            )
+        for slot in _open_slots(ctx):
+            if slot.instrument_token:
+                ctx.ws.add_token(slot.instrument_token)
+                logger.info(
+                    "Recovery: subscribed option token %d (%s) on WebSocket.",
+                    slot.instrument_token, slot.tradingsymbol,
+                )
 
         # FALLBACK feed: PaperFeed REST poll.  Runs in parallel and fires the same
         # tick_handler.  The candle aggregator and state writer are idempotent, so
@@ -3000,78 +3263,17 @@ def main() -> None:
             # ── Periodic reconciliation: detect external closes ────────────────
             now_mono = time.monotonic()
             if (
-                ctx.sm.state == State.POSITION_OPEN
-                and ctx.trade_id
-                and ctx.tradingsymbol
-                and settings.TRADING_MODE == "LIVE"
+                settings.TRADING_MODE == "LIVE"
                 and now_mono - _last_reconcile >= _RECONCILE_INTERVAL
             ):
                 _last_reconcile = now_mono
-                try:
-                    from broker.position_repository import get_net_position_qty
-                    actual_qty = get_net_position_qty(ctx.tradingsymbol)
-                    if actual_qty is None:
-                        # API failure — cannot determine if position is open or closed;
-                        # do nothing and let the next reconcile cycle retry.
-                        logger.warning(
-                            "Reconciliation skipped — broker API unavailable for %s.",
-                            ctx.tradingsymbol,
-                        )
-                    elif actual_qty == 0:
-                        # Position closed externally (manual exit, SL hit at broker, etc.)
-                        logger.warning(
-                            "Position %s has qty=0 at broker — closed externally. "
-                            "Reconciling DB and resetting state.",
-                            ctx.tradingsymbol,
-                        )
-                        # Fetch fill price from broker orders
-                        exit_price = ctx.entry_price  # fallback
-                        try:
-                            orders = ctx.broker._kite.orders()
-                            sells = [
-                                o for o in orders
-                                if o.get("tradingsymbol") == ctx.tradingsymbol
-                                and o.get("transaction_type") == "SELL"
-                                and o.get("status") == "COMPLETE"
-                            ]
-                            if sells:
-                                exit_price = float(sells[-1].get("average_price", exit_price))
-                        except Exception:
-                            pass
-                        pnl = (exit_price - ctx.entry_price) * ctx.quantity
-                        mark_trade_closed(ctx.trade_id, exit_price, now_ist().isoformat(), pnl)
-                        notify("EXIT_FILLED", symbol=ctx.tradingsymbol,
-                               exit_price=exit_price, pnl=pnl, reason="EXTERNAL_CLOSE")
-                        log_event(logger, "EXTERNAL_CLOSE_DETECTED",
-                                  symbol=ctx.tradingsymbol, exit_price=exit_price, pnl=pnl)
-                        # Cancel any lingering stop order
-                        if ctx.stop_order_id:
-                            ctx.broker.cancel_order(ctx.stop_order_id)
-                        # PAPER/SHADOW: the real broker has no position but the
-                        # PaperBroker._positions dict still holds the entry qty.
-                        # Decrement it now so the next entry for the same symbol
-                        # doesn't accumulate a stale qty, which would cause
-                        # PRE_SELL_QTY_MISMATCH on the next SL hit.
-                        if settings.TRADING_MODE in ("PAPER", "SHADOW"):
-                            _pb_positions = getattr(ctx.broker, "_positions", {})
-                            _stale_qty = _pb_positions.get(ctx.tradingsymbol, 0)
-                            if _stale_qty > 0:
-                                _pb_positions[ctx.tradingsymbol] = max(0, _stale_qty - ctx.quantity)
-                                logger.debug(
-                                    "EXTERNAL_CLOSE: cleared paper broker position %s "
-                                    "(%d → %d).",
-                                    ctx.tradingsymbol, _stale_qty,
-                                    _pb_positions[ctx.tradingsymbol],
-                                )
-                        # POSITION_OPEN -> CLOSED is not a valid direct transition;
-                        # must pass through EXIT_PENDING first.
-                        ctx.sm.transition(State.EXIT_PENDING, reason="external close detected")
-                        ctx.sm.transition(State.CLOSED, reason="external close detected")
-                        ctx.sm.transition(State.IDLE, reason="ready for next trade")
-                        _close_trade_context(ctx)
-                        _write_state(ctx)
-                except Exception as exc:
-                    logger.error("Reconciliation check failed: %s", exc)
+                for slot in _open_slots(ctx):
+                    if not (slot.trade_id and slot.tradingsymbol):
+                        continue
+                    try:
+                        _reconcile_slot(ctx, slot)
+                    except Exception as exc:
+                        logger.error("Reconciliation check failed: %s", exc)
 
             # ── EOD forced exit ────────────────────────────────────────────────
             if not _eod_done and is_after_or_equal(now_ist().time(), force_exit_time):
