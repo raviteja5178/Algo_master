@@ -665,6 +665,13 @@ def _evaluate_core(
             min_bounce_pts=settings.VWAP_MIN_BOUNCE_PTS,
             max_submerged_candles=settings.VWAP_MAX_SUBMERGED_CANDLES,
             slope_lookback=settings.VWAP_SLOPE_LOOKBACK,
+            mr_zscore_entry=settings.VWAP_MR_ZSCORE_ENTRY,
+            mr_adx_max=settings.VWAP_MR_ADX_MAX,
+            mr_rsi_confirm=settings.VWAP_MR_RSI_CONFIRM,
+            mr_volume_spike=settings.VWAP_MR_VOLUME_SPIKE,
+            mr_min_rr=settings.VWAP_MR_MIN_RR,
+            mr_min_score=settings.VWAP_MR_MIN_SCORE,
+            mr_vwap_cross_min=settings.VWAP_MR_VWAP_CROSS_MIN,
         )
 
         def _vwap_level_blocked(side: str) -> bool:

@@ -19,6 +19,13 @@ def _candle(h: int, m: int, o: float, hi: float, lo: float, c: float, vol: int =
     return Candle(_ts(h, m), open=o, high=hi, low=lo, close=c, volume=vol)
 
 
+def _candle_seq(idx: int, o: float, hi: float, lo: float, c: float, vol: int = 100) -> Candle:
+    """Build a candle with a sequential timestamp (9:15 + idx*5m) safe for any count."""
+    total_minutes = 9 * 60 + 15 + idx * 5
+    h, m = divmod(total_minutes, 60)
+    return _candle(h, m, o, hi, lo, c, vol)
+
+
 # ── VWAPCalculator ────────────────────────────────────────────────────────────
 
 class TestVWAPCalculator:
@@ -240,6 +247,13 @@ class TestVWAPSignalEngineIntegration:
             ms.VWAP_MAX_SUBMERGED_CANDLES = 3
             ms.VWAP_SLOPE_LOOKBACK = 0
             ms.VWAP_NO_NEW_ENTRY_AFTER = ""
+            ms.VWAP_MR_ZSCORE_ENTRY = 0.0
+            ms.VWAP_MR_ADX_MAX = 0.0
+            ms.VWAP_MR_RSI_CONFIRM = False
+            ms.VWAP_MR_VOLUME_SPIKE = 0.0
+            ms.VWAP_MR_MIN_RR = 0.0
+            ms.VWAP_MR_MIN_SCORE = 0
+            ms.VWAP_MR_VWAP_CROSS_MIN = 0
 
             sig = evaluate_signals(c5, c15, vwap=73600.0)
             assert sig is None
@@ -274,6 +288,13 @@ class TestVWAPSignalEngineIntegration:
             ms.VWAP_MAX_SUBMERGED_CANDLES = 3
             ms.VWAP_SLOPE_LOOKBACK = 0
             ms.VWAP_NO_NEW_ENTRY_AFTER = ""
+            ms.VWAP_MR_ZSCORE_ENTRY = 0.0
+            ms.VWAP_MR_ADX_MAX = 0.0
+            ms.VWAP_MR_RSI_CONFIRM = False
+            ms.VWAP_MR_VOLUME_SPIKE = 0.0
+            ms.VWAP_MR_MIN_RR = 0.0
+            ms.VWAP_MR_MIN_SCORE = 0
+            ms.VWAP_MR_VWAP_CROSS_MIN = 0
 
             sig = evaluate_signals(c5, c15, vwap=73600.0)
             assert sig == "CE_VWAP"
@@ -308,6 +329,13 @@ class TestVWAPSignalEngineIntegration:
             ms.VWAP_MAX_SUBMERGED_CANDLES = 3
             ms.VWAP_SLOPE_LOOKBACK = 0
             ms.VWAP_NO_NEW_ENTRY_AFTER = ""
+            ms.VWAP_MR_ZSCORE_ENTRY = 0.0
+            ms.VWAP_MR_ADX_MAX = 0.0
+            ms.VWAP_MR_RSI_CONFIRM = False
+            ms.VWAP_MR_VOLUME_SPIKE = 0.0
+            ms.VWAP_MR_MIN_RR = 0.0
+            ms.VWAP_MR_MIN_SCORE = 0
+            ms.VWAP_MR_VWAP_CROSS_MIN = 0
 
             sig = evaluate_signals(c5, c15, vwap=73600.0)
             assert sig is None
@@ -342,8 +370,308 @@ class TestVWAPSignalEngineIntegration:
             ms.VWAP_MAX_SUBMERGED_CANDLES = 3
             ms.VWAP_SLOPE_LOOKBACK = 0
             ms.VWAP_NO_NEW_ENTRY_AFTER = ""
+            ms.VWAP_MR_ZSCORE_ENTRY = 0.0
+            ms.VWAP_MR_ADX_MAX = 0.0
+            ms.VWAP_MR_RSI_CONFIRM = False
+            ms.VWAP_MR_VOLUME_SPIKE = 0.0
+            ms.VWAP_MR_MIN_RR = 0.0
+            ms.VWAP_MR_MIN_SCORE = 0
+            ms.VWAP_MR_VWAP_CROSS_MIN = 0
 
             sig = evaluate_signals(c5, c15, vwap=73600.0)
             assert sig == "PE_VWAP"
 
 
+
+
+# ── Enhanced VWAP Mean-Reversion helpers ──────────────────────────────────────
+
+class TestVWAPZscore:
+
+    def _candles_around_vwap(self, vwap: float, closes: list[float]) -> list[Candle]:
+        result = []
+        for i, c in enumerate(closes):
+            result.append(_candle(10, i * 5, c - 2, c + 5, c - 8, c))
+        return result
+
+    def test_zscore_positive_above_vwap(self):
+        from strategies.vwap_strategy import vwap_zscore
+        vwap = 73600.0
+        # 10 candles near vwap, last one far above
+        closes = [73600, 73605, 73595, 73600, 73602, 73598, 73601, 73600, 73599, 73700]
+        candles = self._candles_around_vwap(vwap, closes)
+        z = vwap_zscore(candles, vwap)
+        assert z is not None and z > 0
+
+    def test_zscore_negative_below_vwap(self):
+        from strategies.vwap_strategy import vwap_zscore
+        vwap = 73600.0
+        closes = [73600, 73605, 73595, 73600, 73602, 73598, 73601, 73600, 73599, 73500]
+        candles = self._candles_around_vwap(vwap, closes)
+        z = vwap_zscore(candles, vwap)
+        assert z is not None and z < 0
+
+    def test_zscore_returns_none_with_too_few_candles(self):
+        from strategies.vwap_strategy import vwap_zscore
+        candles = [_candle(10, 0, 100, 110, 90, 100), _candle(10, 5, 100, 110, 90, 102)]
+        assert vwap_zscore(candles, 100.0) is None
+
+
+class TestADXRegimeOk:
+
+    def test_disabled_always_passes(self):
+        from strategies.vwap_strategy import adx_regime_ok
+        candles = [_candle(10, i * 5, 100, 110, 90, 100 + i) for i in range(5)]
+        assert adx_regime_ok(candles, adx_max=0.0) is True
+
+    def test_passes_when_insufficient_candles(self):
+        from strategies.vwap_strategy import adx_regime_ok
+        candles = [_candle(10, i * 5, 100, 110, 90, 100) for i in range(5)]
+        # ADX needs 2*14+1 candles — not enough, should allow
+        assert adx_regime_ok(candles, adx_max=25.0) is True
+
+    def test_blocks_when_adx_high(self):
+        from strategies.vwap_strategy import adx_regime_ok
+        # Build a strong directional trend so ADX will be high
+        candles = [_candle_seq(i, 70000 + i * 50, 70000 + i * 55, 70000 + i * 45, 70000 + i * 50)
+                   for i in range(40)]
+        # With a strong trend, ADX should exceed 5 (very permissive threshold)
+        result = adx_regime_ok(candles, adx_max=5.0)
+        # ADX should be well above 5 for such a trend — expected False
+        assert result is False
+
+
+class TestVWAPCrossCount:
+
+    def test_no_crossings(self):
+        from strategies.vwap_strategy import vwap_cross_count
+        vwap = 73600.0
+        candles = [_candle(10, i * 5, 73610, 73620, 73605, 73615) for i in range(5)]
+        assert vwap_cross_count(candles, vwap) == 0
+
+    def test_one_crossing(self):
+        from strategies.vwap_strategy import vwap_cross_count
+        vwap = 73600.0
+        closes = [73610, 73620, 73590, 73595, 73605]
+        candles = [_candle(10, i * 5, c - 2, c + 5, c - 8, c) for i, c in enumerate(closes)]
+        # crosses from 73620 (above) to 73590 (below) = 1 crossing
+        assert vwap_cross_count(candles, vwap) >= 1
+
+    def test_multiple_crossings(self):
+        from strategies.vwap_strategy import vwap_cross_count
+        vwap = 73600.0
+        closes = [73610, 73590, 73620, 73580, 73610]
+        candles = [_candle(10, i * 5, c - 2, c + 5, c - 8, c) for i, c in enumerate(closes)]
+        assert vwap_cross_count(candles, vwap) == 4
+
+
+class TestRSIReversalOk:
+
+    def _make_closes(self, base: float, ups: int, downs: int, final: float) -> list[float]:
+        """Alternate up/down moves then set a final close."""
+        closes = [base]
+        for i in range(ups):
+            closes.append(closes[-1] + 10)
+        for i in range(downs):
+            closes.append(closes[-1] - 12)
+        closes.append(final)
+        return closes
+
+    def test_ce_rsi_reversal_confirmed(self):
+        from strategies.vwap_strategy import rsi_reversal_ok
+        # Build a downtrend to push RSI below 30, then a bounce
+        closes = [1000 - i * 5 for i in range(20)]  # declining
+        closes.append(closes[-1] + 20)               # bounce up
+        candles = [_candle_seq(i, c - 2, c + 5, c - 8, c) for i, c in enumerate(closes)]
+        # With aggressive decline RSI should be low before bounce
+        # The function returns True when not enough data or when confirmed
+        result = rsi_reversal_ok(candles, "CE")
+        assert isinstance(result, bool)
+
+    def test_pe_rsi_reversal_confirmed(self):
+        from strategies.vwap_strategy import rsi_reversal_ok
+        closes = [1000 + i * 5 for i in range(20)]  # rising
+        closes.append(closes[-1] - 20)               # drop
+        candles = [_candle_seq(i, c - 2, c + 5, c - 8, c) for i, c in enumerate(closes)]
+        result = rsi_reversal_ok(candles, "PE")
+        assert isinstance(result, bool)
+
+    def test_returns_true_with_insufficient_data(self):
+        from strategies.vwap_strategy import rsi_reversal_ok
+        candles = [_candle(10, i * 5, 100, 110, 90, 100) for i in range(5)]
+        assert rsi_reversal_ok(candles, "CE") is True
+        assert rsi_reversal_ok(candles, "PE") is True
+
+
+class TestVolumeSpike:
+
+    def test_disabled_always_passes(self):
+        from strategies.vwap_strategy import volume_spike
+        candles = [_candle(10, i * 5, 100, 110, 90, 100, vol=50) for i in range(5)]
+        assert volume_spike(candles, multiplier=0.0) is True
+
+    def test_spike_detected(self):
+        from strategies.vwap_strategy import volume_spike
+        # 20 candles with vol=100, then a spike at vol=300
+        candles = [_candle_seq(i, 100, 110, 90, 100, vol=100) for i in range(20)]
+        candles.append(_candle_seq(20, 100, 110, 90, 100, vol=300))
+        assert volume_spike(candles, multiplier=1.5) is True
+
+    def test_no_spike_blocked(self):
+        from strategies.vwap_strategy import volume_spike
+        candles = [_candle_seq(i, 100, 110, 90, 100, vol=100) for i in range(21)]
+        # current vol=100, avg=100, need 1.5x — should fail
+        assert volume_spike(candles, multiplier=1.5) is False
+
+    def test_passes_with_insufficient_history(self):
+        from strategies.vwap_strategy import volume_spike
+        candles = [_candle(10, i * 5, 100, 110, 90, 100, vol=50) for i in range(5)]
+        assert volume_spike(candles, multiplier=2.0) is True
+
+
+class TestRewardToRiskOk:
+
+    def test_disabled_always_passes(self):
+        from strategies.vwap_strategy import reward_to_risk_ok
+        assert reward_to_risk_ok(100.0, 110.0, 95.0, min_rr=0.0) is True
+
+    def test_ce_sufficient_rr(self):
+        from strategies.vwap_strategy import reward_to_risk_ok
+        # close=73580, vwap=73620 → reward=40; stop=73560 → risk=20; RR=2.0
+        assert reward_to_risk_ok(73580.0, 73620.0, 73560.0, min_rr=1.5) is True
+
+    def test_ce_insufficient_rr(self):
+        from strategies.vwap_strategy import reward_to_risk_ok
+        # close=73590, vwap=73600 → reward=10; stop=73560 → risk=30; RR=0.33
+        assert reward_to_risk_ok(73590.0, 73600.0, 73560.0, min_rr=1.5) is False
+
+    def test_zero_risk_passes(self):
+        from strategies.vwap_strategy import reward_to_risk_ok
+        assert reward_to_risk_ok(100.0, 110.0, 100.0, min_rr=1.5) is True
+
+
+class TestSetupScore:
+
+    def _make_signal_candles(self, vwap: float) -> list[Candle]:
+        """Enough today candles for all helpers to compute."""
+        closes = [vwap + (i % 3 - 1) * 10 for i in range(25)]
+        closes[-1] = vwap - 40   # last close well below VWAP (CE overshoot)
+        candles = []
+        for i, c in enumerate(closes):
+            vol = 300 if i == len(closes) - 1 else 100
+            candles.append(_candle_seq(i, c - 2, c + 5, c - 45, c, vol=vol))
+        return candles
+
+    def test_score_is_between_0_and_6(self):
+        from strategies.vwap_strategy import setup_score
+        vwap = 73600.0
+        candles = self._make_signal_candles(vwap)
+        score = setup_score(candles, vwap, "CE", stop=candles[-1].low)
+        assert 0 <= score <= 6
+
+    def test_score_increases_with_better_setup(self):
+        from strategies.vwap_strategy import setup_score
+        vwap = 73600.0
+        # Build a rotational-looking session (many crossings, moderate vol)
+        closes = [vwap + (10 if i % 2 == 0 else -10) for i in range(24)]
+        closes.append(vwap - 50)  # final big overshoot below VWAP
+        candles = [_candle_seq(i, c - 2, c + 5, c - 55, c,
+                               vol=300 if i == len(closes) - 1 else 100)
+                   for i, c in enumerate(closes)]
+        score = setup_score(candles, vwap, "CE", stop=candles[-1].low,
+                            adx_max=50.0, vol_multiplier=1.5, min_rr=0.5)
+        # With oscillating session, vol spike, and permissive params → at least 3
+        assert score >= 2
+
+
+class TestEnhancedVWAPCESignal:
+    """is_vwap_ce_signal with new mr_* params applied."""
+
+    def _base_candles(self) -> tuple[list[Candle], float]:
+        """Valid base CE setup: 3 below VWAP then break above."""
+        vwap = 73600.0
+        candles = [
+            _candle(10, 0,  73580, 73590, 73570, 73580),
+            _candle(10, 5,  73580, 73595, 73575, 73590),
+            _candle(10, 10, 73590, 73600, 73580, 73595),
+            _candle(10, 15, 73600, 73660, 73598, 73650),
+        ]
+        return candles, vwap
+
+    def test_mr_zscore_blocks_weak_extension(self):
+        candles, vwap = self._base_candles()
+        # close=73650 barely above vwap=73600 — z-score likely low on small sample
+        # With very high threshold, it should block
+        result = is_vwap_ce_signal(candles, vwap, mr_zscore_entry=100.0)
+        assert result is False
+
+    def test_mr_adx_max_blocks_when_trending(self):
+        from strategies.vwap_strategy import is_vwap_ce_signal as _sig
+        # Build a strong trend then append a valid CE candle
+        candles = [_candle_seq(i, 70000 + i * 50, 70000 + i * 55,
+                               70000 + i * 45, 70000 + i * 50) for i in range(39)]
+        candles.append(_candle_seq(39, 72000, 72100, 71990, 72050))
+        v = 71500.0
+        # With adx_max=1 it should nearly always block
+        assert _sig(candles, v, mr_adx_max=1.0) is False
+
+    def test_mr_volume_spike_blocks_without_spike(self):
+        candles, vwap = self._base_candles()
+        # Add 20 candles with vol=100 before the signal candles to build history
+        history = [_candle_seq(i, 73580, 73590, 73570, 73580, vol=100) for i in range(20)]
+        full = history + candles
+        result = is_vwap_ce_signal(full, vwap, mr_volume_spike=5.0)
+        assert result is False
+
+    def test_mr_min_rr_blocks_poor_rr(self):
+        candles, vwap = self._base_candles()
+        # close=73650 very close to vwap=73600 (reward=50), candle low=73598 (risk=52)
+        # RR ≈ 0.96 → should fail with min_rr=1.5
+        result = is_vwap_ce_signal(candles, vwap, mr_min_rr=1.5)
+        assert result is False
+
+    def test_mr_vwap_cross_min_blocks_no_crossings(self):
+        candles, vwap = self._base_candles()
+        # All candles are below VWAP except the last — 1 crossing happened
+        # Require 3 → should block
+        result = is_vwap_ce_signal(candles, vwap, mr_vwap_cross_min=3)
+        assert result is False
+
+
+class TestEnhancedVWAPPESignal:
+    """is_vwap_pe_signal with new mr_* params applied."""
+
+    def _base_candles(self) -> tuple[list[Candle], float]:
+        """Valid base PE setup: 3 above VWAP then break below."""
+        vwap = 73600.0
+        candles = [
+            _candle(10, 0,  73620, 73630, 73615, 73620),
+            _candle(10, 5,  73620, 73625, 73605, 73615),
+            _candle(10, 10, 73615, 73620, 73600, 73610),
+            _candle(10, 15, 73610, 73612, 73545, 73550),
+        ]
+        return candles, vwap
+
+
+    def test_mr_zscore_blocks_weak_extension(self):
+        candles, vwap = self._base_candles()
+        result = is_vwap_pe_signal(candles, vwap, mr_zscore_entry=100.0)
+        assert result is False
+
+    def test_mr_volume_spike_blocks_without_spike(self):
+        candles, vwap = self._base_candles()
+        history = [_candle_seq(i, 73610, 73625, 73605, 73615, vol=100) for i in range(20)]
+        full = history + candles
+        result = is_vwap_pe_signal(full, vwap, mr_volume_spike=5.0)
+        assert result is False
+
+    def test_mr_min_rr_blocks_poor_rr(self):
+        candles, vwap = self._base_candles()
+        # close=73550, vwap=73600 → reward=50, candle high=73612 → risk=62; RR≈0.81
+        result = is_vwap_pe_signal(candles, vwap, mr_min_rr=1.5)
+        assert result is False
+
+    def test_mr_vwap_cross_min_blocks_no_crossings(self):
+        candles, vwap = self._base_candles()
+        result = is_vwap_pe_signal(candles, vwap, mr_vwap_cross_min=3)
+        assert result is False

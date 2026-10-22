@@ -1,4 +1,4 @@
-﻿"""
+"""
 Central configuration loaded from environment variables / .env file.
 All trading parameters are read here — no magic numbers anywhere else.
 """
@@ -577,6 +577,31 @@ VWAP_MAX_SUBMERGED_CANDLES: int = _getint("VWAP_MAX_SUBMERGED_CANDLES", 3)
 VWAP_SLOPE_LOOKBACK: int      = _getint("VWAP_SLOPE_LOOKBACK", 3)
 # No new VWAP entries on candles starting at/after this time ("" = no cut-off).
 VWAP_NO_NEW_ENTRY_AFTER: str  = _get("VWAP_NO_NEW_ENTRY_AFTER", "")
+# ── Enhanced VWAP Mean-Reversion filters (all default off) ────────────────────
+# VWAP_MR_ZSCORE_ENTRY : minimum |z-score| of close vs VWAP to qualify for entry.
+#   z = (close - vwap) / std(today closes).  2.0 = 2 standard deviations.
+#   0 = disabled (no z-score requirement).
+VWAP_MR_ZSCORE_ENTRY: float   = _getfloat("VWAP_MR_ZSCORE_ENTRY", 0.0)
+# VWAP_MR_ADX_MAX : block VWAP mean-reversion trades when ADX(14) >= this value.
+#   25 = only trade when market is rotational/choppy; 0 = disabled.
+VWAP_MR_ADX_MAX: float        = _getfloat("VWAP_MR_ADX_MAX", 0.0)
+# VWAP_MR_RSI_CONFIRM : require RSI(14) to cross back above 30 (CE) / below 70 (PE).
+#   true = stricter; false = off (default).
+VWAP_MR_RSI_CONFIRM: bool     = _getbool("VWAP_MR_RSI_CONFIRM", False)
+# VWAP_MR_VOLUME_SPIKE : require current 5m volume > N × avg of previous 20 candles.
+#   1.5 = 50% above average; 0 = disabled.
+VWAP_MR_VOLUME_SPIKE: float   = _getfloat("VWAP_MR_VOLUME_SPIKE", 0.0)
+# VWAP_MR_MIN_RR : minimum reward-to-VWAP / risk ratio.
+#   reward = |close - vwap|, risk = |close - reversal candle extreme|.
+#   1.5 = need at least 1.5R to VWAP; 0 = disabled.
+VWAP_MR_MIN_RR: float         = _getfloat("VWAP_MR_MIN_RR", 0.0)
+# VWAP_MR_MIN_SCORE : minimum setup quality score (0–6) to take the trade.
+#   Each criterion (z-score, ADX regime, RSI reversal, volume spike, R:R,
+#   VWAP cross count) contributes 1 point.  5 = trade only best setups; 0 = off.
+VWAP_MR_MIN_SCORE: int        = _getint("VWAP_MR_MIN_SCORE", 0)
+# VWAP_MR_VWAP_CROSS_MIN : require price to have crossed VWAP at least N times
+#   today before entry (confirms oscillating/rotational session).  0 = disabled.
+VWAP_MR_VWAP_CROSS_MIN: int   = _getint("VWAP_MR_VWAP_CROSS_MIN", 0)
 # VWAP_CROSS_EXIT: while a CE_VWAP or PE_VWAP trade is open, exit on the first
 # completed 5m candle that closes back through VWAP — the structural thesis
 # (price above VWAP for CE / below for PE) is invalidated.  This fires before
