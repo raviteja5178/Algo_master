@@ -86,21 +86,29 @@ def live_signal_kwargs() -> dict:
         bounce_min_wick_pct=settings.PIVOT_BOUNCE_MIN_WICK_PCT,
         bounce_trend_ema=settings.PIVOT_BOUNCE_TREND_EMA,
         bounce_confirm_next=settings.PIVOT_BOUNCE_CONFIRM_NEXT,
+        enable_swing_pivot=settings.PIVOT_ENABLE_SWING,
+        swing_pivot_left=settings.PIVOT_SWING_LEFT,
+        swing_pivot_right=settings.PIVOT_SWING_RIGHT,
+        swing_pivot_trend_ema=settings.PIVOT_SWING_TREND_EMA,
+        swing_pivot_rr_t1=settings.PIVOT_SWING_RR_T1,
+        swing_pivot_rr_t2=settings.PIVOT_SWING_RR_T2,
+        swing_pivot_rr_t3=settings.PIVOT_SWING_RR_T3,
+        swing_pivot_use_atr_sl=settings.PIVOT_SWING_USE_ATR_SL,
+        swing_pivot_atr_mult=settings.PIVOT_SWING_ATR_MULT,
     )
 
 
 _NO_FILTERS = dict(min_od_gap_atr=0.0, first_candle_confirm=False, max_first_wick_atr=0.0)
-_NO_EXTRAS = dict(enable_acceptance=False, bounce_zone_atr=0.0)
+_NO_EXTRAS = dict(enable_acceptance=False, bounce_zone_atr=0.0, enable_swing_pivot=False)
 
 # name -> overrides applied on top of the live config
 VARIANT_OVERRIDES: dict[str, dict] = {
-    "LIVE": {},
-    "LIVE_NO_BOUNCE": dict(bounce_zone_atr=0.0),
-    "LEGACY_AB": dict(**_NO_FILTERS, **_NO_EXTRAS, pivot_mode="BOTH"),
-    "MODE_A_ONLY": dict(**_NO_EXTRAS, pivot_mode="OPEN_DIRECTION"),
-    "MODE_B_ONLY": dict(**_NO_FILTERS, **_NO_EXTRAS, pivot_mode="REJECTION"),
-    "ACCEPTANCE_ONLY": dict(pivot_mode="NONE", enable_acceptance=True, bounce_zone_atr=0.0),
-    "BOUNCE_ONLY": dict(pivot_mode="NONE", enable_acceptance=False),
+    "ACCEPTANCE_PLUS_BOUNCE": dict(pivot_mode="NONE", enable_acceptance=True, bounce_zone_atr=0.15, enable_swing_pivot=False),
+    "ACCEPTANCE_BOUNCE_MODE_A": dict(pivot_mode="OPEN_DIRECTION", enable_acceptance=True, bounce_zone_atr=0.15, enable_swing_pivot=False),
+    "ACCEPTANCE_ONLY": dict(pivot_mode="NONE", enable_acceptance=True, bounce_zone_atr=0.0, enable_swing_pivot=False),
+    "BOUNCE_ONLY": dict(pivot_mode="NONE", enable_acceptance=False, bounce_zone_atr=0.15, enable_swing_pivot=False),
+    "FULL_PIVOT_SUITE": dict(pivot_mode="BOTH", enable_acceptance=True, bounce_zone_atr=0.15, enable_swing_pivot=False),
+    "FULL_WITH_SWING_5_2": dict(pivot_mode="BOTH", enable_acceptance=True, bounce_zone_atr=0.15, enable_swing_pivot=True, swing_pivot_left=5, swing_pivot_right=2, swing_pivot_trend_ema=50),
 }
 
 

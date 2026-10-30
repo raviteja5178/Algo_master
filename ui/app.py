@@ -52,10 +52,40 @@ sys.path.insert(0, str(ROOT))
 
 import sqlite3
 
-from dotenv import dotenv_values, set_key
+from dotenv import dotenv_values
 
 ENV_FILE = ROOT / ".env"
 DB_FILE_DEFAULT = ROOT / "trades.db"
+
+
+def _set_env_key(key: str, value: str) -> None:
+    """Write / update a single key=value in .env without an atomic rename.
+
+    python-dotenv's set_key() uses os.rename(tmp → .env) which raises
+    [WinError 5] Access Denied on Windows when another process (e.g. the bot)
+    holds a read handle on .env.  We avoid that by reading the file, patching
+    the relevant line in-memory, and writing straight back with open(..., 'w').
+    """
+    path = ENV_FILE
+    lines: list[str] = []
+    if path.exists():
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+
+    # Replace the existing line for this key, or append if not found.
+    prefix = f"{key}="
+    replaced = False
+    safe_val = value.replace("\\", "\\\\")  # escape backslashes
+    new_line = f"{key}={safe_val}\n"
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith(prefix) and not stripped.startswith("#"):
+            lines[i] = new_line
+            replaced = True
+            break
+    if not replaced:
+        lines.append(new_line)
+
+    path.write_text("".join(lines), encoding="utf-8")
 
 app = Flask(__name__, template_folder="templates")
 
@@ -239,22 +269,222 @@ def _start_bot_proc(auto: bool = False) -> bool:
     return True
 
 
+# ── Watchdog shared state (exposed via /api/watchdog/status) ──────────────────
+_watchdog_state: dict = {
+    "last_cycle": None,          # ISO timestamp of last watchdog cycle
+    "last_action": None,         # human-readable last action taken
+    "stale_lock_cleared": 0,     # cumulative count of stale lock removals
+    "auto_logins": 0,            # cumulative count of morning auto-logins
+    "zombie_kills": 0,           # cumulative count of zombie bot kills
+    "restarts": 0,               # cumulative count of auto-restarts
+    "last_log_age_s": None,      # seconds since last log line was written
+    "bot_running": False,
+}
+
+_MARKET_OPEN_HOUR  = 9
+_MARKET_OPEN_MIN   = 0    # start trying auto-login at 09:00
+_MARKET_CLOSE_HOUR = 15
+_MARKET_CLOSE_MIN  = 35   # after 15:35 stop the bot automatically
+_LOG_STALE_SECS    = 300  # treat bot as zombie if log is silent for 5 min
+
+
+def _log_last_modified_age() -> float | None:
+    """Return seconds since bot.log was last written to, or None if absent."""
+    try:
+        import time as _t
+        return _t.time() - _BOT_LOG.stat().st_mtime
+    except Exception:
+        return None
+
+
+def _clean_stale_bot_lock() -> bool:
+    """
+    If .bot.lock exists but the PID inside is no longer alive, delete the
+    lock file so subsequent is_lock_held("bot") calls return False.
+    Returns True if a stale lock was removed.
+    """
+    from utils.process_lock import lock_path
+    lp = lock_path("bot")
+    if not lp.exists():
+        return False
+    if is_lock_held("bot"):
+        return False   # genuinely held — don't touch it
+    # Lock file exists but no live process holds it — stale
+    try:
+        lp.unlink(missing_ok=True)
+        return True
+    except Exception:
+        return False
+
+
+def _try_morning_auto_login() -> bool:
+    """
+    Attempt an automated Zerodha login using credentials stored in .env.
+    Only called when the token is stale and we're inside the pre-market window.
+    Returns True if a fresh access token was obtained.
+    """
+    import time as _t
+    from dotenv import dotenv_values as _dv, load_dotenv as _ld
+    env = _dv(ENV_FILE)
+    user_id     = env.get("KITE_USER_ID") or env.get("KITE_USERNAME", "")
+    password    = env.get("KITE_PASSWORD", "")
+    totp_secret = env.get("KITE_TOTP_SECRET", "")
+    api_key     = env.get("KITE_API_KEY", "")
+    api_secret  = env.get("KITE_API_SECRET", "")
+    if not all([user_id, password, totp_secret, api_key, api_secret]):
+        return False
+    try:
+        from broker.auto_auth import login_and_get_access_token
+        access_token = login_and_get_access_token(
+            api_key, api_secret, user_id, password, totp_secret
+        )
+        if not access_token:
+            return False
+        # Persist using our WinError-5-safe writer
+        _set_env_key("KITE_ACCESS_TOKEN", access_token)
+        _set_env_key("KITE_TOKEN_DATE", str(__import__("datetime").date.today()))
+        os.environ["KITE_ACCESS_TOKEN"] = access_token
+
+        from config import settings
+        _ld(dotenv_path=ENV_FILE, override=True)
+        settings.KITE_ACCESS_TOKEN = access_token
+        settings.KITE_TOKEN_DATE   = str(__import__("datetime").date.today())
+
+        # Reset KiteConnect singleton
+        import broker.kite_client as _kc
+        _kc._kite = None
+
+        # Invalidate token status cache so next poll re-validates
+        global _token_status_cache, _session_authenticated
+        _token_status_cache["is_valid"]   = True
+        _token_status_cache["last_check"] = 0.0
+        _session_authenticated = True  # auto-login counts as an explicit session login
+        return True
+    except Exception as exc:
+        import logging as _log
+        _log.getLogger(__name__).warning("Watchdog auto-login failed: %s", exc)
+        return False
+
+
+def _ist_now():
+    """Return current time as a timezone-aware IST datetime."""
+    try:
+        from utils.time_utils import IST
+        return __import__("datetime").datetime.now(IST)
+    except Exception:
+        from datetime import datetime, timezone, timedelta
+        return datetime.now(timezone(timedelta(hours=5, minutes=30)))
+
+
 def _watchdog() -> None:
     """
-    Background thread: every 30 s, if the Kite token is valid but the bot
-    is not running, auto-restart it — unless a manual Stop paused it.  This keeps the bot alive across Flask
-    restarts, crashes, and initial dashboard loads where the token is already
-    persisted in .env.
+    Self-healing background thread — runs every 30 s.
+
+    Each cycle performs (in order):
+      1. Clean stale .bot.lock left behind by a crashed bot process.
+      2. Morning auto-login (09:00–09:20 IST): if credentials are in .env and
+         the token is stale, obtain a fresh Zerodha access token automatically.
+      3. Zombie detection: bot lock is held but bot.log hasn't moved in
+         LOG_STALE_SECS (5 min) during market hours → kill + restart.
+      4. Auto-start: token is valid and bot is not running → start bot.
+      5. Post-session cleanup (after 15:35 IST): stop the bot if it's still
+         running after market close.
     """
     import time
+    import logging as _log
+    _logger = _log.getLogger(__name__)
+
     time.sleep(5)  # give Flask a moment to finish starting
+
     while True:
         try:
+            import datetime as _dt
+            now_ist = _ist_now()
+            now_h   = now_ist.hour
+            now_m   = now_ist.minute
+
+            _watchdog_state["last_cycle"]  = now_ist.isoformat()
+            _watchdog_state["bot_running"] = _is_bot_running()
+
+            # ── 1. Stale lock cleanup ─────────────────────────────────────────
+            if _clean_stale_bot_lock():
+                _watchdog_state["stale_lock_cleared"] += 1
+                _watchdog_state["last_action"] = f"Stale .bot.lock removed at {now_ist.strftime('%H:%M:%S')}"
+                _logger.warning("WATCHDOG: Removed stale .bot.lock (crashed bot)")
+                _watchdog_state["bot_running"] = False
+
+            # ── 2. Morning auto-login ─────────────────────────────────────────
+            # Window: 09:00–09:20 IST, only when token is stale and not paused.
+            in_morning_window = (
+                (now_h == _MARKET_OPEN_HOUR and now_m < 20)
+            )
             tok = _check_token_validity_cached()
-            if tok.get("is_valid") and not is_paused() and not _is_bot_running():
-                _start_bot_proc(auto=True)
-        except Exception:
-            pass
+            if in_morning_window and not tok.get("is_valid") and not is_paused():
+                _logger.info("WATCHDOG: Token stale in morning window — attempting auto-login...")
+                if _try_morning_auto_login():
+                    _watchdog_state["auto_logins"] += 1
+                    _watchdog_state["last_action"] = f"Auto-login succeeded at {now_ist.strftime('%H:%M:%S')}"
+                    _logger.info("WATCHDOG: Morning auto-login succeeded.")
+                    tok = _check_token_validity_cached()
+                else:
+                    _watchdog_state["last_action"] = f"Auto-login failed at {now_ist.strftime('%H:%M:%S')}"
+                    _logger.warning("WATCHDOG: Morning auto-login failed — manual login required.")
+
+            # ── 3. Zombie bot detection ───────────────────────────────────────
+            # Only check during market hours (09:15–15:35 IST).
+            in_market_hours = (
+                (now_h > 9 or (now_h == 9 and now_m >= 15))
+                and (now_h < 15 or (now_h == 15 and now_m <= 35))
+            )
+            log_age = _log_last_modified_age()
+            _watchdog_state["last_log_age_s"] = round(log_age, 1) if log_age is not None else None
+
+            if (
+                in_market_hours
+                and _watchdog_state["bot_running"]
+                and log_age is not None
+                and log_age > _LOG_STALE_SECS
+                and not is_paused()
+            ):
+                _logger.warning(
+                    "WATCHDOG: Bot appears to be a zombie (lock held, log silent %ds). Killing...",
+                    int(log_age),
+                )
+                _stop_bot()
+                _watchdog_state["zombie_kills"] += 1
+                _watchdog_state["last_action"] = (
+                    f"Zombie bot killed at {now_ist.strftime('%H:%M:%S')} "
+                    f"(log silent {int(log_age)}s)"
+                )
+                _watchdog_state["bot_running"] = False
+                time.sleep(3)  # let the process tree die before restarting
+
+            # ── 4. Auto-start ─────────────────────────────────────────────────
+            tok = _check_token_validity_cached()
+            if tok.get("is_valid") and not is_paused() and not _watchdog_state["bot_running"]:
+                started = _start_bot_proc(auto=True)
+                if started:
+                    _watchdog_state["restarts"] += 1
+                    _watchdog_state["last_action"] = f"Bot (re)started at {now_ist.strftime('%H:%M:%S')}"
+                    _watchdog_state["bot_running"] = True
+                    _logger.info("WATCHDOG: Bot started/restarted.")
+
+            # ── 5. Post-session cleanup ───────────────────────────────────────
+            # After 15:35 IST, stop the bot if it's still running.
+            after_close = (
+                now_h > _MARKET_CLOSE_HOUR
+                or (now_h == _MARKET_CLOSE_HOUR and now_m >= _MARKET_CLOSE_MIN)
+            )
+            if after_close and _watchdog_state["bot_running"]:
+                _logger.info("WATCHDOG: Market closed — stopping bot.")
+                _stop_bot()
+                _watchdog_state["last_action"] = f"Post-session bot stop at {now_ist.strftime('%H:%M:%S')}"
+                _watchdog_state["bot_running"] = False
+
+        except Exception as exc:
+            import logging as _log2
+            _log2.getLogger(__name__).exception("WATCHDOG: unhandled error: %s", exc)
+
         time.sleep(30)
 
 
@@ -782,16 +1012,31 @@ def api_fvg():
         if not kite:
             return jsonify({"error": "Kite not authenticated"}), 200
 
-        from datetime import date, timedelta
-        today = date.today()
+        from datetime import timedelta
+        from utils.time_utils import IST, today_ist
+        today = today_ist()
         start = today - timedelta(days=30)
         candles = kite.historical_data(265, start, today, "day")
 
-        if len(candles) < 3:
+        # Filter for completed sessions prior to today so CPR, pivot levels,
+        # and daily FVGs are never calculated from today's in-progress candle.
+        completed = []
+        for c in candles:
+            d = c.get("date")
+            ts = IST.localize(d) if getattr(d, "tzinfo", None) is None and hasattr(d, "tzinfo") else d
+            c_date = ts.date() if hasattr(ts, "date") else str(ts)[:10]
+            if isinstance(c_date, str):
+                if c_date < str(today):
+                    completed.append(c)
+            else:
+                if c_date < today:
+                    completed.append(c)
+
+        if len(completed) < 3:
             return jsonify({"error": "Insufficient daily candle data"}), 200
 
         # Use yesterday (last completed session) as the base for CPR
-        prev = candles[-1]
+        prev = completed[-1]
         H, L, C = prev["high"], prev["low"], prev["close"]
         P  = (H + L + C) / 3
         BC = (H + L) / 2
@@ -819,18 +1064,22 @@ def api_fvg():
         else:
             cpr_bias = "NEUTRAL"
 
-        # FVG scan — 3-candle pattern on daily
+        # FVG scan — 3-candle pattern on completed daily sessions
         fvg_bullish = []   # low[i] > high[i-2]
         fvg_bearish = []   # high[i] < low[i-2]
-        for i in range(2, len(candles)):
-            d0, d1, d2 = candles[i-2], candles[i-1], candles[i]
+        for i in range(2, len(completed)):
+            d0, d1, d2 = completed[i-2], completed[i-1], completed[i]
+            d0_dt = d0.get("date")
+            d2_dt = d2.get("date")
+            d0_str = str(d0_dt.date()) if hasattr(d0_dt, "date") else str(d0_dt)[:10]
+            d2_str = str(d2_dt.date()) if hasattr(d2_dt, "date") else str(d2_dt)[:10]
             # Bullish FVG
             if d2["low"] > d0["high"]:
                 gap = round(d2["low"] - d0["high"], 2)
                 mid = round((d2["low"] + d0["high"]) / 2, 2)
                 fvg_bullish.append({
-                    "date_from": str(d0["date"].date()),
-                    "date_to":   str(d2["date"].date()),
+                    "date_from": d0_str,
+                    "date_to":   d2_str,
                     "top":       round(d2["low"], 2),
                     "bottom":    round(d0["high"], 2),
                     "mid":       mid,
@@ -842,8 +1091,8 @@ def api_fvg():
                 gap = round(d0["low"] - d2["high"], 2)
                 mid = round((d0["low"] + d2["high"]) / 2, 2)
                 fvg_bearish.append({
-                    "date_from": str(d0["date"].date()),
-                    "date_to":   str(d2["date"].date()),
+                    "date_from": d0_str,
+                    "date_to":   d2_str,
                     "top":       round(d0["low"], 2),
                     "bottom":    round(d2["high"], 2),
                     "mid":       mid,
@@ -871,9 +1120,32 @@ def api_fvg():
         else:
             overall = "NEUTRAL"
 
+        # Compute full pivot levels (R1/R2/R3/S1/S2/S3) using the same
+        # formula the bot uses so the sidebar shows them before the bot starts.
+        env = dotenv_values(ENV_FILE)
+        pivot_formula = env.get("PIVOT_FORMULA", "FIBONACCI").upper()
+        rng = H - L
+        if pivot_formula == "TRADITIONAL":
+            r1 = 2 * P - L
+            r2 = P + rng
+            r3 = H + 2 * (P - L)
+            s1 = 2 * P - H
+            s2 = P - rng
+            s3 = L - 2 * (H - P)
+        else:  # FIBONACCI (default)
+            r1 = P + 0.382 * rng
+            r2 = P + 0.618 * rng
+            r3 = P + 1.000 * rng
+            s1 = P - 0.382 * rng
+            s2 = P - 0.618 * rng
+            s3 = P - 1.000 * rng
+
+        prev_dt = prev.get("date")
+        prev_date_str = str(prev_dt.date()) if hasattr(prev_dt, "date") else str(prev_dt)[:10]
+
         return jsonify({
             "prev_ohlc": {
-                "date":  str(prev["date"].date()),
+                "date":  prev_date_str,
                 "high":  round(H, 2),
                 "low":   round(L, 2),
                 "close": round(C, 2),
@@ -886,6 +1158,19 @@ def api_fvg():
                 "tag":    cpr_tag,
                 "hint":   cpr_hint,
                 "bias":   cpr_bias,
+            },
+            "pivot_levels": {
+                "pivot": round(P,  2),
+                "r1":    round(r1, 2),
+                "r2":    round(r2, 2),
+                "r3":    round(r3, 2),
+                "s1":    round(s1, 2),
+                "s2":    round(s2, 2),
+                "s3":    round(s3, 2),
+                "prev_high":  round(H, 2),
+                "prev_low":   round(L, 2),
+                "prev_close": round(C, 2),
+                "formula":    pivot_formula,
             },
             "fvg_bullish": fvg_bullish,
             "fvg_bearish": fvg_bearish,
@@ -1239,6 +1524,18 @@ def api_bot_stop():
                     "still_running": still_running})
 
 
+@app.get("/api/watchdog/status")
+def api_watchdog_status():
+    """Return the current state of the self-healing watchdog thread."""
+    return jsonify({
+        **_watchdog_state,
+        "bot_running":      _is_bot_running(),
+        "bot_paused":       is_paused(),
+        "log_stale_secs":   _LOG_STALE_SECS,
+        "zombie_threshold": _LOG_STALE_SECS,
+    })
+
+
 # ── API: env config ───────────────────────────────────────────────────────────
 
 # Keys that are safe to expose to the UI (exclude secrets)
@@ -1386,7 +1683,7 @@ def api_env_post():
         for key, value in data.items():
             if key not in _EDITABLE_KEYS:
                 continue
-            set_key(str(ENV_FILE), key, str(value))
+            _set_env_key(key, str(value))
             os.environ[key] = str(value)
             updated[key] = value
 
@@ -1597,7 +1894,7 @@ def _handle_request_token(request_token: str):
         from broker.authentication import complete_login
         access_token = complete_login(request_token)
 
-        set_key(str(ENV_FILE), "KITE_ACCESS_TOKEN", access_token)
+        _set_env_key("KITE_ACCESS_TOKEN", access_token)
         os.environ["KITE_ACCESS_TOKEN"] = access_token
 
         from config import settings
@@ -1914,7 +2211,7 @@ def api_auth_login():
         return jsonify({"ok": False, "error": err_str}), 401
 
     # Persist the new access token
-    set_key(str(ENV_FILE), "KITE_ACCESS_TOKEN", access_token)
+    _set_env_key("KITE_ACCESS_TOKEN", access_token)
     os.environ["KITE_ACCESS_TOKEN"] = access_token
     load_dotenv(dotenv_path=ENV_FILE, override=True)
     settings.KITE_ACCESS_TOKEN = access_token
@@ -1957,7 +2254,7 @@ def api_auth_logout():
     _stop_bot()
 
     # Clear access token from .env and memory
-    set_key(str(ENV_FILE), "KITE_ACCESS_TOKEN", "")
+    _set_env_key("KITE_ACCESS_TOKEN", "")
     os.environ["KITE_ACCESS_TOKEN"] = ""
 
     from config import settings

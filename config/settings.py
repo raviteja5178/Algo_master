@@ -215,6 +215,34 @@ EMA_RSI_PERIOD: int          = _getint("EMA_RSI_PERIOD", 14)
 EMA_RSI_CE_MIN: float        = _getfloat("EMA_RSI_CE_MIN", 55.0)
 EMA_RSI_PE_MAX: float        = _getfloat("EMA_RSI_PE_MAX", 45.0)
 EMA_PULLBACK_TOL_PTS: float  = _getfloat("EMA_PULLBACK_TOL_PTS", 10.0)
+# EMA_CROSS_TRIGGER: true = also fire on the EMA9 x EMA21 cross (CE: EMA9 crosses above
+#   EMA21; PE: below), in addition to the close-vs-EMA9 crossover and EMA21 pullback.
+#   15m trend gate, RSI and daily-trend gate still apply. Off by default.
+EMA_CROSS_TRIGGER: bool      = _getbool("EMA_CROSS_TRIGGER", False)
+# EMA_CROSS_IGNORE_15M: with EMA_CROSS_TRIGGER, the EMA9 x EMA21 cross itself may fire even
+#   when the 15m EMA trend is not aligned (RSI still applies). Crossover/pullback still need it.
+EMA_CROSS_IGNORE_15M: bool   = _getbool("EMA_CROSS_IGNORE_15M", False)
+# EMA_CROSS_ONLY: true = the EMA9 x EMA21 cross on 5m candles is the ONLY EMA entry trigger
+#   (the close-vs-EMA9 crossover and EMA21 pullback are switched off).  RSI, the 15m trend
+#   (unless EMA_CROSS_IGNORE_15M) and the usual gates / SmartEntry still confirm.  Off by default.
+EMA_CROSS_ONLY: bool         = _getbool("EMA_CROSS_ONLY", False)
+# EMA_REQUIRE_CANDLE_COLOR: true = every EMA trigger (close>EMA9 crossover, EMA9xEMA21
+#   cross, EMA21 pullback) also needs the signal candle to be bullish for CE (close > open)
+#   or bearish for PE (close < open).  Off by default.
+EMA_REQUIRE_CANDLE_COLOR: bool = _getbool("EMA_REQUIRE_CANDLE_COLOR", False)
+# EMA_MIN_BODY_ATR: every EMA trigger also needs the signal candle's body (|close - open|)
+#   to be >= this many x ATR(14) on the 5m chart (0.35 = same threshold as SmartEntry's
+#   body filter).  Works even with EMA_SKIP_SMART_FILTERS=true.  0 = off (default).
+EMA_MIN_BODY_ATR: float      = _getfloat("EMA_MIN_BODY_ATR", 0.0)
+# EMA_IGNORE_15M: true (default) = EMA CE/PE use 5m candles ONLY.  The 15m trend
+#   requirement in the EMA rule-set, the 15m TREND_GATE and SmartEntry Filter 6 (15m
+#   trend) are all skipped for EMA signals (other strategies are unaffected).
+EMA_IGNORE_15M: bool         = _getbool("EMA_IGNORE_15M", True)
+# EMA_ATR_CONFIRM: true = an EMA CE/PE entry additionally needs the ATR trailing-stop
+#   ("ATR 5 Min Index Study", NATR_PERIOD / NATR_MULT) to be in the same state on the
+#   5m chart: CE only while close > ATR line (buy state), PE only while close < it
+#   (sell state).  Fails open while the line is not computable.
+EMA_ATR_CONFIRM: bool        = _getbool("EMA_ATR_CONFIRM", True)
 # EMA_SKIP_SMART_FILTERS: true = EMA CE/PE bypass SmartEntry candle filters
 #   (body/ATR, EMA9 slope, EMA gap, gap widening, 15m trend) — the rule-set has its
 #   own trend + RSI logic. Post-loss cooldown and premium-extension guard still apply.
@@ -249,6 +277,23 @@ EMA_BE_TRIGGER_R: float        = _getfloat("EMA_BE_TRIGGER_R", 1.0)
 EMA_BE_BUFFER_PTS: float       = _getfloat("EMA_BE_BUFFER_PTS", 4.0)
 EMA_TRAIL_ATR_MULT: float      = _getfloat("EMA_TRAIL_ATR_MULT", 2.0)
 EMA_TRAIL_EMA9_EXIT: bool      = _getbool("EMA_TRAIL_EMA9_EXIT", True)
+# EMA_NATR_RISK: true = EMA trades are risk-managed by the NATR trailing line
+#   ("ATR 5 Min Index Study", NATR_PERIOD / NATR_MULT) instead of swing SL + BE +
+#   chandelier: initial SL = NATR line (or entry ∓ NATR_MULT × ATR if the line is
+#   still on the other side), TSL = ratchets with the NATR line each 5m close,
+#   target = EMA_NATR_TARGET_RR × initial risk (0 = no target).  EMA9-trail, time
+#   stop and reversal exits are bypassed; the EMA-collapse smart exit, TIME_DECAY and
+#   daily-loss limit stay active.  Off by default.
+# EMA_NATR_MAX_RISK_RUPEES: skip when index risk × delta × qty exceeds this (0 = off).
+EMA_NATR_RISK: bool              = _getbool("EMA_NATR_RISK", False)
+EMA_NATR_TARGET_RR: float        = _getfloat("EMA_NATR_TARGET_RR", 2.0)
+EMA_NATR_MAX_RISK_RUPEES: float  = _getfloat("EMA_NATR_MAX_RISK_RUPEES", 0.0)
+# EMA_NATR_BROKER_TRAIL: true (default) = the bot keeps the ONE SL order placed at entry in
+#   sync with its own NATR stop: each time the bot moves the stop it calls modify_stop_order
+#   on that same order (no broker-side trailing order is created).  The index stop is
+#   converted to a premium trigger with a fixed delta.  false = the SL order is never
+#   modified; only the bot's index logic exits.
+EMA_NATR_BROKER_TRAIL: bool      = _getbool("EMA_NATR_BROKER_TRAIL", True)
 EMA_TIME_STOP_BARS: int        = _getint("EMA_TIME_STOP_BARS", 6)
 EMA_TIME_STOP_MIN_R: float     = _getfloat("EMA_TIME_STOP_MIN_R", 0.5)
 # Room filter: skip when nearest opposing level (PDH/PDL, day H/L, R1/S1) < this × risk. 0 = off.
@@ -735,6 +780,11 @@ PIVOT_ACCEPTANCE: bool          = _getbool("PIVOT_ACCEPTANCE", False)
 #   PIVOT_ACCEPT_BLOCK_REGIMES : comma list of intraday regimes (market_regime.py)
 #                                in which acceptance is skipped.  Empty = no gate (default).
 #   PIVOT_ACCEPT_MAX_PER_SIDE  : max acceptance signals per side per day (0 = no cap, default).
+#   PIVOT_ACCEPT_REQUIRE_CONFIRM_BODY : when true, the signal (latest) candle must have a
+#                                confirming body: CE close > open (bullish), PE close <
+#                                open (bearish).  Blocks acceptance on red CE / green PE
+#                                signal candles that satisfy the geometry but are already
+#                                reversing away from the Pivot.
 # The regime and per-side gates are OFF by default: a 400-day index backtest showed they
 # cut total R (CHOPPY block 54 -> 17.5R, 1-per-side 54 -> 35R); distance + room held up.
 PIVOT_ACCEPT_MIN_DIST_ATR: float = _getfloat("PIVOT_ACCEPT_MIN_DIST_ATR", 0.5)
@@ -743,6 +793,7 @@ PIVOT_ACCEPT_BLOCK_REGIMES: frozenset[str] = frozenset(
     s.strip().upper() for s in _get("PIVOT_ACCEPT_BLOCK_REGIMES", "").split(",") if s.strip()
 )
 PIVOT_ACCEPT_MAX_PER_SIDE: int   = _getint("PIVOT_ACCEPT_MAX_PER_SIDE", 0)
+PIVOT_ACCEPT_REQUIRE_CONFIRM_BODY: bool = _getbool("PIVOT_ACCEPT_REQUIRE_CONFIRM_BODY", False)
 # PIVOT_BOUNCE_ZONE_ATR: support-bounce (CE) / resistance-rejection (PE) at
 #   every pivot level S3..R3.  Zone half-width = this × ATR; the signal candle
 #   must wick into the zone and close back on its approach side with a
@@ -762,6 +813,19 @@ PIVOT_BOUNCE_MIN_RANGE_ATR: float = _getfloat("PIVOT_BOUNCE_MIN_RANGE_ATR", 0.0)
 PIVOT_BOUNCE_MIN_WICK_PCT: float  = _getfloat("PIVOT_BOUNCE_MIN_WICK_PCT", 0.0)
 PIVOT_BOUNCE_TREND_EMA: int       = _getint("PIVOT_BOUNCE_TREND_EMA", 0)
 PIVOT_BOUNCE_CONFIRM_NEXT: bool   = _getbool("PIVOT_BOUNCE_CONFIRM_NEXT", False)
+
+# ── Fractal Swing Pivot Reversal / Breakout (TradingView Pivot Reversal) ─────
+# PIVOT_ENABLE_SWING: enable fractal swing high/low breakout mode.
+PIVOT_ENABLE_SWING: bool        = _getbool("PIVOT_ENABLE_SWING", False)
+PIVOT_SWING_LEFT: int           = _getint("PIVOT_SWING_LEFT", 4)
+PIVOT_SWING_RIGHT: int          = _getint("PIVOT_SWING_RIGHT", 2)
+PIVOT_SWING_TREND_EMA: int      = _getint("PIVOT_SWING_TREND_EMA", 50)         # 0 = disabled
+PIVOT_SWING_RR_T1: float        = _getfloat("PIVOT_SWING_RR_T1", 1.5)
+PIVOT_SWING_RR_T2: float        = _getfloat("PIVOT_SWING_RR_T2", 2.5)
+PIVOT_SWING_RR_T3: float        = _getfloat("PIVOT_SWING_RR_T3", 3.5)
+PIVOT_SWING_USE_ATR_SL: bool    = _getbool("PIVOT_SWING_USE_ATR_SL", False)    # False = structural swing low/high
+PIVOT_SWING_ATR_MULT: float     = _getfloat("PIVOT_SWING_ATR_MULT", 1.2)
+
 # Move to breakeven after +N R.  1.5 (was 1.0): replay showed +10% total points; win rate
 # drops (58% -> ~50%) because fewer trades are protected early.
 PIVOT_BE_TRIGGER_R: float       = _getfloat("PIVOT_BE_TRIGGER_R", 1.5)

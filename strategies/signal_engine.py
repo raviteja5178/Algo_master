@@ -394,10 +394,12 @@ def evaluate_signals(
                       signal=sig, side=_sig_side, reason=_side_blk)
             return None
         # ── Higher-timeframe trend gate (trend-following strategies only) ──────
+        _ema_5m_only = settings.EMA_IGNORE_15M and sig in ("CE", "PE")
         if (settings.TREND_GATE_15M or settings.TREND_GATE_DAILY) \
                 and strategy_key(sig) in settings.TREND_GATE_STRATEGIES:
             _why = None
-            if settings.TREND_GATE_15M and not trend_15m_ok(_sig_side, candles_15m):
+            if settings.TREND_GATE_15M and not _ema_5m_only \
+                    and not trend_15m_ok(_sig_side, candles_15m):
                 _why = "against 15m trend (close/EMA21 slope)"
             elif settings.TREND_GATE_DAILY and not daily_trend_ok(_sig_side, daily_trend):
                 _why = f"against daily trend ({daily_trend})"
@@ -414,7 +416,9 @@ def evaluate_signals(
                     log_event(logger, "SMART_ENTRY_BLOCKED_COOLDOWN",
                               direction=sig, candles_remaining=smart_entry.cooldown_remaining)
                     return None
-            elif not smart_entry.allow(sig, candles_5m, candles_15m=candles_15m):
+            elif not smart_entry.allow(
+                sig, candles_5m, candles_15m=None if _ema_5m_only else candles_15m
+            ):
                 return None
         # AI confirmation gate (optional — fails safely to ALLOW)
         if ai_confirmation is not None:
@@ -573,11 +577,21 @@ def evaluate_signals(
                     acceptance_min_dist_atr=settings.PIVOT_ACCEPT_MIN_DIST_ATR,
                     acceptance_min_room_r=settings.PIVOT_ACCEPT_MIN_ROOM_R,
                     acceptance_blocked_sides=_pivot_accept_blocked_sides(_day),
+                    acceptance_require_confirm_body=settings.PIVOT_ACCEPT_REQUIRE_CONFIRM_BODY,
                     bounce_zone_atr=settings.PIVOT_BOUNCE_ZONE_ATR,
                     bounce_min_range_atr=settings.PIVOT_BOUNCE_MIN_RANGE_ATR,
                     bounce_min_wick_pct=settings.PIVOT_BOUNCE_MIN_WICK_PCT,
                     bounce_trend_ema=settings.PIVOT_BOUNCE_TREND_EMA,
                     bounce_confirm_next=settings.PIVOT_BOUNCE_CONFIRM_NEXT,
+                    enable_swing_pivot=settings.PIVOT_ENABLE_SWING,
+                    swing_pivot_left=settings.PIVOT_SWING_LEFT,
+                    swing_pivot_right=settings.PIVOT_SWING_RIGHT,
+                    swing_pivot_trend_ema=settings.PIVOT_SWING_TREND_EMA,
+                    swing_pivot_rr_t1=settings.PIVOT_SWING_RR_T1,
+                    swing_pivot_rr_t2=settings.PIVOT_SWING_RR_T2,
+                    swing_pivot_rr_t3=settings.PIVOT_SWING_RR_T3,
+                    swing_pivot_use_atr_sl=settings.PIVOT_SWING_USE_ATR_SL,
+                    swing_pivot_atr_mult=settings.PIVOT_SWING_ATR_MULT,
                 )
                 if setup is not None:
                     sig_name = f"{setup.side}_PIVOT"
@@ -757,7 +771,18 @@ def evaluate_signals(
         _ema_kwargs = dict(
             rsi_period=settings.EMA_RSI_PERIOD,
             pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS,
+            ema_cross=settings.EMA_CROSS_TRIGGER,
+            cross_without_15m=settings.EMA_CROSS_IGNORE_15M,
+            cross_only=settings.EMA_CROSS_ONLY,
+            ignore_15m=settings.EMA_IGNORE_15M,
+            require_candle_color=settings.EMA_REQUIRE_CANDLE_COLOR,
+            min_body_atr=settings.EMA_MIN_BODY_ATR,
         )
+        _atr_state = 0
+        if settings.EMA_ATR_CONFIRM:
+            from strategies.natr_strategy import natr_state
+            _atr_state = natr_state(candles_5m, natr_period=settings.NATR_PERIOD,
+                                    natr_mult=settings.NATR_MULT)
         _day_block = ema_day_block_reason()
         if _day_block:
             log_event(logger, "EMA_BLOCKED_DAY_LOCK", candle=latest_5m_ts, reason=_day_block)
@@ -765,12 +790,14 @@ def evaluate_signals(
             log_event(logger, "EMA_BLOCKED_COOLDOWN",
                       candle=latest_5m_ts, candles_remaining=_ema_cooldown_left)
         else:
-            if is_ce_signal(candles_5m, candles_15m, rsi_min=settings.EMA_RSI_CE_MIN, **_ema_kwargs):
+            if _atr_state >= 0 and is_ce_signal(
+                candles_5m, candles_15m, rsi_min=settings.EMA_RSI_CE_MIN, **_ema_kwargs
+            ):
                 log_event(logger, "CE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
                 if (sig := _gate("CE")) is not None:
                     return sig
 
-            if not _candle_already_attempted() and is_pe_signal(
+            if _atr_state <= 0 and not _candle_already_attempted() and is_pe_signal(
                 candles_5m, candles_15m, rsi_max=settings.EMA_RSI_PE_MAX, **_ema_kwargs
             ):
                 log_event(logger, "PE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)

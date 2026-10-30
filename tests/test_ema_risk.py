@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from execution.ema_trade_manager import EmaTradeManager, plan_ema_risk
+from execution.ema_trade_manager import EmaTradeManager, plan_ema_risk, plan_natr_risk
 from execution.smart_exit import SmartExitEngine
 from market.candle_builder import Candle
 
@@ -128,6 +128,80 @@ class TestEmaTradeManager:
         assert EmaTradeManager.load("OTHER") is None
         EmaTradeManager.clear()
         assert EmaTradeManager.load("T1") is None
+
+# ── NATR-managed risk (EMA_NATR_RISK) ────────────────────────────────────────
+
+class TestNatrRisk:
+    def test_plan_uses_line_behind_entry(self):
+        p, why = plan_natr_risk("CE", 1000, 880, 30, mult=3.0, target_rr=2.0)
+        assert why is None
+        assert p["stop"] == 880 and p["risk"] == 120 and p["target"] == 1240
+        assert p["source"] == "natr_line"
+
+    def test_plan_line_wrong_side_uses_mult_atr(self):
+        p, _ = plan_natr_risk("CE", 1000, 1050, 30, mult=3.0)   # line above price
+        assert p["stop"] == 910 and p["source"] == "natr_atr"
+        p, _ = plan_natr_risk("PE", 1000, 950, 30, mult=3.0)
+        assert p["stop"] == 1090
+
+    def test_plan_min_distance_and_no_target(self):
+        p, _ = plan_natr_risk("CE", 1000, 995, 30, min_atr=1.0, target_rr=0)
+        assert p["risk"] == 30 and p["target"] > 100000
+
+    def test_plan_needs_atr(self):
+        assert plan_natr_risk("CE", 1000, 900, None)[0] is None
+
+    def test_manager_ignores_be_trail_and_candle_exits(self):
+        m = EmaTradeManager("CE", 1000, 880, 1240, 30, 400, delta=0.5, natr_mode=True)
+        assert m.on_index_price(1200) is None            # no BE / chandelier move
+        assert m.stop_index == 880 and m.stage == "INITIAL"
+        assert m.on_candle(900, 1000) is None            # no EMA9 / time-stop exit
+        assert m.on_index_price(879) == ("EXIT", "EMA_SL_HIT")
+
+    def test_stop_follows_natr_line_only_forward(self):
+        m = EmaTradeManager("CE", 1000, 880, 1240, 30, 400, delta=0.5, natr_mode=True)
+        assert m.set_natr_line(940, close=1100) is True
+        assert m.stop_index == 940 and m.stage == "TRAIL"
+        assert m.on_index_price(1105)[0] == "STOP_MOVED"  # broker SL update reported once
+        assert m.on_index_price(1106) is None
+        assert m.set_natr_line(920, close=1100) is False  # never loosens
+        assert m.stop_index == 940
+        assert m.on_index_price(939) == ("EXIT", "EMA_TSL_HIT")
+
+    def test_line_on_wrong_side_of_close_ignored(self):
+        m = EmaTradeManager("CE", 1000, 880, 1240, 30, 400, natr_mode=True)
+        assert m.set_natr_line(1050, close=1020) is False
+        assert m.stop_index == 880
+
+    def test_pe_mirror(self):
+        m = EmaTradeManager("PE", 1000, 1120, 760, 30, 400, natr_mode=True)
+        assert m.set_natr_line(1060, close=900) is True
+        assert m.stop_index == 1060
+        assert m.on_index_price(1061) == ("EXIT", "EMA_TSL_HIT")
+
+    def test_broker_trail_off_keeps_option_stop_but_index_stop_follows(self):
+        m = EmaTradeManager("CE", 1000, 880, 1240, 30, 400, delta=0.5, natr_mode=True,
+                            natr_broker_trail=False)
+        initial = m.option_stop
+        assert m.set_natr_line(940, close=1100) is True
+        assert m.stop_index == 940 and m.option_stop == initial
+        assert m.on_index_price(1105) is None            # no broker SL modification requested
+        assert m.on_index_price(939) == ("EXIT", "EMA_TSL_HIT")
+
+    def test_off_by_default(self):
+        assert _mgr().natr_mode is False
+        assert _mgr().set_natr_line(950, close=1100) is False
+
+    def test_save_load_keeps_natr_mode(self, tmp_path, monkeypatch):
+        import execution.ema_trade_manager as etm
+        monkeypatch.setattr(etm, "_STATE_FILE", tmp_path / "ema.json")
+        m = EmaTradeManager("CE", 1000, 880, 1240, 30, 400, natr_mode=True)
+        m.set_natr_line(940, close=1100)
+        m.save("T9")
+        r = EmaTradeManager.load("T9")
+        assert r.natr_mode is True and r.stop_index == 940
+
+
 
 
 # ── SmartExit: EMA profit-lock skip + multi-close collapse ───────────────────

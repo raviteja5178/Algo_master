@@ -435,6 +435,36 @@ def _ema_option_block_reason(instrument: dict, option_ltp: float | None) -> str 
     return None
 
 
+def _natr_line(candles) -> float | None:
+    """Latest NATR trailing-stop line (period/mult from settings) or None."""
+    from strategies.natr_strategy import _compute_natr_stop
+    if len(candles) < settings.NATR_PERIOD + 3:
+        return None
+    return _compute_natr_stop(candles, settings.NATR_PERIOD, settings.NATR_MULT)[-1]
+
+
+def _plan_ema_natr_entry(ctx: BotContext, side: str, sensex_ltp: float, c5, delta: float,
+                         max_sl_pct: float, expiry: bool):
+    """EMA_NATR_RISK: SL / target planned from the NATR line. Same return as _plan_ema_entry."""
+    from execution.ema_trade_manager import plan_natr_risk
+    atr = atr_at(c5, period=settings.NATR_PERIOD)
+    line = _natr_line(c5)
+    plan, reason = plan_natr_risk(
+        side, sensex_ltp, line, atr, mult=settings.NATR_MULT,
+        target_rr=settings.EMA_NATR_TARGET_RR,
+    )
+    if plan is not None:
+        _rd = settings.EMA_EXPIRY_DELTA if expiry else settings.EMA_OPTION_DELTA
+        plan["risk_rupees"] = round(plan["risk"] * _rd * ctx.quantity, 2)
+        cap = settings.EMA_NATR_MAX_RISK_RUPEES
+        if cap > 0 and plan["risk_rupees"] > cap:
+            reason = f"NATR risk ₹{plan['risk_rupees']:.0f} > max ₹{cap:.0f}"
+            plan = None
+    log_event(logger, "EMA_NATR_RISK_PLAN", side=side, sensex=round(sensex_ltp, 2),
+              atr=round(atr, 2) if atr else None, natr_line=line, plan=plan, blocked=reason)
+    return plan, delta, max_sl_pct, reason
+
+
 def _plan_ema_entry(ctx: BotContext, side: str, sensex_ltp: float):
     """
     Pre-fill EMA risk plan on the SENSEX index.
@@ -454,6 +484,8 @@ def _plan_ema_entry(ctx: BotContext, side: str, sensex_ltp: float):
             pass
 
     c5 = ctx.agg_5m.get_completed()
+    if settings.EMA_NATR_RISK:
+        return _plan_ema_natr_entry(ctx, side, sensex_ltp, c5, delta, max_sl_pct, expiry)
     atr = atr_at(c5, period=settings.SPOT_ATR_PERIOD)
     sh, sl = (swing_levels(c5, length=settings.EMA_SWING_LENGTH, reference_price=sensex_ltp)
               if len(c5) >= settings.EMA_SWING_LENGTH + 2 else (None, None))
@@ -1117,6 +1149,8 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
             time_stop_min_r=settings.EMA_TIME_STOP_MIN_R,
             hard_sl_cushion=settings.EMA_HARD_SL_CUSHION,
             max_sl_pct=_ema_max_sl_pct,
+            natr_mode=settings.EMA_NATR_RISK,
+            natr_broker_trail=settings.EMA_NATR_BROKER_TRAIL,
         )
         sl_pts     = round(ctx.entry_price - ctx.pivot_mgr.option_stop, 2)
         target_pts = round(abs(_ema_plan["target"] - sensex_ltp) * _ema_delta, 2)
@@ -2518,11 +2552,15 @@ def _make_candle_handler_5m(ctx: BotContext):
                 _emgr.update_atr(_tatr)
             _e9 = calc_ema(candles_5m, 9)[-1] if len(candles_5m) >= 9 else None
             _ema_reason = _emgr.on_candle(candles_5m[-1].close, _e9)
+            if _emgr.natr_mode:
+                _emgr.set_natr_line(_natr_line(candles_5m), candles_5m[-1].close)
             # Reversal: opposite EMA signal on this candle (side-effect free check)
-            if _ema_reason is None and settings.ENABLE_REVERSAL_EXIT and market_open():
+            if (_ema_reason is None and settings.ENABLE_REVERSAL_EXIT and market_open()
+                    and not _emgr.natr_mode):
                 from strategies.ce_strategy import is_ce_signal as _ce_sig
                 from strategies.pe_strategy import is_pe_signal as _pe_sig
-                _kw = dict(rsi_period=settings.EMA_RSI_PERIOD, pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS)
+                _kw = dict(rsi_period=settings.EMA_RSI_PERIOD, pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS,
+                           ignore_15m=settings.EMA_IGNORE_15M)
                 if ctx.strategy_type == "CE" and _pe_sig(candles_5m, candles_15m, rsi_max=settings.EMA_RSI_PE_MAX, **_kw):
                     _ema_reason = "REVERSAL_SIGNAL"
                 elif ctx.strategy_type == "PE" and _ce_sig(candles_5m, candles_15m, rsi_min=settings.EMA_RSI_CE_MIN, **_kw):

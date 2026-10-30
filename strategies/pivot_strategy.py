@@ -138,6 +138,20 @@ BOUNCE — S/R Level Bounce / Rejection  (opt-in: bounce_zone_atr > 0)
                                 candle's high (CE) / low (PE) → entry there
 
 ═══════════════════════════════════════════════════════════════════════
+SWING PIVOT — Fractal Swing High/Low Breakout (TradingView Pivot Reversal)
+═══════════════════════════════════════════════════════════════════════
+  Premise: price forms fractal swing highs/lows using lookback left/right
+  bars (default Left=4, Right=2). When price breaks out above the latest
+  confirmed swing high (CE) or breaks down below the latest confirmed swing
+  low (PE), enter in the breakout direction.
+
+  Filters & Risk:
+    • Trend alignment via EMA (e.g. 50 EMA): CE only when close > EMA,
+      PE only when close < EMA.
+    • Stop Loss: placed at recent structural swing low/high or ATR multiple.
+    • Targets: calibrated via Risk-to-Reward multiples (T1=1.5R, T2=2.5R, T3=3.5R).
+
+═══════════════════════════════════════════════════════════════════════
 Targets
 ═══════════════════════════════════════════════════════════════════════
   CE_PIVOT : T1 = R1,  T2 = R2,  T3 = R3
@@ -583,6 +597,135 @@ def _check_bounce(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Swing Pivot Reversal / Breakout (Fractal Pivot High / Low Breakout)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _check_swing_pivot(
+    today: list[Candle],
+    all_candles: Sequence[Candle],
+    pivot_levels,
+    atr_period: int,
+    left_bars: int = 4,
+    right_bars: int = 2,
+    trend_ema: int = 50,
+    rr_t1: float = 1.5,
+    rr_t2: float = 2.5,
+    rr_t3: float = 3.5,
+    use_atr_sl: bool = False,
+    sl_atr_mult: float = 1.2,
+    sl_buffer_atr: float = 0.05,
+    min_room_r: float = 1.0,
+) -> PivotSetup | None:
+    """Fractal Swing High/Low breakout strategy.
+
+    Finds the latest confirmed pivot high and pivot low in recent candles.
+    Fires CE on fresh breakout above pivot high (with close > EMA if enabled).
+    Fires PE on fresh breakdown below pivot low (with close < EMA if enabled).
+    """
+    total_candles = len(all_candles)
+    min_needed = left_bars + right_bars + 2
+    if total_candles < min_needed or len(today) < 2:
+        return None
+
+    atr = atr_at(_atr_series(today, all_candles), period=atr_period)
+    if not atr or atr <= 0:
+        return None
+
+    last_candle = all_candles[-1]
+    prev_candle = all_candles[-2]
+    entry = last_candle.close
+
+    # Trend filter via EMA
+    trend = None
+    if trend_ema > 0:
+        series = ema([x.close for x in all_candles], trend_ema)
+        trend = series[-1] if series else None
+        if trend is None:
+            return None
+
+    # Scan backwards for the latest confirmed pivot high and pivot low
+    hprice = None
+    lprice = None
+
+    # We only scan up to the candle that could be confirmed by right_bars
+    # A pivot at bar k is confirmed at bar k + right_bars <= total_candles - 1
+    max_k = total_candles - 1 - right_bars
+    min_k = max(0, total_candles - 60) # lookback up to 60 candles
+
+    for k in range(max_k, min_k - 1, -1):
+        if hprice is None:
+            cand_h = all_candles[k].high
+            is_ph = True
+            for j in range(max(0, k - left_bars), min(total_candles, k + right_bars + 1)):
+                if j != k and all_candles[j].high >= cand_h:
+                    is_ph = False
+                    break
+            if is_ph:
+                hprice = cand_h
+
+        if lprice is None:
+            cand_l = all_candles[k].low
+            is_pl = True
+            for j in range(max(0, k - left_bars), min(total_candles, k + right_bars + 1)):
+                if j != k and all_candles[j].low <= cand_l:
+                    is_pl = False
+                    break
+            if is_pl:
+                lprice = cand_l
+
+        if hprice is not None and lprice is not None:
+            break
+
+    # ── Check CE Breakout (Cross above Swing High) ──────────────────────────
+    if hprice is not None:
+        # Fresh cross: prior candle high <= hprice, current candle high > hprice
+        if prev_candle.high <= hprice and last_candle.high > hprice:
+            if trend is None or entry > trend:
+                # Determine SL: structural swing low or ATR
+                if use_atr_sl or lprice is None:
+                    stop = entry - sl_atr_mult * atr
+                else:
+                    stop = lprice - sl_buffer_atr * atr
+                risk = entry - stop
+                if risk > 0:
+                    t1 = entry + rr_t1 * risk
+                    t2 = entry + rr_t2 * risk
+                    t3 = entry + rr_t3 * risk
+                    setup = _make_setup(
+                        "CE", "SWING_PIVOT", entry, [last_candle], atr, pivot_levels,
+                        "SIGNAL_LOW", 0.0, sl_buffer_atr, min_room_r,
+                        targets=(t1, t2, t3), stop=stop,
+                    )
+                    if setup is not None:
+                        return setup
+
+    # ── Check PE Breakdown (Cross below Swing Low) ──────────────────────────
+    if lprice is not None:
+        # Fresh cross: prior candle low >= lprice, current candle low < lprice
+        if prev_candle.low >= lprice and last_candle.low < lprice:
+            if trend is None or entry < trend:
+                # Determine SL: structural swing high or ATR
+                if use_atr_sl or hprice is None:
+                    stop = entry + sl_atr_mult * atr
+                else:
+                    stop = hprice + sl_buffer_atr * atr
+                risk = stop - entry
+                if risk > 0:
+                    t1 = entry - rr_t1 * risk
+                    t2 = entry - rr_t2 * risk
+                    t3 = entry - rr_t3 * risk
+                    setup = _make_setup(
+                        "PE", "SWING_PIVOT", entry, [last_candle], atr, pivot_levels,
+                        "SIGNAL_LOW", 0.0, sl_buffer_atr, min_room_r,
+                        targets=(t1, t2, t3), stop=stop,
+                    )
+                    if setup is not None:
+                        return setup
+
+    return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Mode C — Cross-and-Acceptance
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -599,6 +742,7 @@ def _check_acceptance(
     min_dist_atr: float = 0.0,
     min_room_r_accept: float = 0.0,
     blocked_sides: frozenset[str] = frozenset(),
+    require_confirm_body: bool = False,
 ) -> PivotSetup | None:
     """
     Acceptance mode: price closed (or opened) on the wrong side of the Pivot,
@@ -609,6 +753,10 @@ def _check_acceptance(
       min_dist_atr      signal close must be >= this x ATR beyond the Pivot.
       min_room_r_accept T1 room must be >= this x risk (max with min_room_r).
       blocked_sides     sides ("CE"/"PE") for which acceptance is skipped.
+      require_confirm_body signal candle must have a confirming body (CE: close >
+                        open; PE: close < open).  Blocks entries on red CE /
+                        green PE candles that satisfy the geometry but are
+                        already reversing away from the Pivot.
     """
     n = sustain_candles
     if len(today) < n:
@@ -653,6 +801,26 @@ def _check_acceptance(
         )
         if first_end != last:
             continue
+
+        # ── Confirming body filter ─────────────────────────────────────────
+        if require_confirm_body:
+            sig = today[-1]
+            if side == "CE" and sig.close <= sig.open:
+                import logging as _log
+                _log.getLogger(__name__).info(
+                    "[PIVOT_ACCEPT_BLOCKED_BODY] side=CE close=%.2f open=%.2f"
+                    " (red candle — rejected)",
+                    sig.close, sig.open,
+                )
+                continue
+            if side == "PE" and sig.close >= sig.open:
+                import logging as _log
+                _log.getLogger(__name__).info(
+                    "[PIVOT_ACCEPT_BLOCKED_BODY] side=PE close=%.2f open=%.2f"
+                    " (green candle — rejected)",
+                    sig.close, sig.open,
+                )
+                continue
 
         atr = atr_at(_atr_series(today, all_candles), period=atr_period)
         if not atr or atr <= 0:
@@ -714,6 +882,7 @@ def find_pivot_setup(
     acceptance_min_dist_atr: float = 0.0,
     acceptance_min_room_r: float = 0.0,
     acceptance_blocked_sides: frozenset[str] = frozenset(),
+    acceptance_require_confirm_body: bool = False,
     # bounce_zone_atr: S/R bounce-rejection zone half-width (0 = disabled).
     bounce_zone_atr: float = 0.0,
     # ── Bounce quality filters (default OFF) ─────────────────────────────
@@ -721,6 +890,16 @@ def find_pivot_setup(
     bounce_min_wick_pct: float = 0.0,
     bounce_trend_ema: int = 0,
     bounce_confirm_next: bool = False,
+    # ── Swing Pivot (Fractal breakout) ───────────────────────────────────
+    enable_swing_pivot: bool = False,
+    swing_pivot_left: int = 4,
+    swing_pivot_right: int = 2,
+    swing_pivot_trend_ema: int = 50,
+    swing_pivot_rr_t1: float = 1.5,
+    swing_pivot_rr_t2: float = 2.5,
+    swing_pivot_rr_t3: float = 3.5,
+    swing_pivot_use_atr_sl: bool = False,
+    swing_pivot_atr_mult: float = 1.2,
 ) -> PivotSetup | None:
     """Return a PivotSetup when the latest completed candle confirms a setup,
     else None.
@@ -814,6 +993,7 @@ def find_pivot_setup(
             min_dist_atr=acceptance_min_dist_atr,
             min_room_r_accept=acceptance_min_room_r,
             blocked_sides=acceptance_blocked_sides,
+            require_confirm_body=acceptance_require_confirm_body,
         )
         if setup is not None:
             return setup
@@ -827,6 +1007,25 @@ def find_pivot_setup(
             min_wick_pct=bounce_min_wick_pct,
             trend_ema=bounce_trend_ema,
             confirm_next=bounce_confirm_next,
+        )
+        if setup is not None:
+            return setup
+
+    # ── Swing Pivot Reversal / Breakout ─────────────────────────────────────
+    if enable_swing_pivot:
+        setup = _check_swing_pivot(
+            today, candles_5m, pivot_levels,
+            atr_period=atr_period,
+            left_bars=swing_pivot_left,
+            right_bars=swing_pivot_right,
+            trend_ema=swing_pivot_trend_ema,
+            rr_t1=swing_pivot_rr_t1,
+            rr_t2=swing_pivot_rr_t2,
+            rr_t3=swing_pivot_rr_t3,
+            use_atr_sl=swing_pivot_use_atr_sl,
+            sl_atr_mult=swing_pivot_atr_mult,
+            sl_buffer_atr=sl_buffer_atr,
+            min_room_r=min_room_r,
         )
         if setup is not None:
             return setup

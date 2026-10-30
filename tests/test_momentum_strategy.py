@@ -416,6 +416,7 @@ class TestSignalEngineWithMomentum:
             mock_settings.ENABLE_ATR_COPILOT_STRATEGY  = False
             mock_settings.ENABLE_TRB_STRATEGY          = False
             mock_settings.ENABLE_EMA_STRATEGY          = True
+            mock_settings.EMA_ATR_CONFIRM              = False
             mock_settings.ENABLE_MOMENTUM_PHASE        = True
             mock_settings.MOMENTUM_MIN_BODY_PTS        = MIN_BODY
             mock_settings.MOMENTUM_WINDOW_START        = "13:30"
@@ -456,6 +457,7 @@ class TestSignalEngineWithMomentum:
             mock_settings.ENABLE_ATR_COPILOT_STRATEGY  = False
             mock_settings.ENABLE_TRB_STRATEGY          = False
             mock_settings.ENABLE_EMA_STRATEGY          = True
+            mock_settings.EMA_ATR_CONFIRM              = False
             mock_settings.ENABLE_MOMENTUM_PHASE        = True
             mock_settings.MOMENTUM_MIN_BODY_PTS        = MIN_BODY
             mock_settings.MOMENTUM_WINDOW_START        = "13:30"
@@ -563,6 +565,7 @@ class TestMomentumMondayFilter:
         ms.ENABLE_ATR_COPILOT_STRATEGY  = False
         ms.ENABLE_TRB_STRATEGY          = False
         ms.ENABLE_EMA_STRATEGY          = True
+        ms.EMA_ATR_CONFIRM              = False
         ms.ENABLE_MOMENTUM_PHASE        = True
         ms.MOMENTUM_MIN_BODY_PTS        = MIN_BODY
         ms.MOMENTUM_WINDOW_START        = "13:30"

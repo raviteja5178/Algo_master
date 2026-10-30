@@ -29,8 +29,12 @@ from utils.time_utils import IST
 
 logger = logging.getLogger(__name__)
 
-# Minimum completed candles to hold in memory (warm-up requires 20)
-_BUFFER = 60
+# Completed candles held in memory.  Indicators (EMA9/EMA21, RSI) are recomputed
+# from this window with an SMA seed, so a short window leaves them un-converged
+# and the EMA9/EMA21 cross can land a candle later than on a charting platform
+# (60 candles did exactly that).  ~375 = 5 sessions of 5m bars, which matches
+# the bootstrap seed and lets the EMAs converge to the charting values.
+_BUFFER = 400
 
 # Market session starts at 09:15 IST.  Any candle or tick before this
 # time is pre-market / pre-open auction data and must not enter the EMA

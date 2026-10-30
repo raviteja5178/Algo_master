@@ -935,3 +935,109 @@ class TestModeAQualityFilters:
         assert s is not None and s.side == "PE" and s.mode == "REJECTION", (
             "Mode B REJECTION must be unaffected by OD quality filter settings"
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestSwingPivotBreakout (Fractal Pivot High/Low Breakout)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSwingPivotBreakout:
+    def _create_candles(self, highs: list[float], lows: list[float], closes: list[float]) -> list[Candle]:
+        y = date.today() - timedelta(days=1)
+        # Prepend 20 yesterday candles so ATR(14) is readily computable
+        candles = [
+            Candle(datetime(y.year, y.month, y.day, 9, 15) + timedelta(minutes=5 * i),
+                   1000, 1010, 990, 1000)
+            for i in range(20)
+        ]
+        t = date.today()
+        base_dt = datetime.combine(t, time(9, 15))
+        for i, (h, l, c) in enumerate(zip(highs, lows, closes)):
+            dt = base_dt + timedelta(minutes=5 * i)
+            candles.append(Candle(dt, c - 2.0, h, l, c))
+        return candles
+
+    def test_swing_pivot_ce_breakout(self):
+        # Build candles with a clear pivot high at index 4 (high=1050)
+        # Left 4 bars (idx 0..3) highs < 1050; Right 2 bars (idx 5..6) highs < 1050
+        # Then candle 8 breaks out with high=1055, close=1052
+        highs  = [1010, 1020, 1030, 1040, 1050, 1035, 1030, 1045, 1055]
+        lows   = [1000, 1010, 1015, 1025, 1030, 1020, 1010, 1025, 1040]
+        closes = [1008, 1018, 1028, 1038, 1045, 1025, 1015, 1042, 1052]
+
+        candles = self._create_candles(highs, lows, closes)
+        setup = find_pivot_setup(
+            candles, PV,
+            enable_swing_pivot=True,
+            swing_pivot_left=4,
+            swing_pivot_right=2,
+            swing_pivot_trend_ema=0,
+            swing_pivot_rr_t1=1.5,
+            swing_pivot_rr_t2=2.5,
+            swing_pivot_rr_t3=3.5,
+        )
+        assert setup is not None
+        assert setup.side == "CE"
+        assert setup.mode == "SWING_PIVOT"
+        assert setup.entry == 1052.0
+        assert setup.risk > 0
+        assert setup.t1 == pytest.approx(setup.entry + 1.5 * setup.risk, rel=1e-2)
+        assert setup.t2 == pytest.approx(setup.entry + 2.5 * setup.risk, rel=1e-2)
+        assert setup.t3 == pytest.approx(setup.entry + 3.5 * setup.risk, rel=1e-2)
+
+    def test_swing_pivot_pe_breakdown(self):
+        # Clear pivot low at index 4 (low=950)
+        # Left 4 bars lows > 950; Right 2 bars lows > 950
+        # Candle 8 breaks down with low=945, close=948
+        highs  = [1000,  990,  985,  975,  970,  980,  990,  975,  960]
+        lows   = [ 990,  980,  970,  960,  950,  965,  970,  955,  945]
+        closes = [ 992,  982,  972,  962,  955,  975,  985,  958,  948]
+
+        candles = self._create_candles(highs, lows, closes)
+        setup = find_pivot_setup(
+            candles, PV,
+            enable_swing_pivot=True,
+            swing_pivot_left=4,
+            swing_pivot_right=2,
+            swing_pivot_trend_ema=0,
+            swing_pivot_rr_t1=1.5,
+            swing_pivot_rr_t2=2.5,
+            swing_pivot_rr_t3=3.5,
+        )
+        assert setup is not None
+        assert setup.side == "PE"
+        assert setup.mode == "SWING_PIVOT"
+        assert setup.entry == 948.0
+        assert setup.risk > 0
+        assert setup.t1 == pytest.approx(setup.entry - 1.5 * setup.risk, rel=1e-2)
+        assert setup.t2 == pytest.approx(setup.entry - 2.5 * setup.risk, rel=1e-2)
+        assert setup.t3 == pytest.approx(setup.entry - 3.5 * setup.risk, rel=1e-2)
+
+    def test_swing_pivot_trend_filter(self):
+        # CE Breakout, but close is below 50 EMA -> should be blocked
+        highs  = [1010, 1020, 1030, 1040, 1050, 1035, 1030, 1045, 1055]
+        lows   = [1000, 1010, 1015, 1025, 1030, 1020, 1010, 1025, 1040]
+        closes = [1008, 1018, 1028, 1038, 1045, 1025, 1015, 1042, 1052]
+
+        # Prepend 55 high-priced candles so EMA(50) > 1100
+        y = date.today() - timedelta(days=1)
+        candles = [
+            Candle(datetime(y.year, y.month, y.day, 9, 15) + timedelta(minutes=5 * i),
+                   1150, 1160, 1140, 1150)
+            for i in range(55)
+        ]
+        t = date.today()
+        base_dt = datetime.combine(t, time(9, 15))
+        for i, (h, l, c) in enumerate(zip(highs, lows, closes)):
+            dt = base_dt + timedelta(minutes=5 * i)
+            candles.append(Candle(dt, c - 2.0, h, l, c))
+
+        setup = find_pivot_setup(
+            candles, PV,
+            enable_swing_pivot=True,
+            swing_pivot_left=4,
+            swing_pivot_right=2,
+            swing_pivot_trend_ema=50,
+        )
+        # Blocked because entry (~1052) < EMA (~1100+)
+        assert setup is None

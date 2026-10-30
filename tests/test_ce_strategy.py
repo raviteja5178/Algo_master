@@ -183,6 +183,137 @@ class TestCEStrategy:
         assert is_ce_signal(c5, _uptrend_15m()) is False
 
 
+# ── EMA9 x EMA21 cross trigger (opt-in) ──────────────────────────────────────
+
+def _ce_ema_cross_5m() -> list[Candle]:
+    # Fall, then a steady rise: EMA9 crosses above EMA21 on the last candle while the
+    # close stays above EMA9 (so the close-vs-EMA9 crossover does NOT fire).
+    closes = [1100 - 5 * i for i in range(22)]
+    closes += [closes[-1] + 6 * (i + 1) for i in range(11)]
+    return _series(closes)
+
+
+def _pe_ema_cross_5m() -> list[Candle]:
+    closes = [1000 + 5 * i for i in range(22)]
+    closes += [closes[-1] - 6 * (i + 1) for i in range(11)]
+    return _series(closes)
+
+
+class TestEmaCrossTrigger:
+    def test_ce_series_is_a_real_ema_cross_only(self):
+        c5 = _ce_ema_cross_5m()
+        e9, e21 = ema(c5, 9), ema(c5, 21)
+        assert e9[-2] <= e21[-2] and e9[-1] > e21[-1]
+        assert not (c5[-2].close <= e9[-2] and c5[-1].close > e9[-1])
+
+    def test_ce_off_by_default(self):
+        assert is_ce_signal(_ce_ema_cross_5m(), _uptrend_15m()) is False
+
+    def test_ce_fires_when_enabled(self):
+        assert is_ce_signal(_ce_ema_cross_5m(), _uptrend_15m(), ema_cross=True) is True
+
+    def test_ce_still_needs_15m_trend_and_rsi(self):
+        assert is_ce_signal(_ce_ema_cross_5m(), _downtrend_15m(), ema_cross=True) is False
+        assert is_ce_signal(_ce_ema_cross_5m(), _uptrend_15m(), rsi_min=99.0, ema_cross=True) is False
+
+    def test_pe_series_is_a_real_ema_cross_only(self):
+        c5 = _pe_ema_cross_5m()
+        e9, e21 = ema(c5, 9), ema(c5, 21)
+        assert e9[-2] >= e21[-2] and e9[-1] < e21[-1]
+        assert not (c5[-2].close >= e9[-2] and c5[-1].close < e9[-1])
+
+    def test_pe_off_by_default(self):
+        assert is_pe_signal(_pe_ema_cross_5m(), _downtrend_15m()) is False
+
+    def test_pe_fires_when_enabled(self):
+        assert is_pe_signal(_pe_ema_cross_5m(), _downtrend_15m(), ema_cross=True) is True
+
+    def test_pe_still_needs_15m_trend_and_rsi(self):
+        assert is_pe_signal(_pe_ema_cross_5m(), _uptrend_15m(), ema_cross=True) is False
+        assert is_pe_signal(_pe_ema_cross_5m(), _downtrend_15m(), rsi_max=1.0, ema_cross=True) is False
+
+    def test_cross_ignores_15m_only_when_opted_in(self):
+        assert is_ce_signal(_ce_ema_cross_5m(), _downtrend_15m(), ema_cross=True,
+                            cross_without_15m=True) is True
+        assert is_pe_signal(_pe_ema_cross_5m(), _uptrend_15m(), ema_cross=True,
+                            cross_without_15m=True) is True
+        # still RSI-gated, and a plain crossover (no EMA cross) still needs the 15m trend
+        assert is_ce_signal(_ce_ema_cross_5m(), _downtrend_15m(), rsi_min=99.0, ema_cross=True,
+                            cross_without_15m=True) is False
+        assert is_ce_signal(_ce_crossover_5m(), _downtrend_15m(), ema_cross=True,
+                            cross_without_15m=True) is False
+        assert is_ce_signal(_ce_ema_cross_5m(), _downtrend_15m(), cross_without_15m=True) is False
+
+    def test_cross_only_disables_other_triggers(self):
+        # plain close-vs-EMA9 crossover fires by default but not with cross_only
+        assert is_ce_signal(_ce_crossover_5m(), _uptrend_15m()) is True
+        assert is_ce_signal(_ce_crossover_5m(), _uptrend_15m(), cross_only=True) is False
+        assert is_pe_signal(_pe_crossover_5m(), _downtrend_15m()) is True
+        assert is_pe_signal(_pe_crossover_5m(), _downtrend_15m(), cross_only=True) is False
+
+    def test_cross_only_fires_on_ema_cross_with_confirmation(self):
+        assert is_ce_signal(_ce_ema_cross_5m(), _uptrend_15m(), cross_only=True) is True
+        assert is_pe_signal(_pe_ema_cross_5m(), _downtrend_15m(), cross_only=True) is True
+        # confirmation still applies: 15m trend and RSI
+        assert is_ce_signal(_ce_ema_cross_5m(), _downtrend_15m(), cross_only=True) is False
+        assert is_ce_signal(_ce_ema_cross_5m(), _uptrend_15m(), rsi_min=99.0, cross_only=True) is False
+        assert is_ce_signal(_ce_ema_cross_5m(), _downtrend_15m(), cross_only=True,
+                            cross_without_15m=True) is True
+
+# ── Signal-candle colour requirement (opt-in) ────────────────────────────────
+
+def _with_last_open(c5: list[Candle], open_: float) -> list[Candle]:
+    last = c5[-1]
+    return c5[:-1] + [Candle(last.timestamp, open_, last.high, last.low, last.close)]
+
+
+class TestRequireCandleColor:
+    def test_ce_needs_green_signal_candle(self):
+        for base in (_ce_crossover_5m(), _ce_ema_cross_5m()):
+            kw = dict(ema_cross=True, require_candle_color=True)
+            green = _with_last_open(base, base[-1].close - 3)
+            red = _with_last_open(base, base[-1].close + 3)
+            assert is_ce_signal(green, _uptrend_15m(), **kw) is True
+            assert is_ce_signal(red, _uptrend_15m(), **kw) is False
+            assert is_ce_signal(base, _uptrend_15m(), **kw) is False        # doji is not bullish
+            # off by default: the colour is ignored
+            assert is_ce_signal(red, _uptrend_15m(), ema_cross=True) is True
+
+    def test_pe_needs_red_signal_candle(self):
+        for base in (_pe_crossover_5m(), _pe_ema_cross_5m()):
+            kw = dict(ema_cross=True, require_candle_color=True)
+            red = _with_last_open(base, base[-1].close + 3)
+            green = _with_last_open(base, base[-1].close - 3)
+            assert is_pe_signal(red, _downtrend_15m(), **kw) is True
+            assert is_pe_signal(green, _downtrend_15m(), **kw) is False
+            assert is_pe_signal(base, _downtrend_15m(), **kw) is False
+            assert is_pe_signal(green, _downtrend_15m(), ema_cross=True) is True
+
+    def test_min_body_atr_blocks_small_bodies(self):
+        # test candles have high/low = close +/- 1, so ATR is small; a 3-pt body clears 0.35 x ATR
+        # only when ATR is small enough.  Use a wide ratio to force a block and a tiny one to pass.
+        for base, fn, trend, sign in (
+            (_ce_crossover_5m(), is_ce_signal, _uptrend_15m(), -1),
+            (_pe_crossover_5m(), is_pe_signal, _downtrend_15m(), +1),
+        ):
+            sig = _with_last_open(base, base[-1].close + sign * 3)
+            assert fn(sig, trend) is True                                  # off by default
+            assert fn(sig, trend, min_body_atr=0.01) is True                # tiny threshold passes
+            assert fn(sig, trend, min_body_atr=50.0) is False               # huge threshold blocks
+            # applies to every trigger, including the EMA9xEMA21 cross
+        ce_cross = _with_last_open(_ce_ema_cross_5m(), _ce_ema_cross_5m()[-1].close - 3)
+        pe_cross = _with_last_open(_pe_ema_cross_5m(), _pe_ema_cross_5m()[-1].close + 3)
+        assert is_ce_signal(ce_cross, _uptrend_15m(), ema_cross=True, min_body_atr=50.0) is False
+        assert is_pe_signal(pe_cross, _downtrend_15m(), ema_cross=True, min_body_atr=50.0) is False
+        assert is_ce_signal(ce_cross, _uptrend_15m(), ema_cross=True, min_body_atr=0.01) is True
+        assert is_pe_signal(pe_cross, _downtrend_15m(), ema_cross=True, min_body_atr=0.01) is True
+
+
+
+
+
+
+
 # ── PE ────────────────────────────────────────────────────────────────────────
 
 class TestPEStrategy:
