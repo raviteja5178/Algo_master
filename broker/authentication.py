@@ -18,7 +18,8 @@ from __future__ import annotations
 import logging
 import os
 from datetime import date
-from dotenv import set_key
+from pathlib import Path
+
 from kiteconnect import KiteConnect  # type: ignore
 
 from config import settings
@@ -26,12 +27,38 @@ from utils.logging_config import log_event
 
 logger = logging.getLogger(__name__)
 
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+
+
+def _set_env_key(key: str, value: str) -> None:
+    """Write/update a single key=value in .env without an atomic rename.
+
+    python-dotenv's set_key() uses os.rename(tmp → .env) which raises
+    [WinError 5] Access Denied on Windows when another process holds a
+    read handle on .env.  We patch the line in-memory and write straight back.
+    """
+    lines: list[str] = []
+    if _ENV_FILE.exists():
+        lines = _ENV_FILE.read_text(encoding="utf-8").splitlines(keepends=True)
+    prefix = f"{key}="
+    new_line = f"{key}={value}\n"
+    replaced = False
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith(prefix) and not stripped.startswith("#"):
+            lines[i] = new_line
+            replaced = True
+            break
+    if not replaced:
+        lines.append(new_line)
+    _ENV_FILE.write_text("".join(lines), encoding="utf-8")
+
 
 def _save_token(access_token: str) -> None:
     """Persist access_token and today's date to .env and settings."""
     today_str = date.today().isoformat()
-    set_key(".env", "KITE_ACCESS_TOKEN", access_token)
-    set_key(".env", "KITE_TOKEN_DATE", today_str)
+    _set_env_key("KITE_ACCESS_TOKEN", access_token)
+    _set_env_key("KITE_TOKEN_DATE", today_str)
     settings.KITE_ACCESS_TOKEN = access_token
     settings.KITE_TOKEN_DATE = today_str
 

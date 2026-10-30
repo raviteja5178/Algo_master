@@ -4,7 +4,9 @@ PE entry strategy — SENSEX 5m EMA 9/21 + RSI (copied rule-set).
 Macro trend (15m, latest completed candle):
     GLOBAL_TREND = SHORT_ONLY when  15m Close < 15m EMA9  AND  15m EMA9 < 15m EMA21
 
-Trigger (5m, latest completed candle) — either:
+Trigger (5m, latest completed candle) — any of:
+    c) EMA cross : (opt-in, ema_cross=True) EMA9 crosses BELOW EMA21 on this candle
+                   (prev EMA9 >= prev EMA21  AND  EMA9 < EMA21)
     a) Crossover : prev 5m close >= prev EMA9  AND  5m close < EMA9
     b) Pullback  : price pulled back from below EMA9 up to EMA21, then
                    the current candle is rejected at EMA21.  All must hold:
@@ -29,7 +31,7 @@ from collections.abc import Sequence
 from utils.time_utils import today_ist
 
 from market.candle_builder import Candle
-from market.indicators import ema, rsi
+from market.indicators import atr_at, ema, rsi
 
 FAST_EMA = 9
 SLOW_EMA = 21
@@ -55,6 +57,12 @@ def is_pe_signal(
     rsi_period: int = 14,
     rsi_max: float = 45.0,
     pullback_tol_pts: float = 10.0,
+    ema_cross: bool = False,
+    cross_without_15m: bool = False,
+    cross_only: bool = False,
+    ignore_15m: bool = False,
+    require_candle_color: bool = False,
+    min_body_atr: float = 0.0,
 ) -> bool:
     """
     Return True when the 15m trend is SHORT_ONLY and a 5m PE trigger fires.
@@ -62,14 +70,15 @@ def is_pe_signal(
     Both sequences must be in chronological order (oldest first).
     Minimum required: 21 completed 5m candles and 21 completed 15m candles.
     """
-    if len(candles_5m) < SLOW_EMA or len(candles_15m) < SLOW_EMA:
+    if len(candles_5m) < SLOW_EMA or (not ignore_15m and len(candles_15m) < SLOW_EMA):
         return False
 
     latest = candles_5m[-1]
     if latest.timestamp.date() != today_ist():
         return False
 
-    if not is_global_trend_short(candles_15m):
+    trend_ok = True if ignore_15m else is_global_trend_short(candles_15m)
+    if not trend_ok and not ((ema_cross or cross_only) and cross_without_15m):
         return False
 
     ema9_series = ema(candles_5m, FAST_EMA)
@@ -79,7 +88,30 @@ def is_pe_signal(
     if None in (e9_now, e9_prev, e21_now, rsi_now):
         return False
 
+    # require_candle_color: every trigger (crossover / EMA cross / pullback) needs the
+    # signal candle itself to be bearish (close < open).
+    if require_candle_color and not latest.close < latest.open:
+        return False
+
+    # min_body_atr: the signal candle body must be >= min_body_atr x ATR(14).  Fails open
+    # while ATR is not computable.
+    if min_body_atr > 0:
+        _atr = atr_at(candles_5m, period=14)
+        if _atr and abs(latest.close - latest.open) < min_body_atr * _atr:
+            return False
+
     crossover = candles_5m[-2].close >= e9_prev and latest.close < e9_now
+
+    # EMA9 x EMA21 cross (opt-in): EMA9 moves from >= EMA21 to < EMA21 on this candle.
+    # cross_without_15m: this trigger alone may fire when the 15m trend is not SHORT_ONLY.
+    # cross_only: the cross is the ONLY trigger (no close-vs-EMA9 crossover / pullback).
+    e21_series = ema(candles_5m, SLOW_EMA)
+    cross = bool((ema_cross or cross_only) and e21_series[-2] is not None
+                 and e9_prev >= e21_series[-2] and e9_now < e21_now)
+    if cross_only or not trend_ok:
+        return cross and rsi_now < rsi_max
+    if cross:
+        crossover = True
 
     # Pullback to EMA21 — all conditions must hold:
     #   1. Current close sits on or just below EMA21 (within tolerance).

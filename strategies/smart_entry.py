@@ -330,9 +330,9 @@ class SmartEntryFilter:
             return False
         recent = candles_5m[-self._squeeze_n:]
         if side == "CE":
-            return all(c.close > c.open for c in recent)
+            return all(c.close > c.open and (c.close - c.open) >= 2.0 for c in recent)
         else:
-            return all(c.close < c.open for c in recent)
+            return all(c.close < c.open and (c.open - c.close) >= 2.0 for c in recent)
 
     def _structure_bypass(self, side: str, candles_5m: Sequence[Candle], direction: str) -> bool:
         """

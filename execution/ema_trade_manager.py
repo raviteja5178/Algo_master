@@ -73,10 +73,51 @@ def plan_ema_risk(
             "source": source, "room": room}, None
 
 
+def plan_natr_risk(
+    side: str,
+    entry_index: float,
+    natr_line: float | None,
+    atr: float | None,
+    *,
+    mult: float = 3.0,
+    min_atr: float = 1.0,
+    target_rr: float = 3.0,
+) -> tuple[dict | None, str | None]:
+    """
+    NATR-managed risk plan (TradingView "ATR 5 Min Index Study").
+
+    Stop = the NATR trailing line when it sits behind entry (the trend the trade
+    follows); if the line is on the wrong side (NATR still in the opposite trend)
+    stop = entry ∓ mult × ATR, i.e. where the line would sit after flipping.
+    Distance is floored at min_atr × ATR.  Returns (plan, None) or (None, reason).
+    """
+    if not atr or atr <= 0 or entry_index <= 0:
+        return None, "ATR unavailable"
+    sign = 1 if side == "CE" else -1
+    if natr_line is not None and (entry_index - natr_line) * sign > 0:
+        dist, source = entry_index - natr_line, "natr_line"
+    else:
+        dist, source = mult * atr, "natr_atr"
+    dist = abs(dist)
+    dist = max(dist, min_atr * atr)
+    stop = round(entry_index - sign * dist, 2)
+    target = round(entry_index + sign * dist * target_rr, 2) if target_rr > 0 else \
+        round(entry_index + sign * 1e6, 2)
+    return {"stop": stop, "target": target, "risk": round(dist, 2),
+            "source": source, "room": None}, None
+
+
 class EmaTradeManager(PivotTradeManager):
     # Exit reason per stage when the index stop is crossed, and on target.
     EXIT_REASONS = {"INITIAL": "EMA_SL_HIT", "BE": "EMA_BE_STOP", "TRAIL": "EMA_TSL_HIT",
                     "TARGET": "EMA_TARGET"}
+    # NATR mode: the stop only follows the NATR line (set per candle via
+    # set_natr_line); BE / chandelier / EMA9-trail / time-stop are disabled.
+    # Class-level defaults keep older persisted states loadable.
+    natr_mode: bool = False
+    natr_line: float | None = None
+    _stop_dirty: bool = False
+    natr_broker_trail: bool = True
 
     def __init__(
         self,
@@ -96,6 +137,8 @@ class EmaTradeManager(PivotTradeManager):
         time_stop_min_r: float = 0.5,
         hard_sl_cushion: float = 1.1,
         max_sl_pct: float = 0.30,
+        natr_mode: bool = False,
+        natr_broker_trail: bool = True,
     ) -> None:
         super().__init__(
             side, entry_index, stop_index, target_index, target_index, target_index,
@@ -108,6 +151,30 @@ class EmaTradeManager(PivotTradeManager):
         self.time_stop_bars = time_stop_bars
         self.time_stop_min_r = time_stop_min_r
         self.bars = 0
+        self.natr_mode = natr_mode
+        self.natr_line = None
+        self.natr_broker_trail = natr_broker_trail
+
+    def set_natr_line(self, line: float | None, close: float) -> bool:
+        """NATR mode: ratchet the stop to the NATR line (call on each 5m close).
+
+        Only a line that is behind price (trend side) is used — a line still on
+        the wrong side of price belongs to the opposite trend.
+        Returns True when the stop moved (caller should update the broker SL)."""
+        if not self.natr_mode or line is None or (close - line) * self.sign <= 0:
+            return False
+        self.natr_line = line
+        broker_stop = self.option_stop
+        moved = self._move_stop(line, "TRAIL")
+        if moved and not self.natr_broker_trail:
+            # Index logic owns the exit; the broker SL stays at its initial
+            # disaster level (a premium stop derived from a fixed delta fires
+            # early once theta / IV decay eat the premium).
+            self.option_stop = broker_stop
+            return moved
+        # the next index tick reports STOP_MOVED so main updates the broker SL
+        self._stop_dirty = self._stop_dirty or moved
+        return moved
 
     # ── every SENSEX tick ─────────────────────────────────────────────────────
     def on_index_price(self, price: float) -> tuple[str, object] | None:
@@ -119,6 +186,11 @@ class EmaTradeManager(PivotTradeManager):
 
         if self._fav(price) > self._fav(self.best_index):
             self.best_index = price
+        if self.natr_mode:
+            if self._stop_dirty:
+                self._stop_dirty = False
+                return ("STOP_MOVED", self.option_stop)
+            return None
         moved = False
         if self.stage == "INITIAL" and self._fav(self.best_index) >= self.be_trigger_r * self.risk:
             moved |= self._move_stop(self.entry_index + self.sign * self.be_buffer_pts, "BE")
@@ -129,6 +201,8 @@ class EmaTradeManager(PivotTradeManager):
     # ── every completed 5m candle ─────────────────────────────────────────────
     def on_candle(self, close: float, ema9: float | None) -> str | None:
         self.bars += 1
+        if self.natr_mode:
+            return None
         if (self.trail_ema9_exit and self.stage != "INITIAL" and ema9 is not None
                 and (close - ema9) * self.sign < 0):
             log_event(logger, "EMA_TRAIL_EMA9_EXIT", side=self.side, close=close, ema9=round(ema9, 2))

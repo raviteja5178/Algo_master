@@ -430,13 +430,15 @@
         <div class="sb-row"><span class="sb-lbl" style="color:var(--accent)">Prev Low</span><span id="sb-pdl" class="sb-val">—</span></div>
         <div class="sb-divider"></div>
         <!-- Pivot Levels -->
-        <div class="sb-section" id="sb-pivot-section" style="display:none">Pivot Levels</div>
+        <div class="sb-section" id="sb-pivot-section" style="display:none">Pivot Levels <span id="sb-pivot-formula" style="font-size:8px;font-weight:400;color:var(--muted2);letter-spacing:0;text-transform:none"></span></div>
         <div id="sb-pivot-rows" style="display:none">
+          <div class="sb-row"><span class="sb-lbl" style="color:#ef4444;font-weight:600">R3</span><span id="sb-r3" class="sb-val" style="color:#ef4444">—</span></div>
           <div class="sb-row"><span class="sb-lbl" style="color:#f97316;font-weight:600">R2</span><span id="sb-r2" class="sb-val" style="color:#f97316">—</span></div>
           <div class="sb-row"><span class="sb-lbl" style="color:#fb923c">R1</span><span id="sb-r1" class="sb-val" style="color:#fb923c">—</span></div>
           <div class="sb-row"><span class="sb-lbl" style="color:#a78bfa;font-weight:600">Pivot</span><span id="sb-pivot" class="sb-val" style="color:#a78bfa">—</span></div>
           <div class="sb-row"><span class="sb-lbl" style="color:#60a5fa">S1</span><span id="sb-s1" class="sb-val" style="color:#60a5fa">—</span></div>
           <div class="sb-row"><span class="sb-lbl" style="color:#3b82f6;font-weight:600">S2</span><span id="sb-s2" class="sb-val" style="color:#3b82f6">—</span></div>
+          <div class="sb-row"><span class="sb-lbl" style="color:#1d4ed8;font-weight:600">S3</span><span id="sb-s3" class="sb-val" style="color:#1d4ed8">—</span></div>
         </div>
         <div class="sb-divider" id="sb-pivot-divider" style="display:none"></div>
         <!-- CPR + Fair Value Gap -->
@@ -1699,11 +1701,7 @@ function calcSignalConds(state,candles,ema9,ema21){
   const showPivot=!!pl;
   ['sb-pivot-section','sb-pivot-rows','sb-pivot-divider'].forEach(id=>document.getElementById(id).style.display=showPivot?'block':'none');
   if(pl){
-    document.getElementById('sb-r2').textContent=pl.r2.toFixed(1);
-    document.getElementById('sb-r1').textContent=pl.r1.toFixed(1);
-    document.getElementById('sb-pivot').textContent=pl.pivot.toFixed(1);
-    document.getElementById('sb-s1').textContent=pl.s1.toFixed(1);
-    document.getElementById('sb-s2').textContent=pl.s2.toFixed(1);
+    _renderSidebarPivotLevels(pl);
   }
   // ── Market regime (rule-based ER / ADX / ATR ratio) ──────────────────────────
   (function(){
@@ -1717,6 +1715,7 @@ function calcSignalConds(state,candles,ema9,ema21){
   })();
   document.getElementById('ema-section').style.display=emaOn?'block':'none';
   document.getElementById('pivot-filter-section').style.display=(emaOn&&!!pl)?'block':'none';
+  // Keep pivot-strat-section visibility in sync (same logic as _applySignalSectionVisibility)
   document.getElementById('orb-section').style.display=orbOn?'block':'none';
   document.getElementById('ob-section').style.display=obOn?'block':'none';
   document.getElementById('momentum-section').style.display=momOn?'block':'none';
@@ -2214,7 +2213,58 @@ async function pollLtp(){try{const d=await fetch('/api/ltp').then(r=>r.json());r
 async function poll(){try{const[status,trades,orders,cs]=await Promise.all([fetch('/api/status').then(r=>r.json()),fetch('/api/trades').then(r=>r.json()),fetch('/api/orders').then(r=>r.json()),fetch('/api/candles').then(r=>r.json())]);renderStatus(status);renderTrades(trades);renderOrders(orders);updateCandleChart(cs);if(cs)renderLtp(cs);}catch(e){console.error('Poll:',e);}}
 // Fetch env once on page load so calcSignalConds can read strategy flags immediately
 // without waiting for the user to open the Settings tab (which creates cfg- elements).
-async function _loadEnvCache(){try{_envCache=await fetch('/api/env').then(r=>r.json());}catch(e){}}
+async function _loadEnvCache(){try{_envCache=await fetch('/api/env').then(r=>r.json());_applySignalSectionVisibility();}catch(e){}}
+
+// Show/hide Signals panel sections based on which strategies are enabled.
+// Called immediately after env is loaded so sections are visible even when
+// the bot has no candle data yet (pre-market, bot stopped, SHADOW mode idle).
+function _applySignalSectionVisibility(){
+  if(!_envCache)return;
+  const g=id=>{const el=document.getElementById('cfg-'+id);if(el)return el.value;return(_envCache&&_envCache[id])||'';};
+  const emaOn=g('ENABLE_EMA_STRATEGY')!=='false',orbOn=g('ENABLE_ORB_STRATEGY')==='true',obOn=g('ENABLE_OB_STRATEGY')==='true',momOn=g('ENABLE_MOMENTUM_PHASE')==='true',trbOn=g('ENABLE_TRB_STRATEGY')==='true',vwapOn=g('ENABLE_VWAP_STRATEGY')==='true',pdhlOn=g('ENABLE_PDHL_STRATEGY')==='true',natrOn=g('ENABLE_NATR_STRATEGY')==='true',atrCopilotOn=g('ENABLE_ATR_COPILOT_STRATEGY')==='true';
+  const pivotStratOn=g('ENABLE_PIVOT_STRATEGY')==='true';
+  const pivotOn=g('ENABLE_PIVOT_LEVELS')==='true';
+  document.getElementById('ema-section').style.display=emaOn?'block':'none';
+  // Pivot filter section: show when EMA is on AND pivot levels are cached (from bot state or FVG)
+  document.getElementById('pivot-filter-section').style.display=(emaOn&&!!_sidebarCache.pl)?'block':'none';
+  document.getElementById('orb-section').style.display=orbOn?'block':'none';
+  document.getElementById('ob-section').style.display=obOn?'block':'none';
+  document.getElementById('momentum-section').style.display=momOn?'block':'none';
+  document.getElementById('trb-section').style.display=trbOn?'block':'none';
+  document.getElementById('vwap-section').style.display=vwapOn?'block':'none';
+  document.getElementById('pdhl-section').style.display=pdhlOn?'block':'none';
+  document.getElementById('natr-section').style.display=natrOn?'block':'none';
+  document.getElementById('atr-copilot-section').style.display=atrCopilotOn?'block':'none';
+  document.getElementById('pivot-strat-section').style.display=pivotStratOn?'block':'none';
+  document.getElementById('signals-empty').style.display=(emaOn||orbOn||obOn||momOn||trbOn||vwapOn||pdhlOn||natrOn||atrCopilotOn||pivotStratOn)?'none':'block';
+  // Populate pivot filter values from cache if available (bot not yet running)
+  if(emaOn&&_sidebarCache.pl){
+    const pl=_sidebarCache.pl;
+    const s=(id,v)=>{const e=document.getElementById(id);if(e&&v!=null)e.textContent=v.toFixed(1);};
+    s('pf-r2',pl.r2); s('pf-r1',pl.r1); s('pf-pivot',pl.pivot); s('pf-s1',pl.s1); s('pf-s2',pl.s2);
+    const buf=parseFloat(g('PIVOT_ZONE_BUFFER')||25);
+    const bEl=document.getElementById('pf-buf'); if(bEl)bEl.textContent=buf;
+    const stEl=document.getElementById('pf-status'); if(stEl)stEl.textContent='Waiting for live candle…';
+  }
+}
+
+// ── Pivot sidebar helper — used by both bot state and FVG response ───────────
+function _renderSidebarPivotLevels(pl){
+  if(!pl)return;
+  const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v!=null?v.toFixed(1):'—';};
+  s('sb-r3', pl.r3);
+  s('sb-r2', pl.r2);
+  s('sb-r1', pl.r1);
+  s('sb-pivot', pl.pivot);
+  s('sb-s1', pl.s1);
+  s('sb-s2', pl.s2);
+  s('sb-s3', pl.s3);
+  const fEl=document.getElementById('sb-pivot-formula');
+  if(fEl)fEl.textContent=pl.formula?('· '+pl.formula):'';
+  ['sb-pivot-section','sb-pivot-rows','sb-pivot-divider'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='block';});
+  // Always update cache so live bot data (which arrives later) overrides the FVG snapshot
+  _sidebarCache.pl=pl;
+}
 
 // ── Fair Value Gap + CPR panel ───────────────────────────────────────────────
 function _renderFvg(d){
@@ -2273,6 +2323,13 @@ function _renderFvg(d){
     }).join('');
   } else {
     bearEl.textContent='None in recent history';
+  }
+  // Populate sidebar pivot levels from FVG data so they show before the bot starts
+  if(d.pivot_levels){
+    _sidebarCache.pl=d.pivot_levels;
+    _renderSidebarPivotLevels(d.pivot_levels);
+    // Repaint pivot filter section in Signals tab if it's using stale/null data
+    _applySignalSectionVisibility();
   }
 }
 async function pollFvg(){try{const d=await fetch('/api/fvg').then(r=>r.json());_renderFvg(d);}catch(e){}}

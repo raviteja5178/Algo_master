@@ -97,6 +97,23 @@ def _compute_natr_stop(
     return result
 
 
+def natr_state(
+    candles_5m: Sequence[Candle],
+    *,
+    natr_period: int = 21,
+    natr_mult: float = 3.0,
+) -> int:
+    """ATR trailing-stop state of the latest candle: +1 = close above the line
+    (ATR "buy" state), -1 = below it ("sell" state), 0 = not computable yet."""
+    if len(candles_5m) < max(_MIN_CANDLES, natr_period + 3):
+        return 0
+    line = _compute_natr_stop(candles_5m, natr_period, natr_mult)[-1]
+    if line is None:
+        return 0
+    close = candles_5m[-1].close
+    return 1 if close > line else -1 if close < line else 0
+
+
 def is_natr_ce_signal(
     candles_5m: Sequence[Candle],
     *,
