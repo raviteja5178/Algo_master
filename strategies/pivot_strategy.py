@@ -535,8 +535,19 @@ def _check_bounce(
         return None
 
     zone_half = zone_atr * atr
-    levels = sorted({pivot_levels.s3, pivot_levels.s2, pivot_levels.s1, pivot_levels.pivot,
-                     pivot_levels.r1, pivot_levels.r2, pivot_levels.r3})
+    raw_levels = {
+        pivot_levels.s3, pivot_levels.s2, pivot_levels.s1, pivot_levels.pivot,
+        pivot_levels.r1, pivot_levels.r2, pivot_levels.r3,
+    }
+    if getattr(pivot_levels, "s4", 0) > 0:
+        raw_levels.add(pivot_levels.s4)
+    if getattr(pivot_levels, "s5", 0) > 0:
+        raw_levels.add(pivot_levels.s5)
+    if getattr(pivot_levels, "r4", 0) > 0:
+        raw_levels.add(pivot_levels.r4)
+    if getattr(pivot_levels, "r5", 0) > 0:
+        raw_levels.add(pivot_levels.r5)
+    levels = sorted(raw_levels)
     k = -2 if confirm_next else -1           # index of the signal candle
     c, prev = today[k], today[k - 1]
     prev2 = today[k - 2] if len(today) >= -k + 2 else None
@@ -614,6 +625,7 @@ def _check_swing_pivot(
     use_atr_sl: bool = False,
     sl_atr_mult: float = 1.2,
     sl_buffer_atr: float = 0.05,
+    max_sl_atr: float = 1.5,
     min_room_r: float = 1.0,
 ) -> PivotSetup | None:
     """Fractal Swing High/Low breakout strategy.
@@ -624,7 +636,7 @@ def _check_swing_pivot(
     """
     total_candles = len(all_candles)
     min_needed = left_bars + right_bars + 2
-    if total_candles < min_needed or len(today) < 2:
+    if total_candles < min_needed or len(today) < 1:
         return None
 
     atr = atr_at(_atr_series(today, all_candles), period=atr_period)
@@ -637,9 +649,11 @@ def _check_swing_pivot(
 
     # Trend filter via EMA
     trend = None
+    prev_trend = None
     if trend_ema > 0:
         series = ema([x.close for x in all_candles], trend_ema)
         trend = series[-1] if series else None
+        prev_trend = series[-2] if (series and len(series) >= 2) else None
         if trend is None:
             return None
 
@@ -678,49 +692,69 @@ def _check_swing_pivot(
 
     # ── Check CE Breakout (Cross above Swing High) ──────────────────────────
     if hprice is not None:
-        # Fresh cross: prior candle high <= hprice, current candle high > hprice
-        if prev_candle.high <= hprice and last_candle.high > hprice:
-            if trend is None or entry > trend:
-                # Determine SL: structural swing low or ATR
-                if use_atr_sl or lprice is None:
-                    stop = entry - sl_atr_mult * atr
-                else:
-                    stop = lprice - sl_buffer_atr * atr
-                risk = entry - stop
-                if risk > 0:
-                    t1 = entry + rr_t1 * risk
-                    t2 = entry + rr_t2 * risk
-                    t3 = entry + rr_t3 * risk
-                    setup = _make_setup(
-                        "CE", "SWING_PIVOT", entry, [last_candle], atr, pivot_levels,
-                        "SIGNAL_LOW", 0.0, sl_buffer_atr, min_room_r,
-                        targets=(t1, t2, t3), stop=stop,
-                    )
-                    if setup is not None:
-                        return setup
+        # 1. Direct breakout on current candle while already > EMA
+        cond_direct = (prev_candle.high <= hprice and last_candle.high > hprice) and (trend is None or entry > trend)
+        # 2. Breakout happened within recent 3 candles, and price crosses > EMA on THIS candle
+        recent_breakout = any(c.high > hprice for c in all_candles[-3:])
+        cond_ema_cross = (
+            recent_breakout
+            and last_candle.high > hprice
+            and (trend is not None and prev_trend is not None and prev_candle.close <= prev_trend and entry > trend)
+        )
+        if cond_direct or cond_ema_cross:
+            # Determine SL: structural swing low (capped by max_sl_atr) or ATR
+            if use_atr_sl or lprice is None:
+                stop = entry - sl_atr_mult * atr
+            elif max_sl_atr > 0:
+                struct_stop = lprice - sl_buffer_atr * atr
+                stop = max(struct_stop, entry - max_sl_atr * atr)
+            else:
+                stop = lprice - sl_buffer_atr * atr
+            risk = entry - stop
+            if risk > 0:
+                t1 = entry + rr_t1 * risk
+                t2 = entry + rr_t2 * risk
+                t3 = entry + rr_t3 * risk
+                setup = _make_setup(
+                    "CE", "SWING_PIVOT", entry, [last_candle], atr, pivot_levels,
+                    "SIGNAL_LOW", 0.0, sl_buffer_atr, min_room_r,
+                    targets=(t1, t2, t3), stop=stop,
+                )
+                if setup is not None:
+                    return setup
 
     # ── Check PE Breakdown (Cross below Swing Low) ──────────────────────────
     if lprice is not None:
-        # Fresh cross: prior candle low >= lprice, current candle low < lprice
-        if prev_candle.low >= lprice and last_candle.low < lprice:
-            if trend is None or entry < trend:
-                # Determine SL: structural swing high or ATR
-                if use_atr_sl or hprice is None:
-                    stop = entry + sl_atr_mult * atr
-                else:
-                    stop = hprice + sl_buffer_atr * atr
-                risk = stop - entry
-                if risk > 0:
-                    t1 = entry - rr_t1 * risk
-                    t2 = entry - rr_t2 * risk
-                    t3 = entry - rr_t3 * risk
-                    setup = _make_setup(
-                        "PE", "SWING_PIVOT", entry, [last_candle], atr, pivot_levels,
-                        "SIGNAL_LOW", 0.0, sl_buffer_atr, min_room_r,
-                        targets=(t1, t2, t3), stop=stop,
-                    )
-                    if setup is not None:
-                        return setup
+        # 1. Direct breakdown on current candle while already < EMA
+        cond_direct = (prev_candle.low >= lprice and last_candle.low < lprice) and (trend is None or entry < trend)
+        # 2. Breakdown happened within recent 3 candles, and price crosses < EMA on THIS candle
+        recent_breakdown = any(c.low < lprice for c in all_candles[-3:])
+        cond_ema_cross = (
+            recent_breakdown
+            and last_candle.low < lprice
+            and (trend is not None and prev_trend is not None and prev_candle.close >= prev_trend and entry < trend)
+        )
+        if cond_direct or cond_ema_cross:
+            # Determine SL: structural swing high (capped by max_sl_atr) or ATR
+            if use_atr_sl or hprice is None:
+                stop = entry + sl_atr_mult * atr
+            elif max_sl_atr > 0:
+                struct_stop = hprice + sl_buffer_atr * atr
+                stop = min(struct_stop, entry + max_sl_atr * atr)
+            else:
+                stop = hprice + sl_buffer_atr * atr
+            risk = stop - entry
+            if risk > 0:
+                t1 = entry - rr_t1 * risk
+                t2 = entry - rr_t2 * risk
+                t3 = entry - rr_t3 * risk
+                setup = _make_setup(
+                    "PE", "SWING_PIVOT", entry, [last_candle], atr, pivot_levels,
+                    "SIGNAL_LOW", 0.0, sl_buffer_atr, min_room_r,
+                    targets=(t1, t2, t3), stop=stop,
+                )
+                if setup is not None:
+                    return setup
 
     return None
 
@@ -900,6 +934,7 @@ def find_pivot_setup(
     swing_pivot_rr_t3: float = 3.5,
     swing_pivot_use_atr_sl: bool = False,
     swing_pivot_atr_mult: float = 1.2,
+    swing_pivot_max_sl_atr: float = 1.5,
 ) -> PivotSetup | None:
     """Return a PivotSetup when the latest completed candle confirms a setup,
     else None.
@@ -951,6 +986,30 @@ def find_pivot_setup(
         return None
 
     today = _today(candles_5m)
+    if not today:
+        return None
+
+    # ── Swing Pivot Reversal / Breakout ─────────────────────────────────────
+    # Evaluated first without artificial multi-candle delays for sharpest entry timing.
+    if enable_swing_pivot:
+        setup = _check_swing_pivot(
+            today, candles_5m, pivot_levels,
+            atr_period=atr_period,
+            left_bars=swing_pivot_left,
+            right_bars=swing_pivot_right,
+            trend_ema=swing_pivot_trend_ema,
+            rr_t1=swing_pivot_rr_t1,
+            rr_t2=swing_pivot_rr_t2,
+            rr_t3=swing_pivot_rr_t3,
+            use_atr_sl=swing_pivot_use_atr_sl,
+            sl_atr_mult=swing_pivot_atr_mult,
+            sl_buffer_atr=sl_buffer_atr,
+            max_sl_atr=swing_pivot_max_sl_atr,
+            min_room_r=min_room_r,
+        )
+        if setup is not None:
+            return setup
+
     if len(today) < sustain_candles:
         return None
 
@@ -1007,25 +1066,6 @@ def find_pivot_setup(
             min_wick_pct=bounce_min_wick_pct,
             trend_ema=bounce_trend_ema,
             confirm_next=bounce_confirm_next,
-        )
-        if setup is not None:
-            return setup
-
-    # ── Swing Pivot Reversal / Breakout ─────────────────────────────────────
-    if enable_swing_pivot:
-        setup = _check_swing_pivot(
-            today, candles_5m, pivot_levels,
-            atr_period=atr_period,
-            left_bars=swing_pivot_left,
-            right_bars=swing_pivot_right,
-            trend_ema=swing_pivot_trend_ema,
-            rr_t1=swing_pivot_rr_t1,
-            rr_t2=swing_pivot_rr_t2,
-            rr_t3=swing_pivot_rr_t3,
-            use_atr_sl=swing_pivot_use_atr_sl,
-            sl_atr_mult=swing_pivot_atr_mult,
-            sl_buffer_atr=sl_buffer_atr,
-            min_room_r=min_room_r,
         )
         if setup is not None:
             return setup

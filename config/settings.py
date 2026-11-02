@@ -818,13 +818,14 @@ PIVOT_BOUNCE_CONFIRM_NEXT: bool   = _getbool("PIVOT_BOUNCE_CONFIRM_NEXT", False)
 # PIVOT_ENABLE_SWING: enable fractal swing high/low breakout mode.
 PIVOT_ENABLE_SWING: bool        = _getbool("PIVOT_ENABLE_SWING", False)
 PIVOT_SWING_LEFT: int           = _getint("PIVOT_SWING_LEFT", 4)
-PIVOT_SWING_RIGHT: int          = _getint("PIVOT_SWING_RIGHT", 2)
+PIVOT_SWING_RIGHT: int          = _getint("PIVOT_SWING_RIGHT", 1)
 PIVOT_SWING_TREND_EMA: int      = _getint("PIVOT_SWING_TREND_EMA", 50)         # 0 = disabled
 PIVOT_SWING_RR_T1: float        = _getfloat("PIVOT_SWING_RR_T1", 1.5)
 PIVOT_SWING_RR_T2: float        = _getfloat("PIVOT_SWING_RR_T2", 2.5)
 PIVOT_SWING_RR_T3: float        = _getfloat("PIVOT_SWING_RR_T3", 3.5)
 PIVOT_SWING_USE_ATR_SL: bool    = _getbool("PIVOT_SWING_USE_ATR_SL", False)    # False = structural swing low/high
 PIVOT_SWING_ATR_MULT: float     = _getfloat("PIVOT_SWING_ATR_MULT", 1.2)
+PIVOT_SWING_MAX_SL_ATR: float   = _getfloat("PIVOT_SWING_MAX_SL_ATR", 1.5)    # 0 = uncapped; caps wide swing SLs
 
 # Move to breakeven after +N R.  1.5 (was 1.0): replay showed +10% total points; win rate
 # drops (58% -> ~50%) because fewer trades are protected early.
@@ -844,6 +845,10 @@ PIVOT_NO_NEW_ENTRY_AFTER: str   = _get("PIVOT_NO_NEW_ENTRY_AFTER", "")
 # PIVOT_NO_FRIDAY: when true, no new pivot entries are allowed on Fridays.
 # Backtest shows Fridays: 20 trades, 15% WR, −₹9,096 (PF 0.37).
 PIVOT_NO_FRIDAY: bool           = _getbool("PIVOT_NO_FRIDAY", False)
+# PIVOT_SKIP_LULLS: when true, skips new pivot entries during low-volume midday/post-lunch windows.
+PIVOT_SKIP_LULLS: bool          = _getbool("PIVOT_SKIP_LULLS", False)
+# PIVOT_LULL_WINDOWS: comma-separated HH:MM-HH:MM intervals read from .env (e.g. "11:20-11:55,13:10-13:35")
+PIVOT_LULL_WINDOWS: str         = _get("PIVOT_LULL_WINDOWS", "")
 
 
 # ── PDHL (Previous Day High/Low) Breakout strategy ───────────────────────────

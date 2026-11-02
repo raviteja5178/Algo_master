@@ -290,6 +290,25 @@ def _parse_time(hhmm: str) -> time:
     return time(int(h), int(m))
 
 
+def _is_in_lull_window(t: time, lull_windows: str) -> bool:
+    """Check if time `t` falls within any comma-separated 'HH:MM-HH:MM' intervals."""
+    if not lull_windows:
+        return False
+    for window in lull_windows.split(","):
+        window = window.strip()
+        if not window or "-" not in window:
+            continue
+        try:
+            start_s, end_s = window.split("-")
+            start_t = _parse_time(start_s.strip())
+            end_t = _parse_time(end_s.strip())
+            if start_t <= t <= end_t:
+                return True
+        except (ValueError, IndexError):
+            continue
+    return False
+
+
 def evaluate_signals(
     candles_5m: Sequence[Candle],
     candles_15m: Sequence[Candle],
@@ -546,6 +565,12 @@ def evaluate_signals(
             ):
                 log_event(logger, "PIVOT_BLOCKED_TIME",
                           candle=latest_5m_ts, after=settings.PIVOT_NO_NEW_ENTRY_AFTER)
+            elif (
+                settings.PIVOT_SKIP_LULLS
+                and _is_in_lull_window((latest_5m_ts + timedelta(minutes=5)).time(), settings.PIVOT_LULL_WINDOWS)
+            ):
+                log_event(logger, "PIVOT_BLOCKED_LULL",
+                          candle=latest_5m_ts, windows=settings.PIVOT_LULL_WINDOWS)
             else:
                 # ── end pivot gates ─────────────────────────────────────────
                 _accept_on = settings.PIVOT_ACCEPTANCE
@@ -592,6 +617,7 @@ def evaluate_signals(
                     swing_pivot_rr_t3=settings.PIVOT_SWING_RR_T3,
                     swing_pivot_use_atr_sl=settings.PIVOT_SWING_USE_ATR_SL,
                     swing_pivot_atr_mult=settings.PIVOT_SWING_ATR_MULT,
+                    swing_pivot_max_sl_atr=settings.PIVOT_SWING_MAX_SL_ATR,
                 )
                 if setup is not None:
                     sig_name = f"{setup.side}_PIVOT"
