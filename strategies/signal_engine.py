@@ -790,6 +790,11 @@ def evaluate_signals(
         _ema_window_ok = latest_5m_ts.time() >= _parse_time(settings.EMA_SCAN_START)
         if settings.EMA_NO_NEW_ENTRY_AFTER:
             _ema_window_ok = _ema_window_ok and latest_5m_ts.time() < _parse_time(settings.EMA_NO_NEW_ENTRY_AFTER)
+        if settings.EMA_MIDDAY_PAUSE_START and settings.EMA_MIDDAY_PAUSE_END:
+            _m_start = _parse_time(settings.EMA_MIDDAY_PAUSE_START)
+            _m_end = _parse_time(settings.EMA_MIDDAY_PAUSE_END)
+            if _m_start <= latest_5m_ts.time() < _m_end:
+                _ema_window_ok = False
     except (ValueError, AttributeError, TypeError):
         pass   # bad config — fail open
 
@@ -816,19 +821,32 @@ def evaluate_signals(
             log_event(logger, "EMA_BLOCKED_COOLDOWN",
                       candle=latest_5m_ts, candles_remaining=_ema_cooldown_left)
         else:
+            _vwap_ok_ce = True
+            _vwap_ok_pe = True
+            if settings.EMA_REQUIRE_VWAP and vwap is not None:
+                _close = candles_5m[-1].close
+                _vwap_ok_ce = _close >= vwap
+                _vwap_ok_pe = _close <= vwap
+
             if _atr_state >= 0 and is_ce_signal(
                 candles_5m, candles_15m, rsi_min=settings.EMA_RSI_CE_MIN, **_ema_kwargs
             ):
-                log_event(logger, "CE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-                if (sig := _gate("CE")) is not None:
-                    return sig
+                if _vwap_ok_ce:
+                    log_event(logger, "CE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
+                    if (sig := _gate("CE")) is not None:
+                        return sig
+                else:
+                    log_event(logger, "EMA_BLOCKED_VWAP", side="CE", close=candles_5m[-1].close, vwap=round(vwap, 2))
 
             if _atr_state <= 0 and not _candle_already_attempted() and is_pe_signal(
                 candles_5m, candles_15m, rsi_max=settings.EMA_RSI_PE_MAX, **_ema_kwargs
             ):
-                log_event(logger, "PE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
-                if (sig := _gate("PE")) is not None:
-                    return sig
+                if _vwap_ok_pe:
+                    log_event(logger, "PE_SIGNAL", candle=latest_5m_ts, close=candles_5m[-1].close)
+                    if (sig := _gate("PE")) is not None:
+                        return sig
+                else:
+                    log_event(logger, "EMA_BLOCKED_VWAP", side="PE", close=candles_5m[-1].close, vwap=round(vwap, 2))
 
     # ── Phase 2: Momentum strategy (opt-in) ────────────────────────────────────
     if not settings.ENABLE_MOMENTUM_PHASE or _skip_on_monday or _candle_already_attempted():

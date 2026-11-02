@@ -243,6 +243,13 @@ EMA_IGNORE_15M: bool         = _getbool("EMA_IGNORE_15M", True)
 #   5m chart: CE only while close > ATR line (buy state), PE only while close < it
 #   (sell state).  Fails open while the line is not computable.
 EMA_ATR_CONFIRM: bool        = _getbool("EMA_ATR_CONFIRM", True)
+# EMA_REQUIRE_VWAP: true = CE entry requires close >= VWAP; PE entry requires close <= VWAP.
+#   Prevents buying CE in an institutional downtrend or PE in an uptrend. Off by default.
+EMA_REQUIRE_VWAP: bool       = _getbool("EMA_REQUIRE_VWAP", False)
+# EMA_MIDDAY_PAUSE_START / EMA_MIDDAY_PAUSE_END: pause new EMA entries during the quiet/choppy
+#   midday window (e.g. "11:30" to "13:00"). Empty = no midday pause (active continuously).
+EMA_MIDDAY_PAUSE_START: str  = _get("EMA_MIDDAY_PAUSE_START", "")
+EMA_MIDDAY_PAUSE_END: str    = _get("EMA_MIDDAY_PAUSE_END", "")
 # EMA_SKIP_SMART_FILTERS: true = EMA CE/PE bypass SmartEntry candle filters
 #   (body/ATR, EMA9 slope, EMA gap, gap widening, 15m trend) — the rule-set has its
 #   own trend + RSI logic. Post-loss cooldown and premium-extension guard still apply.
