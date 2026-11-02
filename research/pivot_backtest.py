@@ -95,6 +95,7 @@ def live_signal_kwargs() -> dict:
         swing_pivot_rr_t3=settings.PIVOT_SWING_RR_T3,
         swing_pivot_use_atr_sl=settings.PIVOT_SWING_USE_ATR_SL,
         swing_pivot_atr_mult=settings.PIVOT_SWING_ATR_MULT,
+        swing_pivot_max_sl_atr=settings.PIVOT_SWING_MAX_SL_ATR,
     )
 
 
@@ -103,12 +104,14 @@ _NO_EXTRAS = dict(enable_acceptance=False, bounce_zone_atr=0.0, enable_swing_piv
 
 # name -> overrides applied on top of the live config
 VARIANT_OVERRIDES: dict[str, dict] = {
+    "CURRENT_LIVE_PIVOT": dict(),
+    "SWING_ONLY_4_1_EMA50": dict(pivot_mode="NONE", enable_acceptance=False, bounce_zone_atr=0.0, enable_swing_pivot=True, swing_pivot_left=4, swing_pivot_right=1, swing_pivot_trend_ema=50),
+    "FULL_PIVOT_SUITE_SWING_4_1": dict(pivot_mode="BOTH", enable_acceptance=True, bounce_zone_atr=0.15, enable_swing_pivot=True, swing_pivot_left=4, swing_pivot_right=1, swing_pivot_trend_ema=50),
     "ACCEPTANCE_PLUS_BOUNCE": dict(pivot_mode="NONE", enable_acceptance=True, bounce_zone_atr=0.15, enable_swing_pivot=False),
     "ACCEPTANCE_BOUNCE_MODE_A": dict(pivot_mode="OPEN_DIRECTION", enable_acceptance=True, bounce_zone_atr=0.15, enable_swing_pivot=False),
     "ACCEPTANCE_ONLY": dict(pivot_mode="NONE", enable_acceptance=True, bounce_zone_atr=0.0, enable_swing_pivot=False),
     "BOUNCE_ONLY": dict(pivot_mode="NONE", enable_acceptance=False, bounce_zone_atr=0.15, enable_swing_pivot=False),
     "FULL_PIVOT_SUITE": dict(pivot_mode="BOTH", enable_acceptance=True, bounce_zone_atr=0.15, enable_swing_pivot=False),
-    "FULL_WITH_SWING_5_2": dict(pivot_mode="BOTH", enable_acceptance=True, bounce_zone_atr=0.15, enable_swing_pivot=True, swing_pivot_left=5, swing_pivot_right=2, swing_pivot_trend_ema=50),
 }
 
 
@@ -250,6 +253,11 @@ def backtest_variant(
             c = candles[g]
             if c.timestamp.time() >= NO_NEW_ENTRY:
                 break
+            if settings.PIVOT_SKIP_LULLS and settings.PIVOT_LULL_WINDOWS:
+                from strategies.signal_engine import _is_in_lull_window
+                if _is_in_lull_window(c.timestamp.time(), settings.PIVOT_LULL_WINDOWS):
+                    pos += 1
+                    continue
             hist = candles[max(0, g + 1 - HISTORY_CANDLES): g + 1]
             setup = find_pivot_setup(hist, levels, **kw)
             if setup is None:

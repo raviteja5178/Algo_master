@@ -186,7 +186,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class PivotLevels:
     """Pivot levels computed from the previous day's OHLC.
-    Supports Fibonacci and Traditional floor formulas.
+    Supports Fibonacci and Traditional floor formulas up to S5 / R5.
     """
     pivot: float
     r1: float
@@ -198,6 +198,10 @@ class PivotLevels:
     prev_high: float
     prev_low:  float
     prev_close: float
+    r4: float = 0.0
+    r5: float = 0.0
+    s4: float = 0.0
+    s5: float = 0.0
 
 
 def compute_pivot_levels(
@@ -208,7 +212,7 @@ def compute_pivot_levels(
 ) -> PivotLevels:
     """
     Compute pivot levels from high, low, close using either FIBONACCI (default)
-    or TRADITIONAL floor pivot formula.
+    or TRADITIONAL floor pivot formula, including extended levels S4, S5, R4, R5.
 
     Fibonacci formula:
         Range = H - L
@@ -216,18 +220,26 @@ def compute_pivot_levels(
         R1 = P + 0.382 * Range
         R2 = P + 0.618 * Range
         R3 = P + 1.000 * Range
+        R4 = P + 1.272 * Range
+        R5 = P + 1.618 * Range
         S1 = P - 0.382 * Range
         S2 = P - 0.618 * Range
         S3 = P - 1.000 * Range
+        S4 = P - 1.272 * Range
+        S5 = P - 1.618 * Range
 
     Traditional formula:
         P  = (H + L + C) / 3
         R1 = 2P - L
         R2 = P + (H - L)
         R3 = H + 2*(P - L)
+        R4 = R3 + (H - L)
+        R5 = R4 + (H - L)
         S1 = 2P - H
         S2 = P - (H - L)
         S3 = L - 2*(H - P)
+        S4 = S3 - (H - L)
+        S5 = S4 - (H - L)
     """
     from config import settings
     formula_mode = (formula or getattr(settings, "PIVOT_FORMULA", "FIBONACCI")).upper()
@@ -242,16 +254,24 @@ def compute_pivot_levels(
         r1 = 2 * P - L
         r2 = P + rng
         r3 = H + 2 * (P - L)
+        r4 = r3 + rng
+        r5 = r4 + rng
         s1 = 2 * P - H
         s2 = P - rng
         s3 = L - 2 * (H - P)
+        s4 = s3 - rng
+        s5 = s4 - rng
     else:  # FIBONACCI
         r1 = P + 0.382 * rng
         r2 = P + 0.618 * rng
         r3 = P + 1.000 * rng
+        r4 = P + 1.272 * rng
+        r5 = P + 1.618 * rng
         s1 = P - 0.382 * rng
         s2 = P - 0.618 * rng
         s3 = P - 1.000 * rng
+        s4 = P - 1.272 * rng
+        s5 = P - 1.618 * rng
 
     return PivotLevels(
         pivot      = round(P, 2),
@@ -264,6 +284,10 @@ def compute_pivot_levels(
         prev_high  = H,
         prev_low   = L,
         prev_close = C,
+        r4         = round(r4, 2),
+        r5         = round(r5, 2),
+        s4         = round(s4, 2),
+        s5         = round(s5, 2),
     )
 
 

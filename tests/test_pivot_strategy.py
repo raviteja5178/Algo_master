@@ -1013,6 +1013,26 @@ class TestSwingPivotBreakout:
         assert setup.t2 == pytest.approx(setup.entry - 2.5 * setup.risk, rel=1e-2)
         assert setup.t3 == pytest.approx(setup.entry - 3.5 * setup.risk, rel=1e-2)
 
+    def test_swing_pivot_max_sl_atr_caps_wide_stop(self):
+        # Swing low at 900, entry at 1052. Distance is ~152 pts.
+        # With ATR ~20 and max_sl_atr=1.5, max risk is 30 pts.
+        # Stop should be capped at 1052 - 30 = 1022.0 rather than 900 - 1 = 899.
+        highs  = [1010, 1020, 1030, 1040, 1050, 1035, 1030, 1045, 1055]
+        lows   = [900,  910,  915,  925,  1030, 1020, 1010, 1025, 1040]
+        closes = [1008, 1018, 1028, 1038, 1045, 1025, 1015, 1042, 1052]
+        candles = self._create_candles(highs, lows, closes)
+        setup = find_pivot_setup(
+            candles, PV,
+            enable_swing_pivot=True,
+            swing_pivot_left=4,
+            swing_pivot_right=2,
+            swing_pivot_trend_ema=0,
+            swing_pivot_max_sl_atr=1.5,
+        )
+        assert setup is not None
+        assert setup.stop == pytest.approx(setup.entry - 1.5 * setup.atr, abs=1.0)
+        assert setup.risk == pytest.approx(1.5 * setup.atr, abs=1.0)
+
     def test_swing_pivot_trend_filter(self):
         # CE Breakout, but close is below 50 EMA -> should be blocked
         highs  = [1010, 1020, 1030, 1040, 1050, 1035, 1030, 1045, 1055]
@@ -1041,3 +1061,37 @@ class TestSwingPivotBreakout:
         )
         # Blocked because entry (~1052) < EMA (~1100+)
         assert setup is None
+
+    def test_swing_pivot_delayed_ema_cross_pe(self):
+        # Prepend history candles so EMA(5) is established
+        y = date.today() - timedelta(days=1)
+        candles = [
+            Candle(datetime(y.year, y.month, y.day, 9, 15) + timedelta(minutes=5 * i),
+                   960, 970, 955, 960)
+            for i in range(15)
+        ]
+
+        # Swing low at index 4 (low=950).
+        # Candle 8 breaks low to 946 (< 950) but close (975) is above EMA (972.2).
+        # Candle 9 stays below 950 (low=940) and close (944) crosses below EMA (962.8) -> triggers PE!
+        highs  = [1000, 990, 985, 975, 970, 980, 990, 975, 980, 952]
+        lows   = [ 990, 980, 970, 960, 950, 965, 970, 955, 946, 940]
+        closes = [ 992, 982, 972, 962, 955, 975, 985, 965, 975, 944]
+
+        t = date.today()
+        base_dt = datetime.combine(t, time(9, 15))
+        for i, (h, l, c) in enumerate(zip(highs, lows, closes)):
+            dt = base_dt + timedelta(minutes=5 * i)
+            candles.append(Candle(dt, c - 2.0, h, l, c))
+
+        setup = find_pivot_setup(
+            candles, PV,
+            enable_swing_pivot=True,
+            swing_pivot_left=4,
+            swing_pivot_right=2,
+            swing_pivot_trend_ema=5,
+        )
+        assert setup is not None
+        assert setup.side == "PE"
+        assert setup.mode == "SWING_PIVOT"
+        assert setup.entry == 944.0

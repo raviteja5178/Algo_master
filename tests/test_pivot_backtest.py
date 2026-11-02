@@ -127,5 +127,5 @@ class TestBacktestDriver:
     def test_variant_with_no_modes_produces_no_trades(self):
         daily, m5 = _synthetic(n_days=100, seed=2)
         t = backtest_variant(daily, m5, dict(pivot_mode="NONE", enable_acceptance=False,
-                                             bounce_zone_atr=0.0))
+                                             bounce_zone_atr=0.0, enable_swing_pivot=False))
         assert len(t) == 0
