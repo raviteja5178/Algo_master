@@ -238,6 +238,13 @@ EMA_MIN_BODY_ATR: float      = _getfloat("EMA_MIN_BODY_ATR", 0.0)
 #   requirement in the EMA rule-set, the 15m TREND_GATE and SmartEntry Filter 6 (15m
 #   trend) are all skipped for EMA signals (other strategies are unaffected).
 EMA_IGNORE_15M: bool         = _getbool("EMA_IGNORE_15M", True)
+# EMA_PULLBACK_ONLY: true = the ONLY EMA trigger is the pullback to EMA21 (bounce/rejection
+#   candle); the close-vs-EMA9 crossover and the EMA9/21 cross are disabled, and EMA9 must
+#   be stacked on the trend side of EMA21 (CE: EMA9 > EMA21, PE: EMA9 < EMA21).  Off = legacy.
+EMA_PULLBACK_ONLY: bool      = _getbool("EMA_PULLBACK_ONLY", False)
+# EMA_MAX_ADX: skip EMA entries when the 5m ADX (INTRADAY_REGIME_ADX_PERIOD) is above this —
+#   an over-extended move reverses more often than it continues.  0 = off (default).
+EMA_MAX_ADX: float           = _getfloat("EMA_MAX_ADX", 0.0)
 # EMA_ATR_CONFIRM: true = an EMA CE/PE entry additionally needs the ATR trailing-stop
 #   ("ATR 5 Min Index Study", NATR_PERIOD / NATR_MULT) to be in the same state on the
 #   5m chart: CE only while close > ATR line (buy state), PE only while close < it

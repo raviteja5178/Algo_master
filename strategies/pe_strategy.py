@@ -63,6 +63,7 @@ def is_pe_signal(
     ignore_15m: bool = False,
     require_candle_color: bool = False,
     min_body_atr: float = 0.0,
+    pullback_only: bool = False,
 ) -> bool:
     """
     Return True when the 15m trend is SHORT_ONLY and a 5m PE trigger fires.
@@ -100,7 +101,10 @@ def is_pe_signal(
         if _atr and abs(latest.close - latest.open) < min_body_atr * _atr:
             return False
 
-    crossover = candles_5m[-2].close >= e9_prev and latest.close < e9_now
+    # pullback_only: skip the crossover / EMA-cross triggers; EMA9 must sit below EMA21.
+    if pullback_only and not e9_now < e21_now:
+        return False
+    crossover = (not pullback_only) and candles_5m[-2].close >= e9_prev and latest.close < e9_now
 
     # EMA9 x EMA21 cross (opt-in): EMA9 moves from >= EMA21 to < EMA21 on this candle.
     # cross_without_15m: this trigger alone may fire when the 15m trend is not SHORT_ONLY.
@@ -108,6 +112,8 @@ def is_pe_signal(
     e21_series = ema(candles_5m, SLOW_EMA)
     cross = bool((ema_cross or cross_only) and e21_series[-2] is not None
                  and e9_prev >= e21_series[-2] and e9_now < e21_now)
+    if pullback_only:
+        cross = False
     if cross_only or not trend_ok:
         return cross and rsi_now < rsi_max
     if cross:

@@ -424,6 +424,7 @@ class TestSignalEngineWithMomentum:
             mock_settings.EMA_COOLDOWN_CANDLES         = 0
             mock_settings.EMA_MAX_TRADES_PER_DAY       = 0
             mock_settings.EMA_MAX_CONSEC_LOSSES        = 0
+            mock_settings.EMA_MAX_ADX                  = 0.0
             mock_settings.ENABLE_PIVOT_STRATEGY        = False
             mock_settings.MOMENTUM_MAX_TRADES_PER_DAY  = 0
             mock_settings.MOMENTUM_REENTRY_COOLDOWN_CANDLES = 0
@@ -466,6 +467,7 @@ class TestSignalEngineWithMomentum:
 
             mock_settings.EMA_MAX_TRADES_PER_DAY       = 0
             mock_settings.EMA_MAX_CONSEC_LOSSES        = 0
+            mock_settings.EMA_MAX_ADX                  = 0.0
             mock_settings.ENABLE_PIVOT_STRATEGY        = False
             mock_settings.MAX_TRADES_PER_SIDE          = 0       # unlimited for this test
 
@@ -573,6 +575,7 @@ class TestMomentumMondayFilter:
         ms.ORB_MOMENTUM_SKIP_MONDAY     = skip
         ms.EMA_MAX_TRADES_PER_DAY       = 0
         ms.EMA_MAX_CONSEC_LOSSES        = 0
+        ms.EMA_MAX_ADX                  = 0.0
         ms.EMA_COOLDOWN_CANDLES         = 0
         ms.MOMENTUM_MAX_TRADES_PER_DAY  = 0
         ms.MOMENTUM_REENTRY_COOLDOWN_CANDLES = 0

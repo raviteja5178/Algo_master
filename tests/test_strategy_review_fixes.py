@@ -240,6 +240,43 @@ class TestEmaPullbackConfirmation:
             assert pe.is_pe_signal(_pullback_series(-1), _trend_15m(-1)) is False
 
 
+class TestEmaPullbackOnly:
+    """EMA_PULLBACK_ONLY: the pullback is the sole trigger; crossover / EMA cross are off."""
+
+    def test_ce_pullback_still_fires(self) -> None:
+        from strategies.ce_strategy import is_ce_signal
+        assert is_ce_signal(_pullback_series(+1), _trend_15m(+1), pullback_only=True) is True
+
+    def test_pe_pullback_still_fires(self) -> None:
+        from strategies.pe_strategy import is_pe_signal
+        assert is_pe_signal(_pullback_series(-1), _trend_15m(-1), pullback_only=True) is True
+
+    def test_ce_plain_crossover_is_rejected(self) -> None:
+        from strategies.ce_strategy import is_ce_signal
+        from tests.test_ce_strategy import _ce_crossover_5m, _uptrend_15m
+        c5 = _ce_crossover_5m()
+        assert is_ce_signal(c5, _uptrend_15m()) is True                    # legacy trigger fires
+        assert is_ce_signal(c5, _uptrend_15m(), pullback_only=True) is False
+
+    def test_pe_plain_crossover_is_rejected(self) -> None:
+        from strategies.pe_strategy import is_pe_signal
+        from tests.test_ce_strategy import _pe_crossover_5m, _downtrend_15m
+        c5 = _pe_crossover_5m()
+        assert is_pe_signal(c5, _downtrend_15m()) is True
+        assert is_pe_signal(c5, _downtrend_15m(), pullback_only=True) is False
+
+    def test_ce_requires_ema9_above_ema21(self) -> None:
+        from strategies.ce_strategy import is_ce_signal
+        # a downtrend has EMA9 < EMA21 -> never a long pullback
+        assert is_ce_signal(_pullback_series(-1), _trend_15m(+1), pullback_only=True) is False
+
+    def test_pe_requires_ema9_below_ema21(self) -> None:
+        from strategies.pe_strategy import is_pe_signal
+        assert is_pe_signal(_pullback_series(+1), _trend_15m(-1), pullback_only=True) is False
+
+
+
+
 # ── 7. TRB: first breakout per side per day + window end ─────────────────────
 
 def _trb_15m() -> list[Candle]:

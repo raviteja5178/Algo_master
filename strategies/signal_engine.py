@@ -808,6 +808,7 @@ def evaluate_signals(
             ignore_15m=settings.EMA_IGNORE_15M,
             require_candle_color=settings.EMA_REQUIRE_CANDLE_COLOR,
             min_body_atr=settings.EMA_MIN_BODY_ATR,
+            pullback_only=settings.EMA_PULLBACK_ONLY,
         )
         _atr_state = 0
         if settings.EMA_ATR_CONFIRM:
@@ -815,8 +816,17 @@ def evaluate_signals(
             _atr_state = natr_state(candles_5m, natr_period=settings.NATR_PERIOD,
                                     natr_mult=settings.NATR_MULT)
         _day_block = ema_day_block_reason()
+        _adx_block = None
+        if settings.EMA_MAX_ADX > 0:
+            from strategies.market_regime import adx_latest
+            _adx = adx_latest(candles_5m, settings.INTRADAY_REGIME_ADX_PERIOD)
+            if _adx is not None and _adx[0] > settings.EMA_MAX_ADX:
+                _adx_block = round(_adx[0], 1)
         if _day_block:
             log_event(logger, "EMA_BLOCKED_DAY_LOCK", candle=latest_5m_ts, reason=_day_block)
+        elif _adx_block is not None:
+            log_event(logger, "EMA_BLOCKED_ADX", candle=latest_5m_ts, adx=_adx_block,
+                      max_adx=settings.EMA_MAX_ADX)
         elif settings.EMA_COOLDOWN_CANDLES > 0 and _ema_cooldown_left > 0:
             log_event(logger, "EMA_BLOCKED_COOLDOWN",
                       candle=latest_5m_ts, candles_remaining=_ema_cooldown_left)
