@@ -285,7 +285,7 @@ def _candle_ctx(state: State, pivot_mgr=None) -> SimpleNamespace:
         entry_price=300.0, quantity=20, entry_atr=50.0, tradingsymbol=SYM,
         trade_id="TRADE_T", prev_day_high=None, prev_day_low=None, pivot_levels=None,
         ai_regime=None, intraday_regime=None, orb_fired_today=False,
-        orb_direction_today=None, daily_trend=None,
+        orb_direction_today=None, daily_trend=None, underlying="SENSEX",
     )
 
 
@@ -376,9 +376,9 @@ def entry_env(monkeypatch):
     for name, mock in store.items():
         monkeypatch.setattr(main, name, mock)
     monkeypatch.setattr(main, "has_action", lambda _id: False)
-    monkeypatch.setattr(main, "fetch_active_trade", lambda: None)
+    monkeypatch.setattr(main, "fetch_active_trade", lambda *a, **k: None)
     monkeypatch.setattr(main, "claim_entry_slot_atomic", MagicMock(return_value=True))
-    monkeypatch.setattr(main, "select_atm_candidates", lambda ltp, ot: [
+    monkeypatch.setattr(main, "select_atm_candidates", lambda ltp, ot, *a, **k: [
         {"tradingsymbol": SYM, "strike": 81000, "instrument_token": 1}])
 
     broker = MagicMock()
@@ -387,7 +387,7 @@ def entry_env(monkeypatch):
     broker.place_stop_order.return_value = "SL1"
     sm = _sm(State.IDLE)
     ctx = SimpleNamespace(
-        sm=sm, broker=broker, quantity=20, sensex_ltp=81000.0,
+        sm=sm, broker=broker, quantity=20, underlying="SENSEX", sensex_ltp=81000.0,
         agg_5m=MagicMock(get_completed=MagicMock(return_value=[])),
         smart_entry=MagicMock(), smart_exit=None, pivot_mgr=None, ws=None,
         intraday_regime=None, trade_id=None, tradingsymbol=None, instrument_token=None,
@@ -450,10 +450,10 @@ class TestMaxRiskPerTrade:
         monkeypatch.setattr(st, "PIVOT_OPTION_DELTA", 0.4)
         monkeypatch.setattr(st, "MAX_RISK_RUPEES_PER_TRADE", 700.0)
         setup = MagicMock(risk=100.0, side="CE")            # 100 × 0.4 × 20 = ₹800
-        monkeypatch.setattr(se, "_last_pivot_setup", setup)
+        monkeypatch.setitem(se._pivot_setups, "SENSEX", setup)
         main.execute_entry(ctx, "CE_PIVOT", 81000.0)
         ctx.broker.place_buy_order.assert_not_called()
-        assert se.peek_pivot_setup() is setup
+        assert se.peek_pivot_setup("SENSEX") is setup
 
     def test_pivot_rupee_risk_uses_option_delta_even_in_paper(self, entry_env, monkeypatch) -> None:
         """PAPER prices the index itself, but the capped loss is an option loss:
@@ -467,7 +467,7 @@ class TestMaxRiskPerTrade:
         monkeypatch.setattr(main, "log_event",
                             lambda lg, ev, **f: blocked.append(ev) if ev == "ENTRY_BLOCKED_MAX_RISK" else None)
         from strategies import signal_engine as se
-        monkeypatch.setattr(se, "_last_pivot_setup", MagicMock(risk=100.0, side="CE"))
+        monkeypatch.setitem(se._pivot_setups, "SENSEX", MagicMock(risk=100.0, side="CE"))
         try:
             main.execute_entry(ctx, "CE_PIVOT", 81000.0)
         except TypeError:

@@ -18,8 +18,42 @@ from utils.time_utils import IST, today_ist
 
 logger = logging.getLogger(__name__)
 
-# SENSEX BSE index token (spot)
-SENSEX_TOKEN = 265  # BSE SENSEX — instrument_token for historical API
+# Standard Zerodha Instrument Tokens for Underlyings
+INDEX_TOKENS: dict[str, int] = {
+    "SENSEX": 265,
+    "NIFTY": 256265,
+    "FINNIFTY": 257801,
+    "BANKNIFTY": 260105,
+    "BANKEX": 274441,
+    "MIDCPNIFTY": 288009,
+}
+
+# Kite Quote Exchange Symbols
+INDEX_EXCHANGE_SYMBOLS: dict[str, str] = {
+    "SENSEX": "BSE:SENSEX",
+    "NIFTY": "NSE:NIFTY 50",
+    "FINNIFTY": "NSE:NIFTY FIN SERVICE",
+    "BANKNIFTY": "NSE:NIFTY BANK",
+    "BANKEX": "BSE:BANKEX",
+    "MIDCPNIFTY": "NSE:NIFTY MID SELECT",
+}
+
+# BSE SENSEX spot — instrument_token for historical API (backward compatibility)
+SENSEX_TOKEN = 265
+
+
+def get_spot_token(underlying: str | None = None) -> int:
+    """Return Kite instrument token for the specified or configured underlying."""
+    from config import settings
+    norm = settings.normalize_index_name(underlying or settings.UNDERLYING)
+    return INDEX_TOKENS.get(norm, SENSEX_TOKEN)
+
+
+def get_exchange_symbol(underlying: str | None = None) -> str:
+    """Return Kite quote symbol (e.g. 'NSE:NIFTY 50', 'NSE:NIFTY FIN SERVICE', 'BSE:SENSEX') for the underlying."""
+    from config import settings
+    norm = settings.normalize_index_name(underlying or settings.UNDERLYING)
+    return INDEX_EXCHANGE_SYMBOLS.get(norm, "BSE:SENSEX")
 
 
 # Market session: only candles at or after 09:15 IST are valid trading data.

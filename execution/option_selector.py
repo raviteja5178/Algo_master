@@ -27,6 +27,7 @@ from datetime import date
 from typing import Literal, TypedDict
 
 from broker.instrument_repository import get_sensex_options, resolve_expiry
+from config import settings
 from utils.logging_config import log_event
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,14 @@ _ITM_FALLBACK_STEPS = 2
 
 # Strike increment for SENSEX options (BSE weekly series uses 100-pt steps).
 SENSEX_STRIKE_STEP = 100
+
+
+def get_strike_step(underlying: str | None = None) -> int:
+    """Return standard strike step for the given underlying index."""
+    norm = settings.normalize_index_name(underlying or settings.UNDERLYING)
+    if norm in ("NIFTY", "FINNIFTY", "MIDCPNIFTY"):
+        return 50
+    return 100
 
 
 class OptionInstrument(TypedDict):
@@ -48,13 +57,22 @@ class OptionInstrument(TypedDict):
 
 
 def _make_instrument(row: dict, expiry: date) -> OptionInstrument:
+    lot_size_raw = row.get("lot_size")
+    try:
+        lot_size = int(lot_size_raw) if lot_size_raw is not None else settings.get_lot_size(settings.UNDERLYING)
+    except (ValueError, TypeError):
+        lot_size = settings.get_lot_size(settings.UNDERLYING)
+
+    if lot_size <= 0:
+        lot_size = settings.get_lot_size(settings.UNDERLYING)
+
     return {
         "tradingsymbol": row["tradingsymbol"],
         "instrument_token": int(row["instrument_token"]),
         "strike": float(row["strike"]),
         "expiry": expiry,
         "exchange": row.get("exchange", "BFO"),
-        "lot_size": int(row.get("lot_size", 1)),
+        "lot_size": lot_size,
     }
 
 
@@ -63,6 +81,7 @@ def select_atm_option(
     option_type: Literal["CE", "PE"],
     expiry: date | None = None,
     itm_fallback: bool = True,
+    underlying: str | None = None,
 ) -> OptionInstrument:
     """
     Return the ATM instrument nearest to *underlying_price*.
@@ -74,7 +93,8 @@ def select_atm_option(
     Raises ValueError if no valid instrument is found.
     """
     candidates = select_atm_candidates(underlying_price, option_type, expiry,
-                                       steps=1 if not itm_fallback else 1)
+                                       steps=1 if not itm_fallback else 1,
+                                       underlying=underlying)
     instrument = candidates[0]
     log_event(
         logger,
@@ -93,14 +113,15 @@ def select_atm_candidates(
     option_type: Literal["CE", "PE"],
     expiry: date | None = None,
     steps: int = _ITM_FALLBACK_STEPS,
+    underlying: str | None = None,
 ) -> list[OptionInstrument]:
     """
     Return an ordered list of candidate instruments for the given direction.
 
     The first element is always the nearest-ATM strike.  Subsequent elements
     are one step deeper ITM each time:
-      CE: strike − 100, strike − 200, …
-      PE: strike + 100, strike + 200, …
+      CE: strike − step, strike − 2*step, …
+      PE: strike + step, strike + 2*step, …
 
     Only strikes that exist in the instrument master are included.
     The list always contains at least one element (the ATM strike).
@@ -108,15 +129,16 @@ def select_atm_candidates(
     Use this when you want to try progressively more ITM options until one
     meets the minimum premium threshold.
 
-    Raises ValueError if no SENSEX options are available for *expiry*.
+    Raises ValueError if no options are available for *expiry*.
     """
+    target = underlying or settings.UNDERLYING
     if expiry is None:
-        expiry = resolve_expiry()
+        expiry = resolve_expiry(target)
 
-    options = get_sensex_options(expiry, option_type)
+    options = get_sensex_options(expiry, option_type, underlying=target)
     if not options:
         raise ValueError(
-            f"No SENSEX {option_type} options found for expiry {expiry}. "
+            f"No {target} {option_type} options found for expiry {expiry}. "
             "Check instrument master and CONFIGURED_EXPIRY."
         )
 
@@ -129,7 +151,8 @@ def select_atm_candidates(
     candidates: list[OptionInstrument] = [_make_instrument(strike_map[atm_strike], expiry)]
 
     # Walk ITM: for PE higher strikes are ITM; for CE lower strikes are ITM.
-    direction = +SENSEX_STRIKE_STEP if option_type == "PE" else -SENSEX_STRIKE_STEP
+    strike_step = get_strike_step(target)
+    direction = +strike_step if option_type == "PE" else -strike_step
     candidate_strike = atm_strike
     for _ in range(steps):
         candidate_strike += direction

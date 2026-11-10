@@ -44,23 +44,31 @@ def load_instruments(force: bool = False) -> list[dict]:
 def get_sensex_options(
     expiry: date,
     option_type: Literal["CE", "PE"],
+    underlying: str | None = None,
 ) -> list[dict]:
     """
-    Filter to SENSEX option contracts for a given expiry and type.
+    Filter to option contracts for a given expiry and type (defaults to configured UNDERLYING).
+    Supports BSE (BFO) and NSE (NFO) option segments for SENSEX, NIFTY, FINNIFTY, etc.
     Returns list of instrument dicts sorted by strike.
     """
+    target = underlying or settings.UNDERLYING
+    norm_target = settings.normalize_index_name(target)
     instruments = load_instruments()
     result = [
         i for i in instruments
         if (
-            i.get("name") == settings.UNDERLYING         # e.g. "SENSEX"
+            (i.get("name") == target or settings.normalize_index_name(str(i.get("name", ""))) == norm_target)
             and i.get("instrument_type") == option_type  # "CE" or "PE"
-            and i.get("segment") in ("BFO", "BFO-OPT")  # BSE Futures & Options
+            and i.get("segment") in ("BFO", "BFO-OPT", "NFO", "NFO-OPT")
             and _parse_expiry(i.get("expiry")) == expiry
         )
     ]
     result.sort(key=lambda x: float(x.get("strike", 0)))
     return result
+
+
+# General alias
+get_options = get_sensex_options
 
 
 def get_near_month_future(
@@ -98,10 +106,13 @@ def _parse_expiry(raw) -> date | None:
     return None
 
 
-def resolve_expiry() -> date:
+def resolve_expiry(underlying: str | None = None) -> date:
     """
-    Return the configured or nearest weekly expiry date.
+    Return the configured or nearest weekly expiry date for *underlying*
+    (defaults to the configured UNDERLYING).
     """
+    target = underlying or settings.UNDERLYING
+    norm_target = settings.normalize_index_name(target)
     if settings.EXPIRY_MODE == "CONFIGURED":
         if not settings.CONFIGURED_EXPIRY:
             raise ValueError("CONFIGURED_EXPIRY must be set.")
@@ -114,7 +125,8 @@ def resolve_expiry() -> date:
         {
             _parse_expiry(i["expiry"])
             for i in instruments
-            if i.get("name") == settings.UNDERLYING and i.get("segment") in ("BFO", "BFO-OPT")
+            if (i.get("name") == target or settings.normalize_index_name(str(i.get("name", ""))) == norm_target)
+            and i.get("segment") in ("BFO", "BFO-OPT", "NFO", "NFO-OPT")
             and _parse_expiry(i["expiry"]) is not None
             and _parse_expiry(i["expiry"]) >= today  # type: ignore[operator]
         }
@@ -139,10 +151,12 @@ def is_expiry_day() -> bool:
     """True when today is a SENSEX option expiry date (fails safe to False)."""
     try:
         today = date.today()
+        norm_underlying = settings.normalize_index_name(settings.UNDERLYING)
         return any(
             _parse_expiry(i.get("expiry")) == today
             for i in load_instruments()
-            if i.get("name") == settings.UNDERLYING and i.get("segment") in ("BFO", "BFO-OPT")
+            if (i.get("name") == settings.UNDERLYING or settings.normalize_index_name(str(i.get("name", ""))) == norm_underlying)
+            and i.get("segment") in ("BFO", "BFO-OPT", "NFO", "NFO-OPT")
         )
     except Exception:
         return False

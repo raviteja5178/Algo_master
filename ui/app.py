@@ -488,14 +488,29 @@ def _watchdog() -> None:
         time.sleep(30)
 
 
-def _read_log_tail(n: int = 50) -> list[str]:
-    """Read the last n lines of bot.log directly from disk."""
+def _read_log_tail(n: int = 50, idx: str | None = None) -> list[str]:
+    """
+    Read the last n lines of bot.log directly from disk.
+
+    The bot runs every index in one process and writes one log.  Lines emitted
+    for a specific index carry a `[INDEX] ` tag right after the logger name.
+    With `idx` set, lines tagged for a *different* index are dropped; untagged
+    (global) lines are kept for every index.
+    """
     if not _BOT_LOG.exists():
         return []
     try:
-        with open(_BOT_LOG, "r", encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-        return [l.rstrip() for l in lines[-n:]]
+        # Only the file tail is needed — avoid loading the whole (multi-MB) log.
+        with open(_BOT_LOG, "rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - 600_000))
+            raw = f.read().decode("utf-8", errors="replace")
+        lines = [l.rstrip() for l in raw.splitlines()]
+        if idx:
+            others = tuple(f" | [{o}] " for o in _INDICES if o != idx.upper())
+            lines = [l for l in lines if not any(t in l for t in others)]
+        return lines[-n:]
     except Exception:
         return []
 
@@ -601,6 +616,41 @@ def _conn():
     return con
 
 
+# ── Per-index (underlying) selection ──────────────────────────────────────────
+# The dashboard has one left-nav entry per index.  Every data endpoint accepts
+# ?underlying=SENSEX|NIFTY|BANKNIFTY|FINNIFTY.  Trades carry no underlying
+# column, but option_symbol always starts with the index name (same convention
+# as persistence.models.fetch_active_trade), so we filter on that prefix.
+
+_INDICES = ("SENSEX", "NIFTY", "BANKNIFTY", "FINNIFTY")
+# Option exchange segment per index (SENSEX options trade on BSE F&O).
+_OPT_EXCHANGE = {"SENSEX": "BFO", "NIFTY": "NFO", "BANKNIFTY": "NFO", "FINNIFTY": "NFO"}
+
+
+def _req_idx() -> str:
+    """Resolve the requested index; falls back to .env UNDERLYING, then SENSEX."""
+    raw = (request.args.get("underlying") or "").strip().upper()
+    if raw == "FINIFTY":
+        raw = "FINNIFTY"
+    if raw in _INDICES:
+        return raw
+    env_u = str(dotenv_values(ENV_FILE).get("UNDERLYING") or "SENSEX").strip().strip("'\"").upper()
+    return env_u if env_u in _INDICES else "SENSEX"
+
+
+def _sym_like(idx: str) -> str:
+    return f"{idx}%"
+
+
+def _opt_exch_for_symbol(symbol: str) -> str:
+    """Exchange segment for an option tradingsymbol (SENSEX* -> BFO, else NFO)."""
+    s = (symbol or "").upper()
+    for name in ("BANKNIFTY", "FINNIFTY", "NIFTY", "SENSEX"):
+        if s.startswith(name):
+            return _OPT_EXCHANGE[name]
+    return "BFO"
+
+
 # ── API: status ───────────────────────────────────────────────────────────────
 
 @app.get("/api/status")
@@ -609,11 +659,14 @@ def api_status():
 
     bot_running = _is_bot_running()
 
+    idx = _req_idx()
     active_trade = None
     con = _conn()
     if con:
         row = con.execute(
-            "SELECT * FROM trades WHERE status='OPEN' ORDER BY created_at DESC LIMIT 1"
+            "SELECT * FROM trades WHERE status='OPEN' AND option_symbol LIKE ? "
+            "ORDER BY created_at DESC LIMIT 1",
+            (_sym_like(idx),),
         ).fetchone()
         if row:
             active_dict = dict(row)
@@ -654,6 +707,11 @@ def api_status():
             active_trade = active_dict
         con.close()
 
+    # Overlay live trailing values (highest_ltp / stop / target) from the bot's
+    # per-index state file; the DB copy is only written on stop moves.
+    if active_trade:
+        _merge_live_trade_state(active_trade, idx)
+
     # Get cached token status for UI login modal
     tok_status = _check_token_validity_cached()
     # Apply session gate — same rule as /api/auth/token-status
@@ -682,6 +740,7 @@ def api_status():
         pass
 
     return jsonify({
+        "underlying": idx,
         "bot_running": bot_running,
         "bot_paused": is_paused(),
         "trading_mode": env.get("TRADING_MODE", "PAPER"),
@@ -714,7 +773,7 @@ def api_status():
             "smart_entry_cooldown": env.get("SMART_ENTRY_COOLDOWN_CANDLES", "0"),
             "option_feed_ok": None,  # populated by bot state file if available
         },
-        "log_tail": _read_log_tail(50),
+        "log_tail": _read_log_tail(50, idx),
     })
 
 
@@ -726,7 +785,8 @@ def api_trades():
     if not con:
         return jsonify([])
     rows = con.execute(
-        "SELECT * FROM trades ORDER BY created_at DESC LIMIT 200"
+        "SELECT * FROM trades WHERE option_symbol LIKE ? ORDER BY created_at DESC LIMIT 200",
+        (_sym_like(_req_idx()),),
     ).fetchall()
     con.close()
     return jsonify([dict(r) for r in rows])
@@ -738,7 +798,9 @@ def api_active_trade():
     if not con:
         return jsonify(None)
     row = con.execute(
-        "SELECT * FROM trades WHERE status='OPEN' ORDER BY created_at DESC LIMIT 1"
+        "SELECT * FROM trades WHERE status='OPEN' AND option_symbol LIKE ? "
+        "ORDER BY created_at DESC LIMIT 1",
+        (_sym_like(_req_idx()),),
     ).fetchone()
     con.close()
     return jsonify(dict(row) if row else None)
@@ -752,7 +814,10 @@ def api_orders():
     if not con:
         return jsonify([])
     rows = con.execute(
-        "SELECT * FROM order_actions ORDER BY created_at DESC LIMIT 300"
+        "SELECT * FROM order_actions WHERE trade_id IN "
+        "(SELECT trade_id FROM trades WHERE option_symbol LIKE ?) "
+        "ORDER BY created_at DESC LIMIT 300",
+        (_sym_like(_req_idx()),),
     ).fetchall()
     con.close()
     return jsonify([dict(r) for r in rows])
@@ -763,15 +828,188 @@ def api_orders():
 _STATE_FILE = ROOT / ".bot_state.json"
 
 
+def _idx_from_symbol(symbol: str | None) -> str:
+    """Index an option tradingsymbol belongs to (BANKNIFTY/FINNIFTY before NIFTY)."""
+    s = (symbol or "").upper()
+    for name in ("BANKNIFTY", "FINNIFTY", "NIFTY", "SENSEX"):
+        if s.startswith(name):
+            return name
+    return "SENSEX"
+
+
+def _merge_live_trade_state(trade: dict, idx: str) -> dict | None:
+    """
+    Merge the bot's live active_trade block for `idx` into `trade`.
+    Reads the per-index state file — the shared .bot_state.json top level only
+    mirrors whichever index wrote last, so it must not be used with several
+    indices running.  highest_ltp only ratchets up: the larger of DB / live wins.
+    Returns the per-index state (or None).
+    """
+    st = _read_state(idx)
+    if not st:
+        return None
+    at = st.get("active_trade")
+    if at and (at.get("symbol") in (None, trade.get("option_symbol"))):
+        if at.get("current_stop") is not None:
+            trade["current_stop"] = at["current_stop"]
+        if at.get("highest_ltp") is not None:
+            trade["highest_ltp"] = max(float(at["highest_ltp"]),
+                                       float(trade.get("highest_ltp") or 0))
+        if at.get("target") is not None:
+            trade["target_reference"] = at["target"]
+        for k in ("break_even_activated", "trail_steps_completed", "be_points"):
+            if at.get(k) is not None:
+                trade[k] = at[k]
+    return st
+
+
+def _read_state(idx: str) -> dict | None:
+    """
+    Latest bot state for one index.  Prefers the per-index file the bot writes
+    (.bot_state_<idx>.json); falls back to the instruments map / top level of
+    the shared .bot_state.json (which only mirrors the last-writing index).
+    """
+    per_inst = ROOT / f".bot_state_{idx.lower()}.json"
+    try:
+        with open(per_inst, "r") as f:
+            return json.load(f)
+    except Exception:
+        pass
+    try:
+        with open(_STATE_FILE, "r") as f:
+            data = json.load(f)
+    except Exception:
+        return None
+    inst = (data.get("instruments") or {}).get(idx)
+    if isinstance(inst, dict):
+        return inst
+    if data.get("underlying", "SENSEX") == idx:
+        return data
+    return None
+
+
+def _enabled_indices() -> list[str]:
+    """Indices the bot will run — mirrors config.settings.get_enabled_underlyings()."""
+    env = dotenv_values(ENV_FILE)
+
+    def _v(k: str, d: str = "") -> str:
+        return str(env.get(k) if env.get(k) is not None else d).strip().strip("'\"")
+
+    raw = _v("ACTIVE_UNDERLYINGS") or _v("UNDERLYINGS")
+    if raw.strip():
+        items = [s.strip().upper().replace("FINIFTY", "FINNIFTY") for s in raw.split(",") if s.strip()]
+        return [i for i in items if i in _INDICES]
+    flags = {
+        "SENSEX": _v("ENABLE_SENSEX", "true"), "NIFTY": _v("ENABLE_NIFTY", "false"),
+        "FINNIFTY": _v("ENABLE_FINNIFTY", "false"), "BANKNIFTY": _v("ENABLE_BANKNIFTY", "false"),
+    }
+    on = [k for k, v in flags.items() if v.lower() in ("1", "true", "yes", "on")]
+    return on or [_req_idx()]
+
+
+@app.get("/api/instruments")
+def api_instruments():
+    """Left-nav summary: per-index LTP, bot state, feed freshness, open position."""
+    now = datetime.now(timezone.utc)
+    con = _conn()
+    enabled = set(_enabled_indices())
+    out = []
+    for idx in _INDICES:
+        st = _read_state(idx) or {}
+        age = None
+        try:
+            ts = datetime.fromisoformat(st["updated_at"])
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            age = (now - ts).total_seconds()
+        except Exception:
+            pass
+        open_n = 0
+        if con:
+            try:
+                open_n = con.execute(
+                    "SELECT COUNT(*) FROM trades WHERE status='OPEN' AND option_symbol LIKE ?",
+                    (_sym_like(idx),),
+                ).fetchone()[0]
+            except Exception:
+                pass
+        out.append({
+            "underlying": idx,
+            "ltp": st.get("ltp"),
+            "bot_state": st.get("bot_state"),
+            "updated_at": st.get("updated_at"),
+            "age_sec": age,
+            "has_state": bool(st),
+            "enabled": idx in enabled,
+            "open_trades": open_n,
+        })
+    if con:
+        con.close()
+    return jsonify(out)
+
+
+@app.get("/api/positions/open")
+def api_positions_open():
+    """
+    ALL open trades across every index (not filtered by the selected tab), each
+    merged with its own index's live trailing state and a live option LTP.
+    Option quotes are fetched in one batched Kite call.
+    """
+    con = _conn()
+    if not con:
+        return jsonify([])
+    try:
+        rows = con.execute(
+            "SELECT * FROM trades WHERE status='OPEN' ORDER BY created_at ASC"
+        ).fetchall()
+    finally:
+        con.close()
+    trades = [dict(r) for r in rows]
+
+    for t in trades:
+        idx = _idx_from_symbol(t.get("option_symbol"))
+        t["underlying"] = idx
+        t["spot_ltp"] = None
+        t["option_ltp"] = None
+        st = _merge_live_trade_state(t, idx)
+        if st:
+            t["spot_ltp"] = st.get("ltp")
+            t["bot_state"] = st.get("bot_state")
+            t["state_updated_at"] = st.get("updated_at")
+
+    keys = {
+        f"{_opt_exch_for_symbol(t['option_symbol'])}:{t['option_symbol']}": t
+        for t in trades if t.get("option_symbol")
+    }
+    if keys:
+        kite = _get_kite_safe()
+        if kite:
+            try:
+                q = kite.quote(list(keys))
+                for k, t in keys.items():
+                    v = q.get(k, {}).get("last_price")
+                    if v is not None:
+                        t["option_ltp"] = float(v)
+            except Exception as exc:
+                for t in trades:
+                    t["quote_error"] = str(exc)
+    return jsonify(trades)
+
+
+_OPT_EXCHANGE_FALLBACK = "NFO"
+
+
 @app.get("/api/position/ltp")
 def api_position_ltp():
     """Return live LTP for the currently open option position directly from Zerodha."""
+    idx = _req_idx()
     con = _conn()
     if not con:
         return jsonify({"ltp": None, "symbol": None})
     row = con.execute(
         "SELECT option_symbol, instrument_token FROM trades WHERE status='OPEN' "
-        "ORDER BY created_at DESC LIMIT 1"
+        "AND option_symbol LIKE ? ORDER BY created_at DESC LIMIT 1",
+        (_sym_like(idx),),
     ).fetchone()
     con.close()
     if not row:
@@ -781,8 +1019,9 @@ def api_position_ltp():
     if not kite:
         return jsonify({"ltp": None, "symbol": symbol})
     try:
-        q = kite.quote([f"BFO:{symbol}"])
-        ltp = q.get(f"BFO:{symbol}", {}).get("last_price")
+        exch = _OPT_EXCHANGE.get(idx, _OPT_EXCHANGE_FALLBACK)
+        q = kite.quote([f"{exch}:{symbol}"])
+        ltp = q.get(f"{exch}:{symbol}", {}).get("last_price")
         return jsonify({"ltp": ltp, "symbol": symbol})
     except Exception as exc:
         return jsonify({"ltp": None, "symbol": symbol, "error": str(exc)})
@@ -790,29 +1029,21 @@ def api_position_ltp():
 
 @app.get("/api/ltp")
 def api_ltp():
-    """Lightweight endpoint: returns only the current SENSEX LTP and timestamp.
+    """Lightweight endpoint: returns only the selected index's LTP and timestamp.
     Polled every second by the UI for real-time price display."""
-    if not _STATE_FILE.exists():
+    data = _read_state(_req_idx())
+    if not data:
         return jsonify({"ltp": None, "updated_at": None})
-    try:
-        with open(_STATE_FILE, "r") as f:
-            data = json.load(f)
-        return jsonify({"ltp": data.get("ltp"), "updated_at": data.get("updated_at")})
-    except Exception:
-        return jsonify({"ltp": None, "updated_at": None})
+    return jsonify({"ltp": data.get("ltp"), "updated_at": data.get("updated_at")})
 
 
 @app.get("/api/candles")
 def api_candles():
     """Return the last N completed 5m and 15m candles plus current indicators."""
-    if not _STATE_FILE.exists():
+    data = _read_state(_req_idx())
+    if not data:
         return jsonify({"candles_5m": [], "candles_15m": [], "ltp": None, "signals": []})
-    try:
-        with open(_STATE_FILE, "r") as f:
-            data = json.load(f)
-        return jsonify(data)
-    except Exception:
-        return jsonify({"candles_5m": [], "candles_15m": [], "ltp": None, "signals": []})
+    return jsonify(data)
 
 
 # ── API: historical chart data ────────────────────────────────────────────────
@@ -861,13 +1092,14 @@ def api_chart():
     chunk = _td(days=_CHUNK_DAYS.get(interval, 60))
 
     try:
-        from market.historical_data import SENSEX_TOKEN
+        from market.historical_data import get_spot_token
+        spot_tok = get_spot_token(_req_idx())
         records = []
         cur_from = from_dt
         while cur_from < to_dt:
             cur_to = min(cur_from + chunk, to_dt)
             batch = kite.historical_data(
-                instrument_token=SENSEX_TOKEN,
+                instrument_token=spot_tok,
                 from_date=cur_from.strftime("%Y-%m-%d %H:%M:%S"),
                 to_date=cur_to.strftime("%Y-%m-%d %H:%M:%S"),
                 interval=interval,
@@ -937,9 +1169,9 @@ def api_chart_signals():
             "exit_price, exit_time, exit_reason, "
             "sensex_entry, sensex_sl, sensex_t1, sensex_t2 "
             "FROM trades "
-            "WHERE entry_time LIKE ? "
+            "WHERE entry_time LIKE ? AND option_symbol LIKE ? "
             "ORDER BY entry_time ASC LIMIT 100",
-            (f"{day}%",),
+            (f"{day}%", _sym_like(_req_idx())),
         ).fetchall()
     finally:
         con.close()
@@ -992,7 +1224,9 @@ def api_pnl():
     rows = con.execute(
         "SELECT exit_time, realized_pnl, strategy_type, option_symbol "
         "FROM trades WHERE status='CLOSED' AND exit_time IS NOT NULL "
-        "ORDER BY exit_time ASC LIMIT 200"
+        "AND option_symbol LIKE ? "
+        "ORDER BY exit_time ASC LIMIT 200",
+        (_sym_like(_req_idx()),),
     ).fetchall()
     con.close()
     return jsonify([dict(r) for r in rows])
@@ -1004,7 +1238,8 @@ def api_pnl():
 def api_fvg():
     """
     Return daily FVGs (bullish + bearish) and CPR for the current session.
-    Fetches the last 15 daily SENSEX candles via Zerodha historical API.
+    Fetches the last ~30 days of daily candles for the selected index
+    (?underlying=) via Zerodha historical API.
     Returns: { cpr, fvg_bullish: [...], fvg_bearish: [...], prev_ohlc, error? }
     """
     try:
@@ -1014,9 +1249,10 @@ def api_fvg():
 
         from datetime import timedelta
         from utils.time_utils import IST, today_ist
+        from market.historical_data import get_spot_token
         today = today_ist()
         start = today - timedelta(days=30)
-        candles = kite.historical_data(265, start, today, "day")
+        candles = kite.historical_data(get_spot_token(_req_idx()), start, today, "day")
 
         # Filter for completed sessions prior to today so CPR, pivot levels,
         # and daily FVGs are never calculated from today's in-progress candle.
@@ -1045,11 +1281,12 @@ def api_fvg():
         bottom = min(TC, BC)
         width  = round(top - bottom, 2)
 
-        # CPR width classification for SENSEX
-        if width < 150:
+        # CPR width classification — thresholds scale with the index level
+        # (equivalent to 150 / 400 pts at SENSEX ~80,000).
+        if width < C * 0.0019:
             cpr_tag = "NARROW"
             cpr_hint = "Trending day expected"
-        elif width < 400:
+        elif width < C * 0.005:
             cpr_tag = "MEDIUM"
             cpr_hint = "Moderate range — watch CPR test"
         else:
@@ -1144,6 +1381,7 @@ def api_fvg():
         prev_date_str = str(prev_dt.date()) if hasattr(prev_dt, "date") else str(prev_dt)[:10]
 
         return jsonify({
+            "underlying": _req_idx(),
             "prev_ohlc": {
                 "date":  prev_date_str,
                 "high":  round(H, 2),
@@ -1269,33 +1507,17 @@ def api_shadow_active():
 
     trade = dict(row)
 
-    # Merge live state from bot_state.json
+    # Merge live state from the trade's own index (per-index state file)
     ltp = None
     bot_state = None
-    if _STATE_FILE.exists():
-        try:
-            with open(_STATE_FILE, "r") as f:
-                st = json.load(f)
+    try:
+        st = _merge_live_trade_state(trade, _idx_from_symbol(trade.get("option_symbol")))
+        if st:
             ltp = st.get("ltp")
             bot_state = st.get("bot_state")
             trade["updated_at"] = st.get("updated_at")
-            # active_trade block from bot contains live current_stop + highest_ltp
-            at = st.get("active_trade")
-            if at:
-                if at.get("current_stop") is not None:
-                    trade["current_stop"]   = at["current_stop"]
-                if at.get("highest_ltp") is not None:
-                    trade["highest_ltp"]    = at["highest_ltp"]
-                if at.get("target") is not None:
-                    trade["target_reference"] = at["target"]
-                if at.get("break_even_activated") is not None:
-                    trade["break_even_activated"] = at["break_even_activated"]
-                if at.get("trail_steps_completed") is not None:
-                    trade["trail_steps_completed"] = at["trail_steps_completed"]
-                if at.get("be_points") is not None:
-                    trade["be_points"] = at["be_points"]
-        except Exception:
-            pass
+    except Exception:
+        pass
 
     trade["live_ltp"]  = ltp
     trade["bot_state"] = bot_state
@@ -1309,8 +1531,9 @@ def api_shadow_active():
         try:
             kite = _get_kite_safe()
             if kite:
-                q = kite.quote([f"BFO:{option_symbol}"])
-                opt_ltp = q.get(f"BFO:{option_symbol}", {}).get("last_price")
+                _ex = _opt_exch_for_symbol(option_symbol)
+                q = kite.quote([f"{_ex}:{option_symbol}"])
+                opt_ltp = q.get(f"{_ex}:{option_symbol}", {}).get("last_price")
                 if opt_ltp is not None:
                     trade["option_ltp"] = float(opt_ltp)
         except Exception:
@@ -1454,26 +1677,14 @@ def api_live_active():
 
     trade = dict(row)
     ltp = bot_state = None
-    if _STATE_FILE.exists():
-        try:
-            with open(_STATE_FILE, "r") as f:
-                st = json.load(f)
+    try:
+        st = _merge_live_trade_state(trade, _idx_from_symbol(trade.get("option_symbol")))
+        if st:
             ltp = st.get("ltp")
             bot_state = st.get("bot_state")
             trade["updated_at"] = st.get("updated_at")
-            at = st.get("active_trade")
-            if at:
-                for src, dst in (("current_stop", "current_stop"),
-                                 ("highest_ltp", "highest_ltp"),
-                                 ("target", "target_reference"),
-                                 ("break_even_activated", "break_even_activated"),
-                                 ("trail_steps_completed", "trail_steps_completed")):
-                    if at.get(src) is not None:
-                        trade[dst] = at[src]
-                if at.get("be_points") is not None:
-                    trade["be_points"] = at["be_points"]
-        except Exception:
-            pass
+    except Exception:
+        pass
     trade["live_ltp"] = ltp
     trade["bot_state"] = bot_state
 
@@ -1483,8 +1694,9 @@ def api_live_active():
         try:
             kite = _get_kite_safe()
             if kite:
-                q = kite.quote([f"BFO:{sym}"])
-                v = q.get(f"BFO:{sym}", {}).get("last_price")
+                _ex = _opt_exch_for_symbol(sym)
+                q = kite.quote([f"{_ex}:{sym}"])
+                v = q.get(f"{_ex}:{sym}", {}).get("last_price")
                 if v is not None:
                     trade["option_ltp"] = float(v)
         except Exception:
@@ -1541,6 +1753,10 @@ def api_watchdog_status():
 # Keys that are safe to expose to the UI (exclude secrets)
 _SAFE_KEYS = {
     "TRADING_MODE", "ENABLE_LIVE_TRADING", "UNDERLYING", "QUANTITY",
+    "ENABLE_SENSEX", "ENABLE_NIFTY", "ENABLE_FINNIFTY", "ENABLE_BANKNIFTY", "ACTIVE_UNDERLYINGS",
+    "NUM_LOTS", "INDEX_LOT_SIZES", "LOT_SIZES",
+    "LOT_SIZE_SENSEX", "LOT_SIZE_NIFTY", "LOT_SIZE_FINNIFTY", "LOT_SIZE_BANKNIFTY",
+    "SENSEX_LOT_SIZE", "NIFTY_LOT_SIZE", "FINNIFTY_LOT_SIZE", "BANKNIFTY_LOT_SIZE",
     "INITIAL_SL_POINTS", "BREAK_EVEN_TRIGGER_POINTS", "TRAIL_STEP_POINTS",
     "INITIAL_TARGET_OFFSET_POINTS", "TARGET_TRAIL_STEP_POINTS",
     "FORCE_EXIT_TIME", "NO_NEW_ENTRY_AFTER", "TIMEZONE",
@@ -1603,7 +1819,11 @@ _SAFE_KEYS = {
 }
 
 _EDITABLE_KEYS = {
-    "TRADING_MODE", "QUANTITY", "INITIAL_SL_POINTS", "BREAK_EVEN_TRIGGER_POINTS",
+    "TRADING_MODE", "QUANTITY", "ENABLE_SENSEX", "ENABLE_NIFTY", "ENABLE_FINNIFTY", "ENABLE_BANKNIFTY", "ACTIVE_UNDERLYINGS",
+    "NUM_LOTS", "INDEX_LOT_SIZES", "LOT_SIZES",
+    "LOT_SIZE_SENSEX", "LOT_SIZE_NIFTY", "LOT_SIZE_FINNIFTY", "LOT_SIZE_BANKNIFTY",
+    "SENSEX_LOT_SIZE", "NIFTY_LOT_SIZE", "FINNIFTY_LOT_SIZE", "BANKNIFTY_LOT_SIZE",
+    "INITIAL_SL_POINTS", "BREAK_EVEN_TRIGGER_POINTS",
     "TRAIL_STEP_POINTS", "INITIAL_TARGET_OFFSET_POINTS", "FORCE_EXIT_TIME",
     "NO_NEW_ENTRY_AFTER", "CONFIGURED_EXPIRY", "EXPIRY_MODE", "LOG_LEVEL",
     "ENABLE_LIVE_TRADING", "KITE_TOTP_SECRET",

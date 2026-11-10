@@ -44,6 +44,12 @@ def _mock_load(_force=False):
 
 # ── Existing ATM selection tests (behaviour unchanged) ────────────────────────
 
+@pytest.fixture(autouse=True)
+def _ensure_sensex_underlying(monkeypatch):
+    from config import settings
+    monkeypatch.setattr(settings, "UNDERLYING", "SENSEX")
+
+
 class TestOptionSelector:
     def test_atm_ce_nearest(self) -> None:
         with patch("broker.instrument_repository.load_instruments", side_effect=_mock_load):

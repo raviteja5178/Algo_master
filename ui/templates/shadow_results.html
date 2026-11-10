@@ -598,7 +598,10 @@ function renderLiveTracker(t) {
 
   // These CAN change during a trade (TSL raises SL, highest_ltp ratchets up):
   const slPrice    = parseFloat(t.current_stop    || (entry - slPts));
-  const highestLtp = Math.max(parseFloat(t.highest_ltp || entry), ltp);
+  // Only compare against the option premium. `ltp` falls back to the index spot
+  // when the option quote is missing, which would make "Highest" mirror the live
+  // index price. The bot's own highest_ltp is the source of truth.
+  const highestLtp = Math.max(parseFloat(t.highest_ltp || entry), optionLtp);
 
   const isNewTrade = (_lastTradeId !== t.trade_id);
   if (isNewTrade) _lastTradeId = t.trade_id;

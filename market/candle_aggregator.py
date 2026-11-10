@@ -163,6 +163,11 @@ class CandleAggregator:
         with self._lock:
             return list(self._completed)
 
+    def wip_snapshot(self) -> tuple[datetime | None, float | None]:
+        """(bucket start, open) of the forming candle, or (None, None)."""
+        with self._lock:
+            return self._wip_start, self._wip_open
+
     def seed(self, candles: list[Candle]) -> None:
         """
         Pre-load completed candles from historical data.
