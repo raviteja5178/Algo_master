@@ -48,3 +48,4 @@ research/data/orderflow/
 # Process locks / pause flag (utils/process_control.py)
 .*.lock
 .bot_paused
+.pine_state_*.json

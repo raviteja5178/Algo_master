@@ -21,8 +21,6 @@ from utils.logging_config import log_event
 
 logger = logging.getLogger(__name__)
 
-# BSE SENSEX spot — same token used by historical_data.py
-_SENSEX_EXCHANGE_TOKEN = "BSE:SENSEX"
 _POLL_INTERVAL_PRIMARY = 1.0   # seconds — used in PAPER mode (only feed)
 _POLL_INTERVAL_FALLBACK = 5.0  # seconds — used in LIVE/SHADOW mode (WebSocket is primary)
 
@@ -73,7 +71,9 @@ class PaperFeed:
         self._running = True
         self._thread = threading.Thread(target=self._loop, daemon=True, name="paper-feed")
         self._thread.start()
-        logger.info("PaperFeed started — polling SENSEX LTP every %.1fs%s",
+        from config import settings
+        logger.info("PaperFeed started — polling %s LTP every %.1fs%s",
+                    ", ".join(settings.get_enabled_underlyings()),
                     self._poll_interval, " (fallback)" if fallback else "")
 
     def stop(self) -> None:
@@ -114,7 +114,8 @@ class PaperFeed:
             return False
 
     def _loop(self) -> None:
-        from market.historical_data import SENSEX_TOKEN
+        from config import settings
+        from market.historical_data import get_spot_token, get_exchange_symbol
 
         poll_interval = getattr(self, "_poll_interval", _POLL_INTERVAL_PRIMARY)
         consecutive_errors = 0
@@ -123,17 +124,22 @@ class PaperFeed:
 
         try:
             while self._running:
+                enabled_underlyings = settings.get_enabled_underlyings()
+                sym_to_token = {get_exchange_symbol(u): get_spot_token(u) for u in enabled_underlyings}
+                query_symbols = list(sym_to_token.keys())
                 try:
-                    quotes = self._kite.quote([_SENSEX_EXCHANGE_TOKEN])
-                    ltp = quotes[_SENSEX_EXCHANGE_TOKEN]["last_price"]
+                    quotes = self._kite.quote(query_symbols)
                     consecutive_errors = 0
                     consecutive_auth_errors = 0
                     _refresh_attempted = False
-                    for cb in self._callbacks:
-                        try:
-                            cb(SENSEX_TOKEN, float(ltp))
-                        except Exception as exc:
-                            logger.error("PaperFeed tick callback error: %s", exc)
+                    for ex_sym, spot_tok in sym_to_token.items():
+                        if ex_sym in quotes and "last_price" in quotes[ex_sym]:
+                            ltp = float(quotes[ex_sym]["last_price"])
+                            for cb in self._callbacks:
+                                try:
+                                    cb(spot_tok, ltp)
+                                except Exception as exc:
+                                    logger.error("PaperFeed tick callback error for token %d: %s", spot_tok, exc)
                 except Exception as exc:
                     consecutive_errors += 1
                     if self._is_auth_error(exc):

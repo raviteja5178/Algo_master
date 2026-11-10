@@ -40,6 +40,7 @@ class EODManager:
         stop_order_id: str | None,
         entry_price: float,
         max_retries: int = 3,
+        ltp_hint: float | None = None,
     ) -> bool:
         """
         Force-close the open position and reconcile.
@@ -66,9 +67,16 @@ class EODManager:
                     tradingsymbol=tradingsymbol,
                     quantity=quantity,
                     tag="EOD_EXIT",
+                    ltp_hint=ltp_hint,
                 )
                 if result["status"] == "COMPLETE":
                     exit_price = result["average_price"]
+                    if not exit_price or exit_price <= 0:
+                        log_event(
+                            logger, "EOD_EXIT_PRICE_UNKNOWN",
+                            trade_id=trade_id, symbol=tradingsymbol,
+                            message="Broker returned no fill price; P&L for this trade is unreliable.",
+                        )
                     # ── Broker position is the truth ───────────────────────────
                     remaining = self._broker.get_position_qty(tradingsymbol)
                     if remaining != 0:

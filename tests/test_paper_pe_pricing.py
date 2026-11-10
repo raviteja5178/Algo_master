@@ -74,8 +74,9 @@ def test_paper_tick_handler_feeds_pe_option_price(monkeypatch) -> None:
     monkeypatch.setattr(main, "_write_ltp", lambda ctx: None)
     seen = []
     monkeypatch.setattr(main, "on_option_ltp", lambda ctx, ltp: seen.append(ltp))
-    ctx = _ctx("PE_PIVOT", agg_5m=MagicMock(), agg_15m=MagicMock(), vwap=MagicMock())
-    handler = main._make_tick_handler(ctx)
+    ctx = _ctx("PE_PIVOT", agg_5m=MagicMock(), agg_15m=MagicMock(), vwap=MagicMock(),
+               spot_token=main.SENSEX_TOKEN)
+    handler = main._make_tick_handler([ctx])
     handler(main.SENSEX_TOKEN, 75120.0)          # index up 120 → PE option down 120
     assert seen == [74880.0]
 

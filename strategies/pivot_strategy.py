@@ -627,6 +627,7 @@ def _check_swing_pivot(
     sl_buffer_atr: float = 0.05,
     max_sl_atr: float = 1.5,
     min_room_r: float = 1.0,
+    max_risk_pts: float = 0.0,
 ) -> PivotSetup | None:
     """Fractal Swing High/Low breakout strategy.
 
@@ -711,7 +712,7 @@ def _check_swing_pivot(
             else:
                 stop = lprice - sl_buffer_atr * atr
             risk = entry - stop
-            if risk > 0:
+            if risk > 0 and not (max_risk_pts > 0 and risk > max_risk_pts):
                 t1 = entry + rr_t1 * risk
                 t2 = entry + rr_t2 * risk
                 t3 = entry + rr_t3 * risk
@@ -744,7 +745,7 @@ def _check_swing_pivot(
             else:
                 stop = hprice + sl_buffer_atr * atr
             risk = stop - entry
-            if risk > 0:
+            if risk > 0 and not (max_risk_pts > 0 and risk > max_risk_pts):
                 t1 = entry - rr_t1 * risk
                 t2 = entry - rr_t2 * risk
                 t3 = entry - rr_t3 * risk
@@ -935,6 +936,7 @@ def find_pivot_setup(
     swing_pivot_use_atr_sl: bool = False,
     swing_pivot_atr_mult: float = 1.2,
     swing_pivot_max_sl_atr: float = 1.5,
+    swing_pivot_max_risk_pts: float = 0.0,
 ) -> PivotSetup | None:
     """Return a PivotSetup when the latest completed candle confirms a setup,
     else None.
@@ -1006,6 +1008,7 @@ def find_pivot_setup(
             sl_buffer_atr=sl_buffer_atr,
             max_sl_atr=swing_pivot_max_sl_atr,
             min_room_r=min_room_r,
+            max_risk_pts=swing_pivot_max_risk_pts,
         )
         if setup is not None:
             return setup

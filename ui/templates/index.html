@@ -76,6 +76,22 @@
   .sb-big{font-size:18px;font-weight:800;font-family:monospace;padding:6px 12px 2px;letter-spacing:-.5px}
   .sb-chg{font-size:10px;padding:0 12px 6px;font-family:monospace}
 
+  /* ── left nav rail: one entry per index ── */
+  #idxnav{width:118px;min-width:118px;background:#24160a;border-right:1px solid #3a2810;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+  .idxnav-title{font-size:9px;font-weight:700;color:#b89a6e;text-transform:uppercase;letter-spacing:1.2px;padding:10px 12px 6px}
+  .idxnav-item{display:block;width:100%;text-align:left;background:none;border:none;border-left:3px solid transparent;padding:9px 10px 9px 11px;cursor:pointer;color:#d9c4a3;font-family:var(--font);border-bottom:1px solid #3a2810}
+  .idxnav-item:hover{background:#3a2810}
+  .idxnav-item.active{background:#3a2810;border-left-color:var(--accent);color:#fff}
+  .idxnav-item.off{opacity:.55}
+  .idxnav-row{display:flex;align-items:center;gap:6px}
+  .idxnav-dot{width:7px;height:7px;border-radius:50%;background:#6b5338;flex-shrink:0}
+  .idxnav-dot.live{background:#2ecc71;box-shadow:0 0 5px #2ecc71}
+  .idxnav-dot.stale{background:#d4870a}
+  .idxnav-name{font-size:11px;font-weight:800;letter-spacing:.3px}
+  .idxnav-ltp{font-size:11px;font-family:monospace;color:#fbd07a;margin-top:3px;padding-left:13px}
+  .idxnav-tag{font-size:8px;font-weight:700;letter-spacing:.4px;padding-left:13px;margin-top:2px;color:#b89a6e;min-height:10px}
+  .idxnav-tag.pos{color:#2ecc71}
+
   /* ── main ── */
   #main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
 
@@ -275,6 +291,24 @@
   .btn-red{background:var(--red-dim);border-color:rgba(239,68,68,.35);color:var(--red)}
   .btn-blue{background:var(--accent-dim);border-color:rgba(59,130,246,.35);color:var(--accent)}
   .btn:disabled{opacity:.35;cursor:not-allowed}
+  /* ── live positions board ── */
+  .lp-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;padding:9px 13px;background:var(--surface);border:1px solid var(--border);border-radius:7px}
+  .lp-bar .lp-tot{font-size:20px;font-weight:800;font-family:monospace}
+  .lp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:12px}
+  .lp-card{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--muted);border-radius:7px;padding:12px 14px}
+  .lp-card.up{border-top-color:var(--green)}.lp-card.down{border-top-color:var(--red)}
+  .lp-hd{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .lp-idx{font-size:11px;font-weight:800;letter-spacing:.5px;padding:2px 8px;border-radius:4px;background:#24160a;color:#fbd07a}
+  .lp-sym{font-family:monospace;font-weight:700;font-size:13px}
+  .lp-pnl{display:flex;align-items:baseline;gap:10px;margin:10px 0 2px}
+  .lp-pnl .big{font-size:28px;font-weight:800;font-family:monospace;line-height:1}
+  .lp-pnl .pct{font-size:12px;font-family:monospace}
+  .lp-grid2{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 12px;margin-top:10px}
+  .lp-track{position:relative;height:8px;border-radius:9999px;background:var(--surface3);border:1px solid var(--border);margin:16px 0 4px}
+  .lp-fill{position:absolute;left:0;top:0;bottom:0;border-radius:9999px;transition:width .35s}
+  .lp-mark{position:absolute;top:-4px;width:2px;height:14px;background:var(--text);opacity:.7}
+  .lp-foot{display:flex;justify-content:space-between;font-size:10px;font-family:monospace;color:var(--muted)}
+  .lp-age{font-size:9px;color:var(--muted)}
   .section-lbl{font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px;display:flex;align-items:center;gap:7px}
   .section-lbl::after{content:'';flex-grow:1;height:1px;background:var(--border)}
 
@@ -351,7 +385,7 @@
   <!-- ── Ticker tape ───────────────────────────────────────── -->
   <div id="ticker">
     <div class="tick-item">
-      <span class="tick-sym">SENSEX</span>
+      <span class="tick-sym" id="tk-idx-name">SENSEX</span>
       <span class="tick-val" id="tk-sensex">—</span>
       <span class="tick-chg muted" id="tk-sensex-chg"></span>
     </div>
@@ -406,6 +440,26 @@
 
   <!-- ── Body ─────────────────────────────────────────────── -->
   <div id="body">
+    <!-- Index navigation: every panel/API below follows the selected index -->
+    <nav id="idxnav">
+      <div class="idxnav-title">Indices</div>
+      <button class="idxnav-item" id="nav-SENSEX" onclick="switchIndex('SENSEX')">
+        <div class="idxnav-row"><span class="idxnav-dot" id="nav-dot-SENSEX"></span><span class="idxnav-name">SENSEX</span></div>
+        <div class="idxnav-ltp" id="nav-ltp-SENSEX">—</div><div class="idxnav-tag" id="nav-tag-SENSEX"></div>
+      </button>
+      <button class="idxnav-item" id="nav-NIFTY" onclick="switchIndex('NIFTY')">
+        <div class="idxnav-row"><span class="idxnav-dot" id="nav-dot-NIFTY"></span><span class="idxnav-name">NIFTY</span></div>
+        <div class="idxnav-ltp" id="nav-ltp-NIFTY">—</div><div class="idxnav-tag" id="nav-tag-NIFTY"></div>
+      </button>
+      <button class="idxnav-item" id="nav-BANKNIFTY" onclick="switchIndex('BANKNIFTY')">
+        <div class="idxnav-row"><span class="idxnav-dot" id="nav-dot-BANKNIFTY"></span><span class="idxnav-name">BANKNIFTY</span></div>
+        <div class="idxnav-ltp" id="nav-ltp-BANKNIFTY">—</div><div class="idxnav-tag" id="nav-tag-BANKNIFTY"></div>
+      </button>
+      <button class="idxnav-item" id="nav-FINNIFTY" onclick="switchIndex('FINNIFTY')">
+        <div class="idxnav-row"><span class="idxnav-dot" id="nav-dot-FINNIFTY"></span><span class="idxnav-name">FINNIFTY</span></div>
+        <div class="idxnav-ltp" id="nav-ltp-FINNIFTY">—</div><div class="idxnav-tag" id="nav-tag-FINNIFTY"></div>
+      </button>
+    </nav>
     <!-- Sidebar -->
     <aside id="sidebar">
       <!-- Session row -->
@@ -502,6 +556,7 @@
       <!-- Tab bar -->
       <div id="tabbar">
         <button class="tab active" onclick="showTab('overview',this)">Overview</button>
+        <button class="tab" onclick="showTab('livepos',this)">Live Positions <span id="lp-badge" class="pill p-muted" style="margin-left:4px">0</span></button>
         <button class="tab" onclick="showTab('signals',this)">Signals</button>
         <button class="tab" onclick="showTab('positions',this)">Positions</button>
         <button class="tab" onclick="showTab('orders',this)">Orders</button>
@@ -526,7 +581,7 @@
               <span style="color:var(--yellow);font-size:13px">⚡</span>
               <div>
                 <div style="font-weight:700;font-size:11px;color:var(--yellow)">Live Feed Disconnected</div>
-                <div style="font-size:10px;color:var(--muted)" id="feed-banner-sub">No SENSEX ticks received — WebSocket may have dropped (403). SENSEX LTP and candle data are frozen. Sidebar shows last-known values.</div>
+                <div style="font-size:10px;color:var(--muted)" id="feed-banner-sub">No ticks received — WebSocket may have dropped (403). LTP and candle data are frozen. Sidebar shows last-known values.</div>
               </div>
             </div>
             <button class="btn" onclick="document.getElementById('feed-banner').style.display='none'" style="font-size:9px;padding:3px 8px">Dismiss</button>
@@ -550,7 +605,7 @@
               <div class="ov-kpi-sub" id="kpi-winrate">—</div>
             </div>
             <div class="ov-kpi">
-              <div class="ov-kpi-lbl">SENSEX</div>
+              <div class="ov-kpi-lbl" id="kpi-idx-lbl">SENSEX</div>
               <div class="ov-kpi-val" id="kpi-ltp">—</div>
               <div class="ov-kpi-sub" id="kpi-ltp-time">—</div>
             </div>
@@ -764,6 +819,17 @@
             <div style="font-weight:600;font-size:13px">No strategies enabled</div>
             <div style="font-size:11px;margin-top:4px">Enable strategies from Settings or select a profile above.</div>
           </div>
+        </div>
+
+        <!-- ════════════════ LIVE POSITIONS (all indices) ════════════════ -->
+        <div id="panel-livepos" class="panel">
+          <div class="lp-bar">
+            <div><div class="lbl" style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Total Open P&amp;L</div><div id="lp-total" class="lp-tot">—</div></div>
+            <div><div class="lbl" style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Open Positions</div><div id="lp-count" class="lp-tot" style="font-size:16px">0</div></div>
+            <div style="margin-left:auto" class="lp-age" id="lp-updated">—</div>
+          </div>
+          <div id="lp-empty" style="color:var(--muted);font-size:12px;padding:6px 0">No open positions on any index.</div>
+          <div id="lp-grid" class="lp-grid"></div>
         </div>
 
         <!-- ════════════════ POSITIONS ════════════════ -->
@@ -1104,6 +1170,30 @@
 <script>
 Chart.defaults.color='#6b7a99';
 Chart.defaults.borderColor='#252b3b';
+// ── Selected index (left nav) ──────────────────────────────
+// Every per-index GET endpoint gets ?underlying=<_idx> appended by the fetch
+// wrapper below, so each panel (levels, pivots, FVG/CPR, strategies, trades,
+// orders, chart, P&L) shows data for the selected index only.
+const _INDICES=['SENSEX','NIFTY','BANKNIFTY','FINNIFTY'];
+let _idx=(()=>{try{const v=localStorage.getItem('dash_idx');return _INDICES.includes(v)?v:'SENSEX';}catch(e){return 'SENSEX';}})();
+let _idxStored=(()=>{try{return _INDICES.includes(localStorage.getItem('dash_idx'));}catch(e){return false;}})();
+const _PER_INDEX_API=['/api/ltp','/api/status','/api/trades','/api/orders','/api/candles','/api/chart','/api/pnl','/api/fvg','/api/position/ltp'];
+(function(){
+  const base=window.fetch.bind(window);
+  window.fetch=function(input,init){
+    try{
+      const method=((init&&init.method)||(input&&input.method)||'GET').toUpperCase();
+      if(method==='GET'){
+        const u=new URL(typeof input==='string'?input:input.url,window.location.href);
+        if(u.origin===window.location.origin&&_PER_INDEX_API.some(p=>u.pathname===p||u.pathname.startsWith(p+'/'))&&!u.searchParams.has('underlying')){
+          u.searchParams.set('underlying',_idx);
+          input=u.pathname+u.search;
+        }
+      }
+    }catch(e){}
+    return base(input,init);
+  };
+})();
 
 // ── P&L chart ──────────────────────────────────────────────
 const pnlChart=new Chart(document.getElementById('pnl-chart').getContext('2d'),{type:'line',data:{labels:[],datasets:[{label:'Cum P&L',data:[],borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.08)',fill:true,tension:.35,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:7,font:{size:9}}},y:{ticks:{font:{size:9}}}}}});
@@ -1311,8 +1401,10 @@ function _fmtDate(d){const p=n=>String(n).padStart(2,'0');return`${d.getFullYear
 // ── Signal markers + SL / T1 / T2 price lines ──────────────────────────────
 async function _fetchAndRenderSignals(){
   if(!_candleSeries)return;
+  const my=_idx;
   try{
     const sigs=await fetch(`/api/chart/signals?date=${_todayStr()}`).then(r=>r.json());
+    if(my!==_idx)return;
     _signalMarkersCache=sigs||[];
     _applySignalMarkers();
     _applyActiveTradeLines();
@@ -1578,10 +1670,13 @@ async function _fetchAndRender(){
   const fromD=new Date(now);fromD.setDate(fromD.getDate()-days);
   const from=_fmtDate(fromD);
   document.getElementById('chart-status').textContent='Loading…';
+  const my=_idx;
   try{
     const res=await fetch(`/api/chart?interval=${_chartInterval}&from_date=${from}&to_date=${to}`);
+    if(my!==_idx)return;
     if(!res.ok){document.getElementById('chart-status').textContent='Error '+res.status;return;}
     const candles=await res.json();
+    if(my!==_idx)return;
     if(candles&&candles.error){document.getElementById('chart-status').textContent=candles.error;return;}
     _renderCandles(candles);
     document.getElementById('chart-status').textContent='';
@@ -1851,9 +1946,9 @@ function showTab(id,btn){
 }
 
 // ── Log ─────────────────────────────────────────────────────
-let _logN=0;
-function renderLog(lines){if(!lines||lines.length===_logN)return;_logN=lines.length;const box=document.getElementById('log-box');const atBot=box.scrollTop+box.clientHeight>=box.scrollHeight-30;box.innerHTML=lines.map(l=>{const lo=l.toLowerCase();let cls='';if(lo.includes('error')||lo.includes('fail')||lo.includes('halt'))cls='l-err';else if(lo.includes('warn')||lo.includes('stale'))cls='l-warn';else if(lo.includes('entry_filled')||lo.includes('entry_sent'))cls='l-entry';else if(lo.includes('exit_filled')||lo.includes('stop_hit'))cls='l-exit';else if(lo.includes('trailing')||lo.includes('break_even'))cls='l-trail';return`<div class="${cls}">${esc(l)}</div>`;}).join('');if(atBot)box.scrollTop=box.scrollHeight;}
-function clearLog(){document.getElementById('log-box').innerHTML='';_logN=0;}
+let _logN=0,_logLast='';
+function renderLog(lines){if(!lines)return;const _sig=lines.length+'|'+(lines.length?lines[lines.length-1]:'');if(_sig===_logLast)return;_logLast=_sig;_logN=lines.length;const box=document.getElementById('log-box');const atBot=box.scrollTop+box.clientHeight>=box.scrollHeight-30;box.innerHTML=lines.map(l=>{const lo=l.toLowerCase();let cls='';if(lo.includes('error')||lo.includes('fail')||lo.includes('halt'))cls='l-err';else if(lo.includes('warn')||lo.includes('stale'))cls='l-warn';else if(lo.includes('entry_filled')||lo.includes('entry_sent'))cls='l-entry';else if(lo.includes('exit_filled')||lo.includes('stop_hit'))cls='l-exit';else if(lo.includes('trailing')||lo.includes('break_even'))cls='l-trail';return`<div class="${cls}">${esc(l)}</div>`;}).join('');if(atBot)box.scrollTop=box.scrollHeight;}
+function clearLog(){document.getElementById('log-box').innerHTML='';_logN=0;_logLast='';}
 
 // ── Status render ───────────────────────────────────────────
 let _botRunning=false;
@@ -1891,7 +1986,7 @@ function renderStatus(data){
 
 // ── Active trade ───────────────────────────────────────────
 let _optLtp=null,_activeCache=null;
-async function pollOptLtp(){if(!_activeCache)return;try{const d=await fetch('/api/position/ltp').then(r=>r.json());if(d.ltp!=null){_optLtp=parseFloat(d.ltp);updateOpenPnl();}}catch(e){}}
+async function pollOptLtp(){if(!_activeCache)return;const my=_idx;try{const d=await fetch('/api/position/ltp').then(r=>r.json());if(my!==_idx)return;if(d.ltp!=null){_optLtp=parseFloat(d.ltp);updateOpenPnl();}}catch(e){}}
 function updateOpenPnl(){
   if(!_activeCache||_optLtp==null)return;
   const at=_activeCache,entry=parseFloat(at.entry_price)||0,qty=parseInt(at.quantity)||0,sl=parseFloat(at.current_stop)||0,target=parseFloat(at.target_reference)||(entry+50),ltp=_optLtp;
@@ -1961,7 +2056,7 @@ function renderActiveTrade(at){
 }
 
 // ── Trades / Orders tables ─────────────────────────────────
-function renderTrades(trades){const tbody=document.getElementById('trades-tbody');if(!trades||!trades.length){tbody.innerHTML='<tr><td colspan="12" class="muted">No trades yet.</td></tr>';return;}const closed=trades.filter(t=>t.status==='CLOSED');const totalPnl=closed.reduce((s,t)=>s+(parseFloat(t.realized_pnl)||0),0);const w=closed.filter(t=>parseFloat(t.realized_pnl)>0).length,l=closed.filter(t=>parseFloat(t.realized_pnl)<0).length,be=closed.filter(t=>parseFloat(t.realized_pnl)===0).length;const wr=closed.length>0?((w/closed.length)*100).toFixed(0):0;document.getElementById('kpi-realised').innerHTML=colorPnl(totalPnl);document.getElementById('kpi-winrate').textContent=`Win ${wr}% · ${closed.length} closed`;document.getElementById('tk-pnl').innerHTML=colorPnl(totalPnl);const ovR=document.getElementById('ov-realised');if(ovR)ovR.innerHTML=colorPnl(totalPnl);const ovWr=document.getElementById('ov-wr');if(ovWr)ovWr.textContent=`${wr}% (${w}W/${l}L)`;distChart.data.datasets[0].data=[w,l,be];distChart.update('none');let cum=0;const pL=[],pD=[];[...closed].reverse().forEach(t=>{if(t.exit_time){cum+=parseFloat(t.realized_pnl)||0;pL.push(fmtTime(t.exit_time));pD.push(parseFloat(cum.toFixed(2)));}});pnlChart.data.labels=pL;pnlChart.data.datasets[0].data=pD;pnlChart.data.datasets[0].borderColor=totalPnl>=0?'#22c55e':'#ef4444';pnlChart.data.datasets[0].backgroundColor=totalPnl>=0?'rgba(34,197,94,.08)':'rgba(239,68,68,.08)';pnlChart.update('none');const dp=t=>{const{direction}=parseStrategy(t.strategy_type);return`<span class="pill ${direction==='CE'?'p-blue':'p-purple'}">${direction}</span>`;};const sp=t=>{const{strategy}=parseStrategy(t.strategy_type);const m={EMA:'p-blue',ORB:'p-yellow',OB:'p-purple',Momentum:'p-green',TRB:'p-yellow',VWAP:'p-teal',PDHL:'p-orange',NATR:'p-green',ATR:'p-purple'};return`<span class="pill ${m[strategy]||'p-muted'}">${strategy}</span>`;};tbody.innerHTML=trades.slice(0,100).map(t=>`<tr><td>${dp(t)}</td><td>${sp(t)}</td><td class="bold mono">${t.option_symbol||'—'}</td><td class="mono">${fmt(t.entry_price)}</td><td class="mono">${fmt(t.exit_price)}</td><td class="red mono">${fmt(t.current_stop)}</td><td class="green mono">${fmt(t.target_reference)}</td><td>${t.quantity||'—'}</td><td>${t.realized_pnl!=null?colorPnl(t.realized_pnl):'—'}</td><td>${statusPill(t.status)}</td><td style="font-size:9px;color:var(--muted)">${fmtTime(t.entry_time)}</td><td style="font-size:9px;color:var(--muted)">${fmtTime(t.exit_time)}</td></tr>`).join('');}
+function renderTrades(trades){const tbody=document.getElementById('trades-tbody');if(!trades||!trades.length){tbody.innerHTML='<tr><td colspan="12" class="muted">No trades yet.</td></tr>';_resetTradeKpis();return;}const closed=trades.filter(t=>t.status==='CLOSED');const totalPnl=closed.reduce((s,t)=>s+(parseFloat(t.realized_pnl)||0),0);const w=closed.filter(t=>parseFloat(t.realized_pnl)>0).length,l=closed.filter(t=>parseFloat(t.realized_pnl)<0).length,be=closed.filter(t=>parseFloat(t.realized_pnl)===0).length;const wr=closed.length>0?((w/closed.length)*100).toFixed(0):0;document.getElementById('kpi-realised').innerHTML=colorPnl(totalPnl);document.getElementById('kpi-winrate').textContent=`Win ${wr}% · ${closed.length} closed`;document.getElementById('tk-pnl').innerHTML=colorPnl(totalPnl);const ovR=document.getElementById('ov-realised');if(ovR)ovR.innerHTML=colorPnl(totalPnl);const ovWr=document.getElementById('ov-wr');if(ovWr)ovWr.textContent=`${wr}% (${w}W/${l}L)`;distChart.data.datasets[0].data=[w,l,be];distChart.update('none');let cum=0;const pL=[],pD=[];[...closed].reverse().forEach(t=>{if(t.exit_time){cum+=parseFloat(t.realized_pnl)||0;pL.push(fmtTime(t.exit_time));pD.push(parseFloat(cum.toFixed(2)));}});pnlChart.data.labels=pL;pnlChart.data.datasets[0].data=pD;pnlChart.data.datasets[0].borderColor=totalPnl>=0?'#22c55e':'#ef4444';pnlChart.data.datasets[0].backgroundColor=totalPnl>=0?'rgba(34,197,94,.08)':'rgba(239,68,68,.08)';pnlChart.update('none');const dp=t=>{const{direction}=parseStrategy(t.strategy_type);return`<span class="pill ${direction==='CE'?'p-blue':'p-purple'}">${direction}</span>`;};const sp=t=>{const{strategy}=parseStrategy(t.strategy_type);const m={EMA:'p-blue',ORB:'p-yellow',OB:'p-purple',Momentum:'p-green',TRB:'p-yellow',VWAP:'p-teal',PDHL:'p-orange',NATR:'p-green',ATR:'p-purple'};return`<span class="pill ${m[strategy]||'p-muted'}">${strategy}</span>`;};tbody.innerHTML=trades.slice(0,100).map(t=>`<tr><td>${dp(t)}</td><td>${sp(t)}</td><td class="bold mono">${t.option_symbol||'—'}</td><td class="mono">${fmt(t.entry_price)}</td><td class="mono">${fmt(t.exit_price)}</td><td class="red mono">${fmt(t.current_stop)}</td><td class="green mono">${fmt(t.target_reference)}</td><td>${t.quantity||'—'}</td><td>${t.realized_pnl!=null?colorPnl(t.realized_pnl):'—'}</td><td>${statusPill(t.status)}</td><td style="font-size:9px;color:var(--muted)">${fmtTime(t.entry_time)}</td><td style="font-size:9px;color:var(--muted)">${fmtTime(t.exit_time)}</td></tr>`).join('');}
 function renderOrders(orders){const tbody=document.getElementById('orders-tbody');if(!orders||!orders.length){tbody.innerHTML='<tr><td colspan="5" class="muted">No orders yet.</td></tr>';return;}const ac={ENTRY:'p-green',EXIT:'p-red',SL_PLACE:'p-yellow',SL_MODIFY:'p-yellow',CANCEL:'p-muted'};tbody.innerHTML=orders.slice(0,150).map(o=>`<tr><td style="font-size:9px;color:var(--muted)">${o.trade_id||'—'}</td><td><span class="pill ${ac[o.action_type]||'p-muted'}">${o.action_type}</span></td><td style="font-size:9px">${o.broker_order_id||'—'}</td><td>${statusPill(o.status)}</td><td style="font-size:9px;color:var(--muted)">${fmtDate(o.created_at)}</td></tr>`).join('');}
 
 // ── LTP ─────────────────────────────────────────────────────
@@ -2166,7 +2261,7 @@ const _ZLogo=_KiteBtn;
 /* ── typewriter cycling for login heading ── */
 (function(){const words=['Scans','Signals','Executes','Trails','Protects'];let i=0;const el=document.getElementById('tw-word');if(!el)return;setInterval(()=>{el.style.opacity='0';el.style.transform='translateY(-6px)';setTimeout(()=>{i=(i+1)%words.length;el.textContent=words[i];el.style.transition='none';el.style.opacity='0';el.style.transform='translateY(8px)';requestAnimationFrame(()=>{requestAnimationFrame(()=>{el.style.transition='opacity .35s,transform .35s';el.style.opacity='1';el.style.transform='translateY(0)';});});},300);},1800);el.style.transition='opacity .35s,transform .35s';})();
 /* ── dynamic browser-tab title ── */
-function updateTabTitle(status,pnl){document.title='Surya Arjun · SENSEX Algo';}
+function updateTabTitle(status,pnl){document.title='Surya Arjun · '+_idx+' Algo';}
 async function doOAuthLogin(){const e=document.getElementById('login-error'),b=document.getElementById('login-btn');e.style.display='none';b.disabled=true;b.innerHTML='⏳ Loading…';try{const d=await fetch('/api/auth/login-url').then(r=>r.json());if(!d.ok){showLoginErr(d.error||'Could not get login URL.');b.disabled=false;b.innerHTML=_ZLogo;return;}window.location.href=d.login_url;}catch(err){showLoginErr('Cannot reach server.');b.disabled=false;b.innerHTML=_ZLogo;}}
 function showLoginErr(msg){const e=document.getElementById('login-error');if(e){e.textContent=msg;e.style.display='block';}}
 async function submitSessId(){const raw=(document.getElementById('login-sessid-input').value||'').trim();const e=document.getElementById('login-error');e.style.display='none';if(!raw){e.textContent='Paste sess_id first.';e.style.display='block';return;}let sid=raw;if(raw.includes('sess_id=')){const m=raw.match(/sess_id=([^&]+)/);if(m)sid=m[1];}const kc={};document.cookie.split(';').forEach(c=>{const[k,v]=c.trim().split('=');if(k&&(k.startsWith('kf_')||k==='kite_id'))kc[k]=v||'';});const btn=document.getElementById('login-sessid-input').nextElementSibling,orig=btn.textContent;btn.disabled=true;btn.textContent='⏳';try{const d=await fetch('/api/auth/finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sess_id:sid,kite_cookies:kc})}).then(r=>r.json());if(!d.ok){e.textContent=d.error||'Failed.';e.style.display='block';btn.disabled=false;btn.textContent=orig;return;}if(d.profile)setPfUI(d.profile);hideLoginOverlay();poll();}catch(err){e.textContent='Network error: '+err;e.style.display='block';btn.disabled=false;btn.textContent=orig;}}
@@ -2209,8 +2304,8 @@ function detectProfile(env){
 }
 
 // ── Polling ─────────────────────────────────────────────────
-async function pollLtp(){try{const d=await fetch('/api/ltp').then(r=>r.json());renderLtp(d);}catch(e){}}
-async function poll(){try{const[status,trades,orders,cs]=await Promise.all([fetch('/api/status').then(r=>r.json()),fetch('/api/trades').then(r=>r.json()),fetch('/api/orders').then(r=>r.json()),fetch('/api/candles').then(r=>r.json())]);renderStatus(status);renderTrades(trades);renderOrders(orders);updateCandleChart(cs);if(cs)renderLtp(cs);}catch(e){console.error('Poll:',e);}}
+async function pollLtp(){const my=_idx;try{const d=await fetch('/api/ltp').then(r=>r.json());if(my!==_idx)return;renderLtp(d);}catch(e){}}
+async function poll(){const my=_idx;try{const[status,trades,orders,cs]=await Promise.all([fetch('/api/status').then(r=>r.json()),fetch('/api/trades').then(r=>r.json()),fetch('/api/orders').then(r=>r.json()),fetch('/api/candles').then(r=>r.json())]);if(my!==_idx)return;renderStatus(status);renderTrades(trades);renderOrders(orders);updateCandleChart(cs);if(cs)renderLtp(cs);}catch(e){console.error('Poll:',e);}}
 // Fetch env once on page load so calcSignalConds can read strategy flags immediately
 // without waiting for the user to open the Settings tab (which creates cfg- elements).
 async function _loadEnvCache(){try{_envCache=await fetch('/api/env').then(r=>r.json());_applySignalSectionVisibility();}catch(e){}}
@@ -2332,13 +2427,162 @@ function _renderFvg(d){
     _applySignalSectionVisibility();
   }
 }
-async function pollFvg(){try{const d=await fetch('/api/fvg').then(r=>r.json());_renderFvg(d);}catch(e){}}
+async function pollFvg(){const my=_idx;try{const d=await fetch('/api/fvg').then(r=>r.json());if(my!==_idx)return;_renderFvg(d);}catch(e){}}
 
 _loadEnvCache();
 pollLtp();setInterval(pollLtp,1000);
 pollOptLtp();setInterval(pollOptLtp,2000);
 poll();setInterval(poll,3000);
 pollFvg();setInterval(pollFvg,60000);
+
+// ── Index nav: switching + live summary ─────────────────────
+function _resetTradeKpis(){
+  ['kpi-realised','tk-pnl'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent='—';});
+  const w=document.getElementById('kpi-winrate');if(w)w.textContent='—';
+  const r=document.getElementById('ov-realised');if(r)r.textContent='—';
+  const o=document.getElementById('ov-wr');if(o)o.textContent='—';
+  try{distChart.data.datasets[0].data=[0,0,0];distChart.update('none');}catch(e){}
+  try{pnlChart.data.labels=[];pnlChart.data.datasets[0].data=[];pnlChart.update('none');}catch(e){}
+}
+
+function _setIdxLabels(){
+  const set=(id,t)=>{const e=document.getElementById(id);if(e)e.textContent=t;};
+  set('tk-idx-name',_idx);set('sb-idx-name',_idx);set('kpi-idx-lbl',_idx);
+  document.title='Surya Arjun · '+_idx+' Algo';
+  _INDICES.forEach(i=>{const b=document.getElementById('nav-'+i);if(b)b.classList.toggle('active',i===_idx);});
+}
+
+function switchIndex(idx){
+  if(!_INDICES.includes(idx)||idx===_idx)return;
+  _idx=idx;_idxStored=true;
+  try{localStorage.setItem('dash_idx',idx);}catch(e){}
+  _setIdxLabels();
+
+  // 1. Drop every cached value that belongs to the previous index
+  _lastBotState=null;_signalMarkersCache=[];_lastSignalCount=0;
+  _prevLtp=null;_lastGoodLtp=null;_optLtp=null;clearLog();
+  _sidebarCache.vwap=null;_sidebarCache.pdh=null;_sidebarCache.pdl=null;_sidebarCache.pl=null;
+  _chartOverlayState={vwap:null,ub:null,lb:null,sl:null,t1:null,t2:null,entry:null,dir:null};
+
+  // 2. Blank the panels so nothing from the old index stays on screen
+  ['sb-ltp','kpi-ltp','chart-ltp','tk-sensex','sb-vwap','sb-pdh','sb-pdl','sb-orb-high','sb-orb-low','sb-atr',
+   'sb-r3','sb-r2','sb-r1','sb-pivot','sb-s1','sb-s2','sb-s3','sb-cpr-tc','sb-cpr-bc','sb-cpr-width','sb-cpr-tag','sb-fvg-bias',
+   'sb-mr-label','sb-mr-er','sb-mr-adx','sb-mr-vol','kpi-ltp-time'
+  ].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent='—';});
+  const chg=document.getElementById('sb-ltp-chg');if(chg){chg.textContent='—';chg.style.color='';}
+  const sl=document.getElementById('sb-ltp');if(sl)sl.style.color='var(--text)';
+  ['sb-fvg-bull','sb-fvg-bear'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent='—';});
+  ['sb-pivot-section','sb-pivot-rows','sb-pivot-divider','sb-fvg-section','sb-fvg-rows','sb-fvg-divider']
+    .forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
+  const cc=document.getElementById('candle-count');if(cc)cc.textContent='';
+  const pl=document.getElementById('pivot-filter-section');if(pl)pl.style.display='none';
+  renderActiveTrade(null);_resetTradeKpis();
+  document.getElementById('trades-tbody').innerHTML='<tr><td colspan="12" class="muted">Loading…</td></tr>';
+  document.getElementById('orders-tbody').innerHTML='<tr><td colspan="5" class="muted">Loading…</td></tr>';
+  _showFeedBanner(false);
+
+  // 3. Rebuild the chart for the new index and reload everything
+  _userZoomed=false;
+  _initLwChart();
+  requestAnimationFrame(()=>requestAnimationFrame(()=>_fetchAndRender()));
+  _applySignalSectionVisibility();
+  pollLtp();poll();pollFvg();pollOptLtp();
+  pollNav();
+}
+
+async function pollNav(){
+  try{
+    const rows=await fetch('/api/instruments').then(r=>r.json());
+    if(!Array.isArray(rows))return;
+    // First visit (nothing remembered): open on the first index the bot is running.
+    if(!_idxStored){
+      _idxStored=true;
+      const first=rows.find(r=>r.enabled);
+      if(first&&first.underlying!==_idx){switchIndex(first.underlying);return;}
+    }
+    rows.forEach(r=>{
+      const i=r.underlying,btn=document.getElementById('nav-'+i);if(!btn)return;
+      btn.classList.toggle('off',!r.enabled);
+      const dot=document.getElementById('nav-dot-'+i),ltp=document.getElementById('nav-ltp-'+i),tag=document.getElementById('nav-tag-'+i);
+      const fresh=r.has_state&&r.age_sec!=null&&r.age_sec<120&&r.ltp;
+      dot.className='idxnav-dot'+(fresh?' live':(r.has_state?' stale':''));
+      ltp.textContent=r.ltp?Number(r.ltp).toLocaleString('en-IN',{maximumFractionDigits:2}):'—';
+      if(r.open_trades>0){tag.textContent='● POSITION';tag.className='idxnav-tag pos';}
+      else if(!r.enabled){tag.textContent='NOT ACTIVE';tag.className='idxnav-tag';}
+      else{tag.textContent=r.bot_state||'';tag.className='idxnav-tag';}
+    });
+  }catch(e){}
+}
+_setIdxLabels();
+pollNav();setInterval(pollNav,3000);
+
+// ── Live Positions board (all indices at once) ──────────────
+// /api/positions/open is NOT index-filtered, so every open trade is shown
+// side by side regardless of which left-nav index is selected.
+function _lpCard(t){
+  const entry=parseFloat(t.entry_price)||0,qty=parseInt(t.quantity)||0,sl=parseFloat(t.current_stop)||0;
+  const target=parseFloat(t.target_reference)||0,high=parseFloat(t.highest_ltp)||entry;
+  const live=t.option_ltp!=null;
+  const ltp=live?parseFloat(t.option_ltp):entry;
+  const pnl=(ltp-entry)*qty,pct=entry>0?((ltp-entry)/entry)*100:0;
+  const cls=!live?'':(pnl>0?'up':pnl<0?'down':'');
+  const {direction}=parseStrategy(t.strategy_type);
+  const dm={CE:'p-blue',PE:'p-purple'};
+  const lo=Math.min(sl,entry),hi=Math.max(target,high,ltp);
+  const span=hi-lo,pos=v=>span>0?Math.max(0,Math.min(100,((v-lo)/span)*100)):0;
+  const fillPct=pos(ltp),entryPct=pos(entry);
+  const fillCol=ltp>=entry?'var(--green)':'var(--red)';
+  let age='';
+  if(t.state_updated_at){const s=(Date.now()-new Date(t.state_updated_at).getTime())/1000;age=isNaN(s)?'':`feed ${s<0?0:Math.round(s)}s ago`;}
+  const bePill=t.break_even_activated?'<span class="pill p-green">BE ON</span>':'';
+  const trail=t.trail_steps_completed?`<span class="pill p-blue">TSL×${t.trail_steps_completed}</span>`:'';
+  return`<div class="lp-card ${cls}" data-id="${esc(t.trade_id)}">
+    <div class="lp-hd">
+      <span class="lp-idx">${esc(t.underlying)}</span>
+      <span class="lp-sym">${esc(t.option_symbol||'—')}</span>
+      <span class="pill ${dm[direction]||'p-muted'}">${esc(direction)}</span>
+      ${bePill}${trail}
+      <span style="margin-left:auto" class="pill p-muted">${esc(t.trade_mode||'')}</span>
+    </div>
+    <div class="lp-pnl">
+      <span class="big ${live?(pnl>0?'green':pnl<0?'red':'muted'):'muted'}">${live?(pnl>=0?'+':'')+pnl.toFixed(2):'—'}</span>
+      <span class="pct ${pct>0?'green':pct<0?'red':'muted'}">${live?(pct>=0?'+':'')+pct.toFixed(2)+'%':'waiting for quote…'}</span>
+    </div>
+    <div class="lp-track">
+      <div class="lp-fill" style="width:${fillPct}%;background:${fillCol}"></div>
+      <div class="lp-mark" style="left:${entryPct}%" title="Entry"></div>
+    </div>
+    <div class="lp-foot"><span class="red">SL ${fmt(sl)}</span><span>Entry ${fmt(entry)}</span><span class="green">T ${target?fmt(target):'—'}</span></div>
+    <div class="lp-grid2">
+      <div class="td-field"><div class="lbl">Option LTP</div><div class="val">${live?fmt(ltp):'—'}</div></div>
+      <div class="td-field"><div class="lbl">Highest</div><div class="val" style="color:var(--accent)">${fmt(high)}</div></div>
+      <div class="td-field"><div class="lbl">Qty</div><div class="val">${qty}</div></div>
+      <div class="td-field"><div class="lbl">${esc(t.underlying)} Spot</div><div class="val">${fmt(t.spot_ltp)}</div></div>
+      <div class="td-field"><div class="lbl">To SL</div><div class="val red">${live?(ltp-sl).toFixed(1):'—'}</div></div>
+      <div class="td-field"><div class="lbl">To Target</div><div class="val green">${live&&target?(target-ltp).toFixed(1):'—'}</div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+      <span class="lp-age">Entered ${fmtTime(t.entry_time)} · ${esc(age)}</span>
+      <button class="btn" onclick="switchIndex('${esc(t.underlying)}');showTab('overview',document.querySelector('#tabbar .tab'))">View chart ›</button>
+    </div>
+  </div>`;
+}
+async function pollLivePos(){
+  try{
+    const rows=await fetch('/api/positions/open').then(r=>r.json());
+    const list=Array.isArray(rows)?rows:[];
+    document.getElementById('lp-badge').textContent=list.length;
+    document.getElementById('lp-badge').className='pill '+(list.length?'p-green':'p-muted');
+    document.getElementById('lp-count').textContent=list.length;
+    document.getElementById('lp-empty').style.display=list.length?'none':'';
+    let tot=0,any=false;
+    list.forEach(t=>{if(t.option_ltp!=null){any=true;tot+=(parseFloat(t.option_ltp)-parseFloat(t.entry_price))*(parseInt(t.quantity)||0);}});
+    document.getElementById('lp-total').innerHTML=any?colorPnl(tot):'—';
+    document.getElementById('lp-updated').textContent='updated '+new Date().toLocaleTimeString('en-IN',{hour12:false});
+    document.getElementById('lp-grid').innerHTML=list.map(_lpCard).join('');
+  }catch(e){}
+}
+pollLivePos();setInterval(pollLivePos,2000);
 
 // ── Strategies panel ─────────────────────────────────────────
 const ST_KEYS=['ENABLE_EMA_STRATEGY','ENABLE_ORB_STRATEGY','ENABLE_TRB_STRATEGY','ENABLE_OB_STRATEGY','ENABLE_MOMENTUM_PHASE','ENABLE_VWAP_STRATEGY','ENABLE_CE_VWAP','ENABLE_PE_VWAP','ENABLE_PDHL_STRATEGY','ENABLE_NATR_STRATEGY','ENABLE_ATR_COPILOT_STRATEGY','ENABLE_PIVOT_STRATEGY','ENABLE_EXPIRY_FLY'];

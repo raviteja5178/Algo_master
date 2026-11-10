@@ -485,8 +485,8 @@ class TestMomentumGuards:
         import strategies.signal_engine as se
         monkeypatch.setattr(se, "_mom_trades_today", {})
         monkeypatch.setattr(se, "_mom_counter_seeded", {"D"})   # skip DB seed
-        monkeypatch.setattr(se, "_mom_cooldown_left", 0)
-        monkeypatch.setattr(se, "_mom_cooldown_side", None)
+        monkeypatch.setattr(se, "_mom_cooldown_left", {})
+        monkeypatch.setattr(se, "_mom_cooldown_side", {})
         monkeypatch.setattr(se.settings, "MOMENTUM_MAX_TRADES_PER_DAY", 1)
         monkeypatch.setattr(se.settings, "MOMENTUM_REENTRY_COOLDOWN_CANDLES", 6)
         self.se = se

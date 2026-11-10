@@ -1033,6 +1033,25 @@ class TestSwingPivotBreakout:
         assert setup.stop == pytest.approx(setup.entry - 1.5 * setup.atr, abs=1.0)
         assert setup.risk == pytest.approx(1.5 * setup.atr, abs=1.0)
 
+    def test_swing_pivot_max_risk_pts_skips_wide_risk(self):
+        # Same candles as the cap test: capped risk is ~1.5 x ATR (~30 pts).
+        highs  = [1010, 1020, 1030, 1040, 1050, 1035, 1030, 1045, 1055]
+        lows   = [900,  910,  915,  925,  1030, 1020, 1010, 1025, 1040]
+        closes = [1008, 1018, 1028, 1038, 1045, 1025, 1015, 1042, 1052]
+        candles = self._create_candles(highs, lows, closes)
+        kw = dict(
+            enable_swing_pivot=True, swing_pivot_left=4, swing_pivot_right=2,
+            swing_pivot_trend_ema=0, swing_pivot_max_sl_atr=1.5, pivot_mode="NONE",
+        )
+        base = find_pivot_setup(candles, PV, **kw)
+        assert base is not None and base.mode == "SWING_PIVOT"
+
+        # ceiling below the setup's risk -> signal skipped
+        assert find_pivot_setup(candles, PV, swing_pivot_max_risk_pts=base.risk - 1, **kw) is None
+        # ceiling above the risk, and 0 (off) -> unchanged
+        assert find_pivot_setup(candles, PV, swing_pivot_max_risk_pts=base.risk + 1, **kw) == base
+        assert find_pivot_setup(candles, PV, swing_pivot_max_risk_pts=0.0, **kw) == base
+
     def test_swing_pivot_trend_filter(self):
         # CE Breakout, but close is below 50 EMA -> should be blocked
         highs  = [1010, 1020, 1030, 1040, 1050, 1035, 1030, 1045, 1055]

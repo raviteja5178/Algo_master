@@ -26,7 +26,7 @@ from kiteconnect import KiteTicker  # type: ignore
 
 from broker.kite_client import get_kite
 from config import settings
-from market.historical_data import SENSEX_TOKEN
+from market.historical_data import SENSEX_TOKEN, INDEX_TOKENS
 from utils.logging_config import log_event
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ _MARKET_CLOSE = (15, 30)
 
 # Tokens that require MODE_FULL because they are non-tradable index tokens.
 # All other tokens use MODE_LTP (smaller packet, lower bandwidth).
-_INDEX_TOKENS: set[int] = {SENSEX_TOKEN}
+_INDEX_TOKENS: set[int] = set(INDEX_TOKENS.values())
 
 
 class WebSocketClient:
@@ -66,6 +66,10 @@ class WebSocketClient:
         self._stale_callbacks: list[Callable[[], None]] = []
         self._last_tick_time: float = 0.0         # updated by ANY token (SENSEX or option)
         self._last_option_tick_time: float = 0.0  # updated ONLY by option tokens
+        # Updated ONLY when a real option tick arrives (or a token is subscribed).
+        # Unlike _last_option_tick_time it is never reset by reconnect/close
+        # bookkeeping, so it keeps growing while the option feed is truly dead.
+        self._last_real_option_tick: float = 0.0
         self._stale_exhausted: bool = False        # True once all reconnect attempts used up
         self._stale_thread: threading.Thread | None = None
         self._running = False
@@ -95,6 +99,13 @@ class WebSocketClient:
     # ── Properties ─────────────────────────────────────────────────────────────
 
     @property
+    def option_feed_age(self) -> float:
+        """Seconds since a real option tick arrived (0.0 when no option token is subscribed)."""
+        if not self._option_tokens:
+            return 0.0
+        return time.monotonic() - self._last_real_option_tick
+
+    @property
     def option_feed_ok(self) -> bool:
         """Return True if option ticks have arrived recently (within 2× STALE_TIMEOUT_SECONDS).
 
@@ -103,13 +114,15 @@ class WebSocketClient:
         """
         if not self._option_tokens:
             return True
-        return time.monotonic() - self._last_option_tick_time < STALE_TIMEOUT_SECONDS * 2
+        # Real-tick clock: reconnect/close bookkeeping must not make a dead feed look healthy.
+        return time.monotonic() - self._last_real_option_tick < STALE_TIMEOUT_SECONDS * 2
 
     def add_token(self, token: int) -> None:
         self._tokens.add(token)
         if token not in _INDEX_TOKENS:
             self._option_tokens.add(token)
             self._last_option_tick_time = time.monotonic()
+            self._last_real_option_tick = time.monotonic()
         self._last_tick_time = time.monotonic()
         if self._ticker and self._running:
             # Guard against calling subscribe() before the WebSocket handshake
@@ -202,37 +215,45 @@ class WebSocketClient:
         """
         Force the existing KiteTicker to drop and re-establish its connection.
 
-        A new KiteTicker instance must NOT be created here because KiteTicker uses
-        Twisted internally and Twisted's reactor can only be started once per
-        process.  Creating a new instance and calling connect(threaded=True) a
-        second time raises ReactorNotRestartable.
+        A new KiteTicker instance must NOT be created here: its Twisted reactor
+        can only be started once per process.  The running reactor is reused.
 
-        If the ticker is currently connected, close() drops the connection and
-        KiteTicker's built-in reconnect loop re-runs _on_connect automatically.
+        KiteTicker.close() calls stop_retry() -> factory.stopTrying(), which
+        permanently disables KiteTicker's own auto-reconnect.  Using it here
+        left the feed dead for the rest of the session after the first stale
+        event, so it must NOT be used to force a reconnect:
 
-        If the ticker is NOT connected (e.g. initial auth failure), calling
-        close() is still safe — it will re-attempt the connection from scratch,
-        which is exactly what we need when the token was stale at startup.
+        * connected    -> drop the socket with the low-level _close() (no
+                          stop_retry); the factory's clientConnectionLost()
+                          then re-dials and _on_connect re-subscribes.
+        * not connected-> the factory may have given up (stopTrying) or be
+                          mid-retry.  Stop whatever is pending and dial a fresh
+                          connection on the already-running reactor.
         """
         logger.warning("WebSocket stale — forcing reconnect (tokens=%s).", list(self._tokens))
         self._last_tick_time = time.monotonic()
-        self._last_option_tick_time = time.monotonic()
+        self._last_option_tick_time = time.monotonic()   # re-arm stale monitor (real-tick clock untouched)
         try:
-            if self._ticker:
-                if self._ticker.is_connected():
-                    self._ticker.close()   # drop + KiteTicker auto-reconnects
-                else:
-                    # Not connected (e.g. auth failure at startup) — force a fresh
-                    # connect attempt.  close() is still the right call: it resets
-                    # KiteTicker's internal state and triggers the reconnect path.
-                    logger.warning(
-                        "WebSocket ticker not connected — attempting fresh connect "
-                        "(token may have been stale at startup)."
-                    )
-                    self._ticker.close()
-                log_event(logger, "WEBSOCKET_RECONNECTED", tokens=list(self._tokens))
-            else:
+            t = self._ticker
+            if not t:
                 logger.warning("WebSocket reconnect skipped — no ticker instance.")
+                return
+            from twisted.internet import reactor  # type: ignore
+
+            if t.is_connected():
+                reactor.callFromThread(t._close)   # keeps the factory's retry loop alive
+            else:
+                logger.warning(
+                    "WebSocket ticker not connected — dialling a fresh connection."
+                )
+                t.access_token = settings.KITE_ACCESS_TOKEN
+                t.socket_url = (
+                    f"{t.root}?api_key={settings.KITE_API_KEY}"
+                    f"&access_token={settings.KITE_ACCESS_TOKEN}"
+                )
+                t.stop_retry()   # cancel any pending retry so we never double-dial
+                reactor.callFromThread(t.connect, threaded=True)
+            log_event(logger, "WEBSOCKET_RECONNECTED", tokens=list(self._tokens))
         except Exception as exc:
             logger.error("WebSocket reconnect failed: %s", exc)
 
@@ -328,6 +349,7 @@ class WebSocketClient:
             # mask a stale option feed while a position is open.
             if token in self._option_tokens:
                 self._last_option_tick_time = time.monotonic()
+                self._last_real_option_tick = time.monotonic()
             for cb in self._ltp_callbacks:
                 try:
                     cb(token, float(ltp))

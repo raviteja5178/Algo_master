@@ -38,6 +38,7 @@ def _client() -> WebSocketClient:
     client._stale_callbacks: list = []
     client._last_tick_time: float = time.monotonic()
     client._last_option_tick_time: float = time.monotonic()
+    client._last_real_option_tick: float = time.monotonic()
     client._stale_exhausted: bool = False
     client._stale_thread = None
     client._running = False
@@ -49,6 +50,8 @@ def _add_option_token(client: WebSocketClient, token: int = 99999) -> int:
     client._tokens.add(token)
     client._option_tokens.add(token)
     client._last_option_tick_time = time.monotonic()
+    client._last_real_option_tick = time.monotonic()
+
     return token
 
 
@@ -66,38 +69,38 @@ class TestOptionFeedOk:
         """Tick arrived well within the generous 2× window."""
         client = _client()
         _add_option_token(client)
-        client._last_option_tick_time = time.monotonic()
+        client._last_real_option_tick = time.monotonic()
         assert client.option_feed_ok is True
 
     def test_returns_false_when_last_tick_is_old(self):
         """Tick arrived more than 2× STALE_TIMEOUT_SECONDS ago → feed dead."""
         client = _client()
         _add_option_token(client)
-        client._last_option_tick_time = time.monotonic() - (STALE_TIMEOUT_SECONDS * 2 + 1)
+        client._last_real_option_tick = time.monotonic() - (STALE_TIMEOUT_SECONDS * 2 + 1)
         assert client.option_feed_ok is False
 
     def test_boundary_just_inside_window(self):
         """Tick at STALE_TIMEOUT_SECONDS - 1 (well within 2× window) → still OK."""
         client = _client()
         _add_option_token(client)
-        client._last_option_tick_time = time.monotonic() - (STALE_TIMEOUT_SECONDS - 1)
+        client._last_real_option_tick = time.monotonic() - (STALE_TIMEOUT_SECONDS - 1)
         assert client.option_feed_ok is True
 
     def test_boundary_just_outside_window(self):
         """Tick at 2× STALE_TIMEOUT_SECONDS + 1 second → feed dead."""
         client = _client()
         _add_option_token(client)
-        client._last_option_tick_time = time.monotonic() - (STALE_TIMEOUT_SECONDS * 2 + 1)
+        client._last_real_option_tick = time.monotonic() - (STALE_TIMEOUT_SECONDS * 2 + 1)
         assert client.option_feed_ok is False
 
     def test_feed_ok_recovers_after_new_tick(self):
         """After a dead period, a new tick arriving restores option_feed_ok."""
         client = _client()
         _add_option_token(client)
-        client._last_option_tick_time = time.monotonic() - (STALE_TIMEOUT_SECONDS * 2 + 5)
+        client._last_real_option_tick = time.monotonic() - (STALE_TIMEOUT_SECONDS * 2 + 5)
         assert client.option_feed_ok is False  # dead
 
-        client._last_option_tick_time = time.monotonic()
+        client._last_real_option_tick = time.monotonic()
         assert client.option_feed_ok is True   # recovered
 
 
