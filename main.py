@@ -51,9 +51,12 @@ from market.candle_aggregator import CandleAggregator
 from market.candle_builder import Candle
 from market.historical_data import (
     SENSEX_TOKEN,
+    INDEX_TOKENS,
     fetch_historical_candles,
     fetch_daily_trend,
     fetch_previous_day_hl,
+    get_spot_token,
+    get_exchange_symbol,
     PivotLevels,
     compute_pivot_levels,
 )
@@ -64,6 +67,7 @@ from notifications.notifier import notify
 from persistence.trade_store import (
     add_live_order_event,
     claim_entry_slot_atomic,
+    claim_signal_atomic,
     fetch_active_trade,
     fetch_today_realised_pnl,
     has_action,
@@ -79,10 +83,15 @@ from strategies.signal_engine import (
     evaluate_signals, note_ema_result, note_ema_trade, tick_ema_cooldown,
     note_mom_exit, note_mom_trade, tick_mom_cooldown,
     note_side_trade,
+    consume_pivot_setup, pivot_day_cap_reason, publish_pivot_setup, side_block_reason,
+    _is_in_lull_window, _signal_id,
 )
+from strategies.pivot_reversal import PineReversalEngine, PineSignal
+from strategies.pivot_strategy import PivotSetup
 from market.indicators import atr_at, ema as calc_ema, swing_levels
+from utils.exchange_utils import option_exchange, option_quote_key
 from utils.latency import LatencyTracker
-from utils.logging_config import configure_logging, log_event
+from utils.logging_config import configure_logging, log_event, log_underlying
 from utils.price_utils import round_to_tick
 from utils.time_utils import IST, is_after_or_equal, market_open, now_ist, parse_time_ist
 
@@ -110,7 +119,16 @@ def _build_broker():
 # ── Global bot state ──────────────────────────────────────────────────────────
 
 class BotContext:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        underlying: str | None = None,
+        ws: WebSocketClient | None = None,
+        paper_feed: PaperFeed | None = None,
+    ) -> None:
+        self.underlying: str = settings.normalize_index_name(underlying or settings.UNDERLYING)
+        self.spot_token: int = get_spot_token(self.underlying)
+        self.exchange_symbol: str = get_exchange_symbol(self.underlying)
+
         self.sm = StateMachine()
         self.broker = _build_broker()
         self.safety = SafetyManager(self.sm)
@@ -120,7 +138,7 @@ class BotContext:
         self.trade_id: str | None = None
         self.tradingsymbol: str | None = None
         self.instrument_token: int | None = None
-        self.quantity: int = settings.QUANTITY
+        self.quantity: int = settings.get_quantity(self.underlying, settings.NUM_LOTS)
         self.entry_price: float = 0.0
         # Last option premium seen by on_option_ltp (0 when flat)
         self.last_option_ltp: float = 0.0
@@ -131,9 +149,11 @@ class BotContext:
         self.strategy_type: str | None = None
         # Pivot strategy owns its own SL/BE/TSL/target engine (None for other strategies)
         self.pivot_mgr: PivotTradeManager | None = None
+        # Pine "Pivot Reversal" engine (PIVOT_PINE_MODE) — None when disabled
+        self.pine: PineReversalEngine | None = None
 
-        # Last known SENSEX spot LTP (updated by every tick)
-        self.sensex_ltp: float = 0.0
+        # Last known spot index LTP (updated by every tick)
+        self.spot_ltp: float = 0.0
 
         # WebSocket order postback delivery.
         # order_id -> dict payload (set by _on_order_update, consumed by _wait_for_fill)
@@ -162,10 +182,10 @@ class BotContext:
         self.pivot_levels: PivotLevels | None = None
 
         # WebSocket (LIVE/SHADOW) or paper feed (PAPER)
-        self.ws = WebSocketClient() if settings.TRADING_MODE != "PAPER" else None
+        self.ws = ws if ws is not None else (WebSocketClient() if settings.TRADING_MODE != "PAPER" else None)
         # Research-only order-flow tick recorder (ENABLE_ORDERFLOW_RECORDER); never read by trading logic
         self.orderflow_recorder = None
-        self.paper_feed = PaperFeed()  # Always initialize PaperFeed for SENSEX REST polling fallback.
+        self.paper_feed = paper_feed if paper_feed is not None else PaperFeed()  # REST polling fallback
 
         # ORB session qualifier state — set when an ORB signal is accepted today
         self.orb_fired_today: bool = False
@@ -250,6 +270,16 @@ class BotContext:
         # Refreshed on every closed 5m candle; observational only (dashboard +
         # trades.smart_entry_flags) — never read by entry/exit logic.
         self.intraday_regime: dict | None = None
+
+    @property
+    def sensex_ltp(self) -> float:
+        """Alias for spot_ltp (backward compatibility)."""
+        return self.spot_ltp
+
+    @sensex_ltp.setter
+    def sensex_ltp(self, val: float) -> None:
+        self.spot_ltp = val
+
 
     def can_create_entry(self, signal_type: str = "") -> bool:
         # EMA-specific no-new-entry cutoff (overrides global when set)
@@ -415,7 +445,8 @@ def _ema_option_block_reason(instrument: dict, option_ltp: float | None) -> str 
 
     if settings.EMA_MAX_SLIPPAGE_PCT > 0:
         try:
-            q = _gk().quote([f"BFO:{symbol}"])[f"BFO:{symbol}"]
+            _qk = option_quote_key(symbol)
+            q = _gk().quote([_qk])[_qk]
             asks = [d.get("price", 0) for d in (q.get("depth", {}).get("sell") or []) if d.get("price", 0) > 0]
             if asks:
                 slip_pct = (asks[0] - option_ltp) / option_ltp * 100
@@ -611,26 +642,26 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     if not ctx.can_create_entry(signal_type=signal_type):
         logger.warning("Entry blocked [%s]: %s.", signal_type, ctx.entry_block_reason())
         return
+    _target_underlying = getattr(ctx, "underlying", settings.UNDERLYING)
     # Apply EMA-specific quantity override
     _is_ema_signal = signal_type in ("CE", "PE")
     if _is_ema_signal and settings.EMA_QUANTITY > 0:
         ctx.quantity = settings.EMA_QUANTITY
     else:
-        ctx.quantity = settings.QUANTITY
+        ctx.quantity = settings.get_quantity(_target_underlying, settings.NUM_LOTS)
 
-    action_id = f"{signal_type}_ENTRY_{now_ist().strftime('%Y-%m-%d_%H-%M')}"
+    action_id = f"{_target_underlying}_{signal_type}_ENTRY_{now_ist().strftime('%Y-%m-%d_%H-%M')}"
     if has_action(action_id):
         logger.info("Entry action %s already recorded — skipping duplicate.", action_id)
         return
 
-    # Second-line defence against duplicate orders from concurrent bot processes:
-    # the state machine above is in-memory and cannot protect across processes.
-    # A DB check here catches the case where another process already opened a
-    # trade (wrote it to DB) since the state-machine check above passed.
-    if fetch_active_trade() is not None:
+    # Second-line defence against duplicate orders:
+    # A DB check here catches the case where another process or thread already opened a
+    # trade (wrote it to DB) for this underlying.
+    if fetch_active_trade(_target_underlying) is not None:
         logger.warning(
-            "Entry blocked [%s]: an OPEN trade already exists in DB "
-            "(concurrent process guard).", signal_type,
+            "Entry blocked [%s for %s]: an OPEN trade already exists in DB.",
+            signal_type, _target_underlying,
         )
         return
 
@@ -640,7 +671,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     # trade_id is not yet assigned; use a provisional key with the signal type
     # and timestamp so the report is identifiable even if the entry fails.
     ctx.latency = LatencyTracker(
-        trade_id=f"{signal_type}_{now_ist().strftime('%Y%m%d_%H%M%S')}"
+        trade_id=f"{ctx.underlying}_{signal_type}_{now_ist().strftime('%Y%m%d_%H%M%S')}"
     )
     # Back-fill CANDLE_COMPLETED using the timestamp recorded by the candle handler
     # The monotonic reading must come from the same instant as the wall-clock
@@ -659,13 +690,8 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
 
     # ── Option selection with ITM fallback ────────────────────────────────────
     # Get ordered candidates: [ATM, one-step ITM, two-step ITM].
-    # We iterate through them, fetching the LTP for each, and use the first
-    # whose premium is at or above the minimum floor.  This prevents the OTM
-    # problem where the nearest-ATM strike is priced below the minimum (e.g.
-    # 72800PE @ ₹262 when SENSEX=72788) while the next ITM strike (72900PE)
-    # would clear the floor.
     try:
-        _candidates = select_atm_candidates(sensex_ltp, option_type)  # type: ignore[arg-type]
+        _candidates = select_atm_candidates(sensex_ltp, option_type, underlying=ctx.underlying)  # type: ignore[arg-type]
     except Exception as exc:
         logger.error("ATM selection failed: %s", exc)
         ctx.sm.transition(State.IDLE, reason="ATM selection failed")
@@ -688,16 +714,17 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
             if _sltp <= 0:
                 try:
                     from broker.kite_client import get_kite
-                    _q = get_kite().quote(["BSE:SENSEX"])
-                    _sltp = float(_q["BSE:SENSEX"]["last_price"])
-                    logger.info("PAPER ltp_hint: resolved SENSEX LTP %.2f via REST fallback.", _sltp)
+                    _ex_sym = get_exchange_symbol(ctx.underlying)
+                    _q = get_kite().quote([_ex_sym])
+                    _sltp = float(_q[_ex_sym]["last_price"])
+                    logger.info("PAPER ltp_hint: resolved %s LTP %.2f via REST fallback.", settings.UNDERLYING, _sltp)
                 except Exception as _exc:
                     logger.warning("PAPER ltp_hint: REST fallback failed (%s) — ltp_hint=None.", _exc)
                     _sltp = 0.0
             _ltp: float | None = _sltp if _sltp > 0 else None
         else:
             # SHADOW / LIVE: fetch the real option LTP from Zerodha REST.
-            _quote_key = f"BFO:{_sym}"
+            _quote_key = option_quote_key(_sym)
             _ltp = None
             for _attempt in range(2):
                 try:
@@ -903,7 +930,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     if settings.MAX_RISK_RUPEES_PER_TRADE > 0 and _ema_plan is None:
         if _is_pivot_signal:
             from strategies import signal_engine as _se_peek
-            _pv_peek = _se_peek.peek_pivot_setup()
+            _pv_peek = _se_peek.peek_pivot_setup(ctx.underlying)
             # Real option delta in every mode (PAPER prices the index itself,
             # but the rupee loss being capped is an option loss).
             _risk_pts = _pv_peek.risk * settings.PIVOT_OPTION_DELTA if _pv_peek is not None else None
@@ -1011,8 +1038,9 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
             if settings.TRADING_MODE == "SHADOW":
                 try:
                     from broker.kite_client import get_kite as _gk2
-                    _qf = _gk2().quote([f"BFO:{ctx.tradingsymbol}"])
-                    _fallback_price = float(_qf[f"BFO:{ctx.tradingsymbol}"]["last_price"])
+                    _qfk = option_quote_key(ctx.tradingsymbol)
+                    _qf = _gk2().quote([_qfk])
+                    _fallback_price = float(_qf[_qfk]["last_price"])
                     logger.info(
                         "SHADOW fill fallback: resolved option LTP %.2f for %s via REST.",
                         _fallback_price, ctx.tradingsymbol,
@@ -1029,8 +1057,9 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
                 if _fallback_price <= 0:
                     try:
                         from broker.kite_client import get_kite
-                        _q = get_kite().quote(["BSE:SENSEX"])
-                        _fallback_price = float(_q["BSE:SENSEX"]["last_price"])
+                        _ex_sym = get_exchange_symbol(ctx.underlying)
+                        _q = get_kite().quote([_ex_sym])
+                        _fallback_price = float(_q[_ex_sym]["last_price"])
                     except Exception as _exc:
                         logger.warning("%s fill fallback REST fetch failed: %s", settings.TRADING_MODE, _exc)
             if _fallback_price > 0:
@@ -1078,11 +1107,11 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         ctx.latency.trade_id = ctx.trade_id   # backfill real trade_id now that we have it
     _fill_day = str(now_ist().date())
     _fill_side = "CE" if signal_type.startswith("CE") else "PE"
-    note_side_trade(_fill_side, _fill_day)     # global per-side daily cap counter
+    note_side_trade(_fill_side, _fill_day, ctx.underlying)     # global per-side daily cap counter
     if signal_type in ("CE", "PE"):
-        note_ema_trade(_fill_day)              # EMA cooldown starts only on a real fill
+        note_ema_trade(_fill_day, ctx.underlying)              # EMA cooldown starts only on a real fill
     elif signal_type in ("CE_MOM", "PE_MOM"):
-        note_mom_trade(_fill_day)
+        note_mom_trade(_fill_day, ctx.underlying)
 
     notify("ENTRY_FILLED", symbol=ctx.tradingsymbol, fill=ctx.entry_price, qty=ctx.quantity)
 
@@ -1098,9 +1127,12 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     # FIX (Flaw 15): snapshot last_pivot_setup under the tick lock (already held
     # by the caller) rather than reading the module global twice.  The local
     # variable is immutable (frozen dataclass) so it is safe to use below.
-    _pv_setup = _se.consume_pivot_setup()
+    _pv_setup = _se.consume_pivot_setup(ctx.underlying)
     _is_pivot = signal_type.endswith("_PIVOT") and _pv_setup is not None and _pv_setup.side == _option_type
     if _is_pivot:
+        # Pine reversal trades: index stop = Pine swing stop, trail-only exits
+        # (no BE / T1-T3 locks), broker option stop is a wide disaster backstop.
+        _pine_trade = _pv_setup.mode == "PINE_REVERSAL"
         ctx.pivot_mgr = PivotTradeManager(
             _pv_setup.side, sensex_ltp, _pv_setup.stop,
             _pv_setup.t1, _pv_setup.t2, _pv_setup.t3,
@@ -1113,15 +1145,28 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
             t2_lock_pct=settings.PIVOT_T2_LOCK_PCT,
             trail_atr_mult=settings.PIVOT_TRAIL_ATR_MULT,
             t2_trail_atr_mult=settings.PIVOT_T2_TRAIL_ATR_MULT,
-            hard_sl_cushion=settings.PIVOT_HARD_SL_CUSHION,
+            hard_sl_cushion=(settings.PIVOT_PINE_BACKSTOP_CUSHION if _pine_trade
+                             else settings.PIVOT_HARD_SL_CUSHION),
             max_sl_pct=settings.MAX_SL_PCT,
-            signal_risk=_pv_setup.risk,
+            # Pine: risk measured from the actual fill, so the 1R trail trigger
+            # is real even when the fill is a little past the breakout level.
+            signal_risk=(abs(sensex_ltp - _pv_setup.stop) if _pine_trade else _pv_setup.risk),
+            trail_only=_pine_trade,
+            trail_act_r=settings.PIVOT_PINE_TRAIL_ACT_R,
+            trail_mult=settings.PIVOT_PINE_TRAIL_ATR_MULT,
+            trail_act_atr=settings.PIVOT_PINE_TRAIL_ACT_ATR,
+            be_atr=settings.PIVOT_PINE_BE_ATR,
+            be_buf_atr=settings.PIVOT_PINE_BE_BUF_ATR,
         )
         _pv_delta = ctx.pivot_mgr.delta
         sl_pts     = round(ctx.entry_price - ctx.pivot_mgr.option_stop, 2)
         target_pts = round(abs(_pv_setup.t3 - sensex_ltp) * _pv_delta, 2)
-        be_pts     = round(ctx.pivot_mgr.be_trigger_r * ctx.pivot_mgr.risk * _pv_delta, 2)
-        trail_pts  = round(settings.PIVOT_TRAIL_ATR_MULT * _pv_setup.atr * _pv_delta, 2)
+        if _pine_trade:
+            be_pts    = round(settings.PIVOT_PINE_TRAIL_ACT_R * ctx.pivot_mgr.risk * _pv_delta, 2)
+            trail_pts = round(settings.PIVOT_PINE_TRAIL_ATR_MULT * _pv_setup.atr * _pv_delta, 2)
+        else:
+            be_pts    = round(ctx.pivot_mgr.be_trigger_r * ctx.pivot_mgr.risk * _pv_delta, 2)
+            trail_pts = round(settings.PIVOT_TRAIL_ATR_MULT * _pv_setup.atr * _pv_delta, 2)
         log_event(
             logger, "PIVOT_RISK_APPLIED",
             side=_pv_setup.side, mode=_pv_setup.mode,
@@ -1391,7 +1436,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     # position is open — rejected orders no longer consume today's quota.
     if signal_type and signal_type.endswith("_PIVOT"):
         from strategies import signal_engine as _se_ref
-        _se_ref.note_pivot_trade(str(now_ist().date()))
+        _se_ref.note_pivot_trade(str(now_ist().date()), ctx.underlying)
     logger.info(
         "Position open | %s | entry=%.2f | sl=%.2f | target_ref=%.2f",
         ctx.tradingsymbol, ctx.entry_price, ctx.trailing.current_stop, ctx.target.target_reference,
@@ -1466,6 +1511,136 @@ def _paper_option_price(ctx: BotContext, index_price: float) -> float:
             and ctx.sm.state in (State.POSITION_OPEN, State.EXIT_PENDING)):
         return round(2 * ctx.entry_price - index_price, 2)
     return index_price
+
+
+# ── Pine "Pivot Reversal" engine glue ──────────────────────────────────────────
+
+def _pine_gate_reason(ctx: BotContext, sig: PineSignal, price: float) -> str | None:
+    """Why a Pine signal must NOT be traded right now (None = go).
+
+    The engine has already consumed the swing level / flipped its virtual
+    position, exactly as the Pine chart does; these are execution-side guards.
+    """
+    now_t = now_ist().time()
+    day = str(now_ist().date())
+    if settings.PIVOT_NO_FRIDAY and now_ist().weekday() == 4:
+        return "friday blocked"
+    if settings.PIVOT_NO_NEW_ENTRY_AFTER and is_after_or_equal(
+            now_t, parse_time_ist(settings.PIVOT_NO_NEW_ENTRY_AFTER)):
+        return f"after {settings.PIVOT_NO_NEW_ENTRY_AFTER}"
+    if settings.PIVOT_PINE_SKIP_LULLS and _is_in_lull_window(now_t, settings.PIVOT_LULL_WINDOWS):
+        return "lull window"
+    if (reason := pivot_day_cap_reason(day, ctx.underlying)):
+        return reason
+    if (reason := side_block_reason(sig.side, day, ctx.underlying)):
+        return reason
+    atr = sig.atr
+    if atr > 0:
+        # chase: price already ran away from Pine's fill price (max(open, level)
+        # for CE, min(open, level) for PE - a gap open is the fill, not a chase)
+        chase = (price - sig.entry) if sig.side == "CE" else (sig.entry - price)
+        if settings.PIVOT_PINE_MAX_CHASE_ATR > 0 and chase > settings.PIVOT_PINE_MAX_CHASE_ATR * atr:
+            return f"chased {chase:.0f} pts past level (> {settings.PIVOT_PINE_MAX_CHASE_ATR}xATR)"
+        # a stale swing level far away is not a tradeable stop
+        risk_now = abs(price - sig.stop)
+        if settings.PIVOT_PINE_MAX_RISK_ATR > 0 and risk_now > settings.PIVOT_PINE_MAX_RISK_ATR * atr:
+            return f"stop {risk_now:.0f} pts away (> {settings.PIVOT_PINE_MAX_RISK_ATR}xATR)"
+    return None
+
+
+def _pine_handle_signal(ctx: BotContext, sig: PineSignal, price: float,
+                        candle_completed_ts: str | None = None) -> None:
+    """Act on a Pine signal: optional reversal exit, guards, then entry."""
+    log_event(logger, "PINE_SIGNAL", side=sig.side, source=sig.source, bar=sig.bar_ts,
+              entry=sig.entry, stop=sig.stop, risk=sig.risk, atr=sig.atr,
+              level=sig.level, price=round(price, 2))
+    if not market_open() or price <= 0:
+        return
+
+    # Opposite signal = Pine reversal: close the running trade first.
+    if ctx.sm.state == State.POSITION_OPEN:
+        held = (ctx.strategy_type or "")[:2]
+        if held and held != sig.side and settings.PIVOT_PINE_REVERSAL_EXIT:
+            log_event(logger, "PINE_REVERSAL_EXIT", held=held, new=sig.side, price=round(price, 2))
+            execute_exit(ctx, reason="PINE_REVERSAL")
+        else:
+            log_event(logger, "PINE_SIGNAL_SKIPPED", side=sig.side, reason="position already open")
+            return
+    if ctx.sm.state != State.IDLE:
+        log_event(logger, "PINE_SIGNAL_SKIPPED", side=sig.side, reason=f"state={ctx.sm.state.value}")
+        return
+
+    if (reason := _pine_gate_reason(ctx, sig, price)):
+        log_event(logger, "PINE_SIGNAL_BLOCKED", side=sig.side, reason=reason)
+        return
+
+    sig_name = f"{sig.side}_PIVOT"
+    if not claim_signal_atomic(_signal_id(sig_name, sig.bar_ts, ctx.underlying), sig_name, sig.bar_ts.isoformat()):
+        log_event(logger, "PINE_SIGNAL_SKIPPED", side=sig.side, reason="already claimed")
+        return
+
+    sgn = 1 if sig.side == "CE" else -1
+    risk = abs(price - sig.stop)
+    pivot_ref = ctx.pivot_levels.pivot if ctx.pivot_levels is not None else 0.0
+    publish_pivot_setup(PivotSetup(
+        side=sig.side, mode="PINE_REVERSAL",
+        entry=round(price, 2), stop=sig.stop, risk=round(risk, 2),
+        t1=round(price + sgn * settings.PIVOT_PINE_RR_T1 * risk, 2),
+        t2=round(price + sgn * settings.PIVOT_PINE_RR_T2 * risk, 2),
+        t3=round(price + sgn * (settings.PIVOT_PINE_RR_T2 + 1.0) * risk, 2),
+        atr=sig.atr, pivot=pivot_ref,
+    ), ctx.underlying)
+    execute_entry(ctx, sig_name, price, signal_candle_ts=sig.bar_ts,
+                  candle_completed_ts=candle_completed_ts)
+    consume_pivot_setup(ctx.underlying)   # never leave a stale setup behind if the entry bailed out
+
+
+def _pine_state_path(ctx: BotContext) -> Path:
+    return _STATE_FILE.parent / f".pine_state_{ctx.underlying.lower()}.json"
+
+
+def _pine_save_state(ctx: BotContext) -> None:
+    """Persist Pine's virtual position / arm flags so a restart cannot rewind them."""
+    if ctx.pine is None:
+        return
+    try:
+        _atomic_write(str(_pine_state_path(ctx)), json.dumps(ctx.pine.snapshot()))
+    except Exception as exc:                      # never let persistence break trading
+        logger.warning("PINE_STATE_SAVE_FAILED: %s", exc)
+
+
+def _pine_restore_state(ctx: BotContext, candles: list[Candle]) -> bool:
+    try:
+        snap = json.loads(_pine_state_path(ctx).read_text())
+    except (OSError, ValueError):
+        return False
+    return ctx.pine.restore(snap, candles)
+
+
+def _pine_on_bar_close(ctx: BotContext, candles_5m: list[Candle]) -> None:
+    """Feed the completed 5m bar to the Pine engine (always, to keep its state)."""
+    if ctx.pine is None:
+        return
+    sig = ctx.pine.on_bar_close(candles_5m)
+    _pine_save_state(ctx)
+    if sig is not None:
+        price = ctx.sensex_ltp if ctx.sensex_ltp > 0 else candles_5m[-1].close
+        _pine_handle_signal(ctx, sig, price,
+                            candle_completed_ts=getattr(ctx, "_last_candle_completed_ts", None))
+
+
+def _pine_on_tick(ctx: BotContext, ltp: float) -> None:
+    """Real-time breakout trigger on the forming 5m bar (PIVOT_PINE_TICK_ENTRY)."""
+    if ctx.pine is None or not settings.PIVOT_PINE_TICK_ENTRY:
+        return
+    if not market_open():
+        return
+    bar_ts, bar_open = ctx.agg_5m.wip_snapshot()
+    sig = ctx.pine.on_tick(ltp, bar_open or ltp, bar_ts)
+    if sig is not None:
+        _pine_save_state(ctx)     # before the entry gate/order: a crash mid-entry must not re-fire it
+        _pine_handle_signal(ctx, sig, ltp,
+                            candle_completed_ts=now_ist().isoformat())
 
 
 def on_option_ltp(ctx: BotContext, ltp: float) -> None:
@@ -1643,7 +1818,7 @@ def _resolve_sl_fill_price(ctx: BotContext) -> float:
 def _close_trade_context(ctx: BotContext) -> None:
     """Clear all active-trade fields on ctx after a confirmed exit."""
     if getattr(ctx, "strategy_type", None) in ("CE_MOM", "PE_MOM"):
-        note_mom_exit(ctx.strategy_type[:2])
+        note_mom_exit(ctx.strategy_type[:2], ctx.underlying)
     # Unsubscribe option token from WebSocket so the stale monitor stops watching it.
     # Without this the option token stays in _option_tokens after trade close and the
     # stale alarm fires continuously after market hours with no ticks arriving.
@@ -1824,7 +1999,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
         elif settings.TRADING_MODE == "SHADOW" and ctx.tradingsymbol:
             try:
                 from broker.kite_client import get_kite as _get_kite
-                _quote_key = f"BFO:{ctx.tradingsymbol}"
+                _quote_key = option_quote_key(ctx.tradingsymbol)
                 _q = _get_kite().quote([_quote_key])
                 _sell_ltp_hint = float(_q[_quote_key]["last_price"])
                 logger.info("SHADOW exit ltp_hint: %.2f for %s", _sell_ltp_hint, ctx.tradingsymbol)
@@ -1873,7 +2048,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
             )
             ctx.smart_entry.on_trade_closed(pnl / max(ctx.quantity, 1))
             if ctx.strategy_type in ("CE", "PE"):
-                note_ema_result(str(now_ist().date()), pnl)
+                note_ema_result(str(now_ist().date()), pnl, ctx.underlying)
             ctx.sm.transition(State.CLOSED, reason="SL filled at exchange")
             ctx.sm.transition(State.IDLE, reason="ready for next trade")
             _close_trade_context(ctx)
@@ -1902,7 +2077,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
     # Determine smart-exit trigger (non-mechanical reasons)
     _SMART_EXITS = {
         "EMA_COLLAPSE", "REVERSAL_SIGNAL", "PROFIT_LOCK",
-        "TIME_DECAY", "DAILY_LOSS_LIMIT",
+        "TIME_DECAY", "DAILY_LOSS_LIMIT", "PINE_REVERSAL",
         "PIVOT_SL_HIT", "PIVOT_BE_STOP", "PIVOT_TSL_HIT", "PIVOT_TARGET_T2", "PIVOT_TARGET_T3",
         "EMA_SL_HIT", "EMA_BE_STOP", "EMA_TSL_HIT", "EMA_TARGET",
         "EMA_TRAIL_EMA9", "EMA_TIME_STOP",
@@ -1932,7 +2107,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
     # Notify smart entry filter so cooldown starts on a loss
     ctx.smart_entry.on_trade_closed(pnl / max(filled_qty, 1))
     if ctx.strategy_type in ("CE", "PE"):
-        note_ema_result(str(now_ist().date()), pnl)
+        note_ema_result(str(now_ist().date()), pnl, ctx.underlying)
 
     ctx.sm.transition(State.CLOSED, reason=reason)
     ctx.sm.transition(State.IDLE, reason="ready for next trade")
@@ -1942,9 +2117,9 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
 # ── Restart recovery ──────────────────────────────────────────────────────────
 
 def recover_from_restart(ctx: BotContext) -> None:
-    active = fetch_active_trade()
+    active = fetch_active_trade(ctx.underlying)
     if not active:
-        logger.info("No active trade found in DB — starting fresh.")
+        logger.info("No active trade found in DB for %s — starting fresh.", ctx.underlying)
         return
 
     logger.info("Active trade found: %s — reconciling with broker.", active["trade_id"])
@@ -2132,8 +2307,7 @@ def _write_ltp(ctx: BotContext) -> None:
     """
     Cheap write: update only ltp, bot_state and updated_at in the state file.
     Called on every tick so the UI LTP is always current.
-    Reads the existing file, patches the three fields, and writes back atomically.
-    Falls back to a full write if the file doesn't exist yet.
+    Reads the existing file, patches the fields, and writes back atomically.
     """
     try:
         state_path = str(_STATE_FILE)
@@ -2142,10 +2316,26 @@ def _write_ltp(ctx: BotContext) -> None:
                 state = json.load(f)
         else:
             state = {}
-        state["ltp"] = ctx.sensex_ltp
+        now_ts = now_ist().isoformat()
+        state["ltp"] = ctx.spot_ltp
+        state["underlying"] = ctx.underlying
         state["bot_state"] = ctx.sm.state.value
-        state["updated_at"] = now_ist().isoformat()
+        state["updated_at"] = now_ts
+
+        if "instruments" not in state or not isinstance(state["instruments"], dict):
+            state["instruments"] = {}
+        inst_entry = state["instruments"].get(ctx.underlying, {})
+        inst_entry["ltp"] = ctx.spot_ltp
+        inst_entry["underlying"] = ctx.underlying
+        inst_entry["bot_state"] = ctx.sm.state.value
+        inst_entry["updated_at"] = now_ts
+        state["instruments"][ctx.underlying] = inst_entry
+
         _atomic_write(state_path, json.dumps(state))
+
+        # Also write per-instrument state file
+        per_inst_path = str(_STATE_FILE.parent / f".bot_state_{ctx.underlying.lower()}.json")
+        _atomic_write(per_inst_path, json.dumps(inst_entry))
     except Exception as exc:
         logger.debug("LTP state write failed (non-critical): %s", exc)
 
@@ -2278,16 +2468,17 @@ def _write_state(ctx: BotContext) -> None:
             import sqlite3 as _sq
             _con = _sq.connect(str(settings.DB_PATH), check_same_thread=False, timeout=5)
             _row = _con.execute(
-                "SELECT COUNT(*) FROM trades WHERE entry_time LIKE ?",
-                (f"{_today_str}%",),
+                "SELECT COUNT(*) FROM trades WHERE entry_time LIKE ? AND option_symbol LIKE ?",
+                (f"{_today_str}%", f"{ctx.underlying}%"),
             ).fetchone()
             _con.close()
             trade_count_today = int(_row[0]) if _row else 0
         except Exception:
             trade_count_today = 0
 
-        state = {
-            "ltp": ctx.sensex_ltp,
+        inst_state = {
+            "underlying": ctx.underlying,
+            "ltp": ctx.spot_ltp,
             "bot_state": ctx.sm.state.value,
             "candles_5m":  _ser(candles_5m,  60),
             "candles_today": _ser(candles_5m_today, 999),   # today-only; no cross-day cut
@@ -2332,7 +2523,27 @@ def _write_state(ctx: BotContext) -> None:
             } if ctx.trade_id else None,
             "updated_at": now_ist().isoformat(),
         }
-        _atomic_write(str(_STATE_FILE), json.dumps(state))
+
+        state_path = str(_STATE_FILE)
+        state = dict(inst_state)
+        if _os.path.exists(state_path):
+            try:
+                with open(state_path, "r") as f:
+                    old_state = json.load(f)
+                    if isinstance(old_state.get("instruments"), dict):
+                        state["instruments"] = old_state["instruments"]
+            except Exception:
+                pass
+
+        if "instruments" not in state or not isinstance(state["instruments"], dict):
+            state["instruments"] = {}
+        state["instruments"][ctx.underlying] = inst_state
+
+        _atomic_write(state_path, json.dumps(state))
+
+        # Write per-instrument state file
+        per_inst_path = str(_STATE_FILE.parent / f".bot_state_{ctx.underlying.lower()}.json")
+        _atomic_write(per_inst_path, json.dumps(inst_state))
     except Exception as exc:
         logger.debug("State file write failed (non-critical): %s", exc)
 
@@ -2368,44 +2579,60 @@ import threading as _threading
 _tick_lock = _threading.Lock()
 
 
-def _make_tick_handler(ctx: BotContext):
+def _make_tick_handler(contexts: BotContext | dict[str, BotContext] | list[BotContext]):
     global _tick_counter
 
+    if isinstance(contexts, BotContext):
+        ctx_list = [contexts]
+    elif isinstance(contexts, dict):
+        ctx_list = list(contexts.values())
+    else:
+        ctx_list = list(contexts)
+
+    spot_map: dict[int, BotContext] = {c.spot_token: c for c in ctx_list}
+
     def handler(token: int, ltp: float) -> None:
+        owner = spot_map.get(token)
+        if owner is None:
+            owner = next((c for c in ctx_list
+                          if c.instrument_token and token == c.instrument_token), None)
+        with log_underlying(getattr(owner, "underlying", None)):
+            _handle(token, ltp)
+
+    def _handle(token: int, ltp: float) -> None:
         global _tick_counter
-        # Discard any tick that arrives before market opens at 09:15 IST.
-        # The bot may start early (pre-open, authentication, etc.) and the
-        # WebSocket or REST feed can deliver pre-auction prices that must
-        # not pollute candle aggregators or trigger signal evaluation.
         if not is_after_or_equal(now_ist().time(), _MARKET_OPEN_TIME):
             return
         with _tick_lock:
-            if token == SENSEX_TOKEN:
-                ctx.sensex_ltp = ltp
-                # Feed into candle aggregators
-                ctx.agg_5m.on_tick(ltp)
-                ctx.agg_15m.on_tick(ltp)
-                # VWAP is updated from completed candles (on_candle below) for
-                # accuracy — tick-level updates would double-count every price
-                # because the same data is also accumulated into the 5m candle.
-                # Pivot trades manage SL/BE/TSL/T2 on the SENSEX price
-                if ctx.pivot_mgr is not None and ctx.sm.state == State.POSITION_OPEN:
-                    on_pivot_index_price(ctx, ltp)
-                # In PAPER mode the option price IS the SENSEX spot price,
-                # so trail/SL checks run against the SENSEX LTP directly.
-                if settings.TRADING_MODE == "PAPER" and ctx.sm.state == State.POSITION_OPEN:
-                    on_option_ltp(ctx, _paper_option_price(ctx, ltp))
-                # After 15:30 only update the scalar LTP — never recompute bands/EMA
-                # from the candle buffer, which may contain post-market frozen candles.
+            # 1. Spot index tick
+            target_ctx = spot_map.get(token)
+            if target_ctx is not None:
+                target_ctx.spot_ltp = ltp
+                target_ctx.agg_5m.on_tick(ltp)
+                target_ctx.agg_15m.on_tick(ltp)
+
+                if target_ctx.pivot_mgr is not None and target_ctx.sm.state == State.POSITION_OPEN:
+                    on_pivot_index_price(target_ctx, ltp)
+
+                if settings.TRADING_MODE == "PAPER" and target_ctx.sm.state == State.POSITION_OPEN:
+                    on_option_ltp(target_ctx, _paper_option_price(target_ctx, ltp))
+
+                if getattr(target_ctx, "pine", None) is not None:
+                    _pine_on_tick(target_ctx, ltp)
+
                 _tick_counter += 1
                 _after_close = now_ist().time() >= _MARKET_CLOSE_TIME
                 if not _after_close and _tick_counter % _FULL_WRITE_INTERVAL == 0:
-                    _write_state(ctx)
+                    _write_state(target_ctx)
                 else:
-                    _write_ltp(ctx)
-            elif ctx.instrument_token and token == ctx.instrument_token:
-                # LIVE/SHADOW: option token tick
-                on_option_ltp(ctx, ltp)
+                    _write_ltp(target_ctx)
+            else:
+                # 2. Option token tick
+                for c in ctx_list:
+                    if c.instrument_token and token == c.instrument_token:
+                        on_option_ltp(c, ltp)
+                        break
+
     return handler
 
 
@@ -2466,8 +2693,44 @@ def _refresh_intraday_regime(ctx: BotContext, *, log: bool = True) -> None:
         logger.debug("Intraday regime compute failed (non-critical): %s", exc)
 
 
+def _rest_option_fallback(ctx: BotContext) -> None:
+    """
+    When the WebSocket option feed is dead, poll the option price over REST and
+    feed it through on_option_ltp so trailing stop, highest LTP and stop-hit
+    checks keep working.  No-op while the feed is healthy.  Never raises.
+    """
+    if (
+        ctx.ws is None
+        or ctx.ws.option_feed_ok
+        or ctx.sm.state != State.POSITION_OPEN
+        or not ctx.tradingsymbol
+    ):
+        return
+    try:
+        # LIVE mode uses broker._fetch_ltp(); PAPER/SHADOW use Kite directly
+        # because PaperBroker has no _fetch_ltp method.
+        if settings.TRADING_MODE == "LIVE":
+            rest_ltp = ctx.broker._fetch_ltp(
+                ctx.tradingsymbol, option_exchange(ctx.tradingsymbol))
+        else:
+            from broker.kite_client import get_kite as _gk
+            _qrk = option_quote_key(ctx.tradingsymbol)
+            _qr = _gk().quote([_qrk])
+            rest_ltp = float(_qr[_qrk]["last_price"])
+        if rest_ltp and rest_ltp > 0:
+            log_event(logger, "OPTION_LTP_REST_FALLBACK",
+                      underlying=ctx.underlying, symbol=ctx.tradingsymbol, ltp=rest_ltp)
+            on_option_ltp(ctx, rest_ltp)
+    except Exception as exc:
+        logger.warning("REST option LTP fallback failed for %s: %s", ctx.tradingsymbol, exc)
+
+
 def _make_candle_handler_5m(ctx: BotContext):
     def handler(candle: Candle) -> None:
+        with log_underlying(getattr(ctx, "underlying", None)):
+            _on_candle(candle)
+
+    def _on_candle(candle: Candle) -> None:
         # Refresh the intraday regime first so the state file written just below
         # (and any trade opened on this candle) carries the up-to-date value.
         _refresh_intraday_regime(ctx)
@@ -2490,31 +2753,17 @@ def _make_candle_handler_5m(ctx: BotContext):
 
         # ── Smart Entry + EMA cooldowns: tick down on every candle ─────────────
         ctx.smart_entry.on_candle()
-        tick_ema_cooldown()
-        tick_mom_cooldown()
+        tick_ema_cooldown(ctx.underlying)
+        tick_mom_cooldown(ctx.underlying)
+
+        # ── Pine reversal engine: the engine must see EVERY completed bar so its
+        # swing/arm/position state matches the chart; entries come from here (bar
+        # close) or from the tick trigger.
+        if getattr(ctx, "pine", None) is not None:
+            _pine_on_bar_close(ctx, candles_5m)
 
         # ── REST option LTP fallback when WebSocket option feed is dead ────────
-        if (
-            ctx.ws is not None
-            and not ctx.ws.option_feed_ok
-            and ctx.sm.state == State.POSITION_OPEN
-            and ctx.tradingsymbol
-        ):
-            try:
-                # LIVE mode uses broker._fetch_ltp(); PAPER/SHADOW use Kite directly
-                # because PaperBroker has no _fetch_ltp method.
-                if settings.TRADING_MODE == "LIVE":
-                    rest_ltp = ctx.broker._fetch_ltp(ctx.tradingsymbol, "BFO")
-                else:
-                    from broker.kite_client import get_kite as _gk
-                    _qr = _gk().quote([f"BFO:{ctx.tradingsymbol}"])
-                    rest_ltp = float(_qr[f"BFO:{ctx.tradingsymbol}"]["last_price"])
-                if rest_ltp and rest_ltp > 0:
-                    log_event(logger, "OPTION_LTP_REST_FALLBACK",
-                              symbol=ctx.tradingsymbol, ltp=rest_ltp)
-                    on_option_ltp(ctx, rest_ltp)
-            except Exception as exc:
-                logger.warning("REST option LTP fallback failed: %s", exc)
+        _rest_option_fallback(ctx)
 
         # ── VWAP cross-exit: close back through VWAP invalidates the thesis ──────
         # CE_VWAP thesis = price above VWAP.  The moment a completed 5m candle
@@ -2671,6 +2920,7 @@ def _make_candle_handler_5m(ctx: BotContext):
             option_day_low=_ai_option_day_low,
             option_day_high=_ai_option_day_high,
             daily_trend=ctx.daily_trend,
+            underlying=ctx.underlying,
         )
 
         # ── AI exit suggestion (per-candle, only when position open) ──────────
@@ -2736,6 +2986,35 @@ def _make_candle_handler_5m(ctx: BotContext):
     return handler
 
 
+def _eod_price_hint(ctx: BotContext) -> float | None:
+    """
+    Option price for a simulated (PAPER/SHADOW) EOD exit.  Without a hint the
+    paper broker fills at its last seen price, which is the ENTRY price when the
+    option feed was dead — silently booking a 0.0 P&L.  LIVE returns None so
+    the real order manager prices from the live market.
+    """
+    if settings.TRADING_MODE == "LIVE":
+        return None
+    if settings.TRADING_MODE == "SHADOW" and ctx.tradingsymbol:
+        try:
+            from broker.kite_client import get_kite as _get_kite
+            _k = option_quote_key(ctx.tradingsymbol)
+            px = float(_get_kite().quote([_k])[_k]["last_price"])
+            if px > 0:
+                logger.info("EOD exit ltp_hint: %.2f for %s (REST)", px, ctx.tradingsymbol)
+                return px
+        except Exception as exc:
+            logger.warning("EOD exit ltp_hint: REST fetch failed (%s).", exc)
+        last = getattr(ctx, "last_option_ltp", 0.0)
+        if last and last > 0:
+            return last
+        logger.error("EOD exit: no live option price for %s — fill price will be unreliable.",
+                     ctx.tradingsymbol)
+        return None
+    px = _paper_option_price(ctx, ctx.sensex_ltp)
+    return px if px > 0 else None
+
+
 def _run_eod_exit(ctx: BotContext) -> None:
     """Square off an open position at the force-exit time."""
     if ctx.sm.state != State.POSITION_OPEN or not ctx.trade_id:
@@ -2753,6 +3032,7 @@ def _run_eod_exit(ctx: BotContext) -> None:
         trade_id=ctx.trade_id,
         stop_order_id=ctx.stop_order_id,
         entry_price=ctx.entry_price,
+        ltp_hint=_eod_price_hint(ctx),
     )
     if eod_ok:
         ctx.sm.transition(State.CLOSED, reason="EOD")
@@ -2776,10 +3056,11 @@ def bootstrap_session(ctx: BotContext) -> None:
     """
     # Seed historical candles — required for EMA warm-up (min 21 completed candles).
     # Log clearly if this fails so the operator knows signals won't fire for ~1h45m.
+    _spot_tok = ctx.spot_token   # this context's own index, not settings.UNDERLYING
     try:
-        hist_5m = fetch_historical_candles(SENSEX_TOKEN, "5minute", days_back=5)
+        hist_5m = fetch_historical_candles(_spot_tok, "5minute", days_back=5)
         ctx.agg_5m.seed(hist_5m)
-        hist_15m = fetch_historical_candles(SENSEX_TOKEN, "15minute", days_back=5)
+        hist_15m = fetch_historical_candles(_spot_tok, "15minute", days_back=5)
         ctx.agg_15m.seed(hist_15m)
     except Exception as exc:
         logger.warning(
@@ -2793,7 +3074,7 @@ def bootstrap_session(ctx: BotContext) -> None:
     # fetch_previous_day_hl now returns a 3-tuple (H, L, C).
     if settings.ENABLE_PDHL_STRATEGY or settings.ENABLE_PIVOT_LEVELS:
         try:
-            ctx.prev_day_high, ctx.prev_day_low, ctx.prev_day_close = fetch_previous_day_hl(SENSEX_TOKEN)
+            ctx.prev_day_high, ctx.prev_day_low, ctx.prev_day_close = fetch_previous_day_hl(_spot_tok)
             logger.info(
                 "Prev-day levels loaded — PDH=%.2f  PDL=%.2f  PDC=%.2f",
                 ctx.prev_day_high or 0, ctx.prev_day_low or 0, ctx.prev_day_close or 0,
@@ -2822,7 +3103,7 @@ def bootstrap_session(ctx: BotContext) -> None:
 
     # Daily trend for the higher-timeframe trend gate (fails to "UNKNOWN" = no gate).
     if settings.TREND_GATE_DAILY:
-        ctx.daily_trend = fetch_daily_trend(SENSEX_TOKEN, settings.TREND_GATE_DAILY_EMA)
+        ctx.daily_trend = fetch_daily_trend(_spot_tok, settings.TREND_GATE_DAILY_EMA)
 
     # Compute pivot levels from prev-day H/L/C (no extra API call needed).
     # If ENABLE_PIVOT_LEVELS is true and we have the data, build PivotLevels directly.
@@ -2842,6 +3123,21 @@ def bootstrap_session(ctx: BotContext) -> None:
     # Seed the intraday regime from the historical candles so the dashboard has a
     # value immediately after a restart instead of waiting for the next candle.
     _refresh_intraday_regime(ctx, log=False)
+
+    # Pine reversal engine: replay the seeded history so swing levels, arm flags
+    # and the virtual position match the TradingView chart from the first tick.
+    # Signals found while replaying are consumed silently (never traded late).
+    if settings.PIVOT_PINE_MODE and settings.ENABLE_PIVOT_STRATEGY:
+        ctx.pine = PineReversalEngine.from_settings(settings)
+        ctx.pine.warm_up(ctx.agg_5m.get_completed())
+        _pine_restored = _pine_restore_state(ctx, ctx.agg_5m.get_completed())
+        log_event(logger, "PINE_ENGINE_READY", restored=_pine_restored,
+                  left=settings.PIVOT_PINE_LEFT, right=settings.PIVOT_PINE_RIGHT,
+                  ema=settings.PIVOT_PINE_EMA, tick_entry=settings.PIVOT_PINE_TICK_ENTRY,
+                  trail_act_r=settings.PIVOT_PINE_TRAIL_ACT_R,
+                  trail_atr=settings.PIVOT_PINE_TRAIL_ATR_MULT,
+                  hprice=ctx.pine.hprice, lprice=ctx.pine.lprice,
+                  le=ctx.pine.le, se=ctx.pine.se, pos=ctx.pine.pos)
 
     # Wire 5m candle handler (signal evaluation fires on every completed 5m candle)
     ctx.agg_5m.subscribe(_make_candle_handler_5m(ctx))
@@ -2891,8 +3187,26 @@ def main() -> None:
     except Exception as exc:
         logger.warning("Instrument master preload failed at startup (will retry on entry): %s", exc)
 
-    ctx = BotContext()
-    recover_from_restart(ctx)
+    enabled_underlyings = settings.get_enabled_underlyings()
+    logger.info("Initializing multi-instrument engine with active underlyings: %s", ", ".join(enabled_underlyings))
+
+    shared_ws = WebSocketClient() if settings.TRADING_MODE != "PAPER" else None
+    shared_paper_feed = PaperFeed()
+
+    contexts: dict[str, BotContext] = {
+        sym: BotContext(sym, ws=shared_ws, paper_feed=shared_paper_feed)
+        for sym in enabled_underlyings
+    }
+
+    # Primary context (for legacy single-point hooks)
+    ctx = list(contexts.values())[0]
+
+    for sym, c in contexts.items():
+        with log_underlying(c.underlying):
+            recover_from_restart(c)
+            bootstrap_session(c)
+            _write_state(c)
+            classify_session_regime(c)
 
     # Expiry-day iron butterfly (SHADOW only; config.validate() refuses LIVE).
     fly_runner = None
@@ -2902,98 +3216,75 @@ def main() -> None:
         from execution.fly_runner import ExpiryFlyRunner
         fly_runner = ExpiryFlyRunner(
             kite_fn=get_kite, options_fn=get_sensex_options, expiry_fn=is_expiry_day,
-            spot_fn=lambda: ctx.sensex_ltp,
+            spot_fn=lambda: ctx.spot_ltp,
         )
         logger.info("Expiry-day iron butterfly enabled (SHADOW): entry %s, wings %d, stop %.0f%%, exit %s.",
                     settings.FLY_ENTRY_TIME, settings.FLY_WING_POINTS,
                     settings.FLY_STOP_PCT * 100, settings.FLY_EXIT_TIME)
 
-    bootstrap_session(ctx)
-
-    # Write an initial state file immediately after seeding so the UI shows a
-    # fresh updated_at right away — prevents false STALE on startup.
-    _write_state(ctx)
-
     # ── Feed setup ────────────────────────────────────────────────────────────
-    tick_handler = _make_tick_handler(ctx)
+    tick_handler = _make_tick_handler(contexts)
 
-    if settings.TRADING_MODE in ("LIVE", "SHADOW"):
-        # PRIMARY feed: KiteTicker WebSocket with SENSEX token 265 subscribed in
-        # MODE_FULL.  This gives sub-second ticks with no REST rate-limit risk.
-        # Option tokens are added dynamically at trade entry.
-        ctx.ws.on_ltp(tick_handler)
+    if settings.TRADING_MODE in ("LIVE", "SHADOW") and shared_ws is not None:
+        shared_ws.on_ltp(tick_handler)
         def _on_stale_feed() -> None:
             logger.warning("Option feed stale — no ticks on open position. Auto-reconnect in progress.")
             notify("BOT_HALTED", reason="stale_feed_with_open_position — auto-reconnect triggered")
 
-        ctx.ws.on_stale(_on_stale_feed)
+        shared_ws.on_stale(_on_stale_feed)
 
         # ── WebSocket order-update handler (PRIMARY fill confirmation) ─────────
-        # Zerodha posts every order-state change here: OPEN → COMPLETE / REJECTED.
-        # We store the payload in ctx.order_fill_events keyed by order_id so that
-        # OrderManager._wait_for_fill() can check for a WS confirmation before
-        # falling back to REST polling.
         def _on_order_update(msg: dict) -> None:
             order_id = str(msg.get("order_id", ""))
             status   = msg.get("status", "")
             if not order_id:
                 return
-            # Always store the latest payload — any terminal status is useful.
-            ctx.order_fill_events[order_id] = msg
-            if status == "COMPLETE":
-                # Mark EXCHANGE_COMPLETE on the active latency tracker if this
-                # matches the current pending entry order.
-                if ctx.latency is not None:
-                    if "EXCHANGE_COMPLETE" not in ctx.latency._checkpoints:
-                        ctx.latency.mark("EXCHANGE_COMPLETE")
-                        avg_price = msg.get("average_price")
-                        if avg_price:
-                            ctx.latency.set_price("fill_price_ws", float(avg_price))
-                log_event(
-                    logger, "ORDER_FILLED_WS",
-                    order_id=order_id,
-                    symbol=msg.get("tradingsymbol"),
-                    fill=msg.get("average_price"),
-                    filled_qty=msg.get("filled_quantity"),
-                    exchange_ts=msg.get("exchange_timestamp"),
-                )
-
-        ctx.ws.on_order_update(_on_order_update)
-
-        ctx.ws.start([SENSEX_TOKEN])   # subscribe SENSEX spot immediately
-        _start_orderflow_recorder(ctx)
-
-        # If we recovered an open position on startup, subscribe its option token now.
-        if ctx.sm.state == State.POSITION_OPEN and ctx.instrument_token:
-            ctx.ws.add_token(ctx.instrument_token)
-            logger.info(
-                "Recovery: subscribed option token %d (%s) on WebSocket.",
-                ctx.instrument_token, ctx.tradingsymbol,
+            for c in contexts.values():
+                c.order_fill_events[order_id] = msg
+                if c.latency is not None and "EXCHANGE_COMPLETE" not in c.latency._checkpoints:
+                    c.latency.mark("EXCHANGE_COMPLETE")
+                    avg_price = msg.get("average_price")
+                    if avg_price:
+                        c.latency.set_price("fill_price_ws", float(avg_price))
+            log_event(
+                logger, "ORDER_FILLED_WS",
+                order_id=order_id,
+                symbol=msg.get("tradingsymbol"),
+                fill=msg.get("average_price"),
+                filled_qty=msg.get("filled_quantity"),
+                exchange_ts=msg.get("exchange_timestamp"),
             )
 
-        # FALLBACK feed: PaperFeed REST poll.  Runs in parallel and fires the same
-        # tick_handler.  The candle aggregator and state writer are idempotent, so
-        # duplicate ticks from both sources are harmless — the most-recent LTP wins.
-        # This ensures continuous data even if the WebSocket reconnects briefly.
-        ctx.paper_feed.on_tick(tick_handler)
-        ctx.paper_feed.start(fallback=True)   # 5s interval — WebSocket is primary
+        shared_ws.on_order_update(_on_order_update)
+
+        all_spot_tokens = [c.spot_token for c in contexts.values()]
+        shared_ws.start(all_spot_tokens)   # subscribe all active spot indices immediately
+        _start_orderflow_recorder(ctx)
+
+        # If we recovered open positions on startup, subscribe their option tokens now.
+        for c in contexts.values():
+            if c.sm.state == State.POSITION_OPEN and c.instrument_token:
+                shared_ws.add_token(c.instrument_token)
+                logger.info(
+                    "Recovery (%s): subscribed option token %d (%s) on WebSocket.",
+                    c.underlying, c.instrument_token, c.tradingsymbol,
+                )
+
+        # FALLBACK feed: PaperFeed REST poll across all active underlyings
+        shared_paper_feed.on_tick(tick_handler)
+        shared_paper_feed.start(fallback=True)   # 5s interval — WebSocket is primary
         logger.info(
-            "LIVE feed: SENSEX WebSocket (token %d) as primary + "
-            "PaperFeed REST as fallback (5s).", SENSEX_TOKEN
+            "LIVE feed: WebSocket (tokens %s) as primary + PaperFeed REST as fallback (5s).",
+            all_spot_tokens,
         )
     else:
-        # PAPER mode: poll SENSEX LTP via REST every second (no WebSocket)
-        ctx.paper_feed.on_tick(tick_handler)
-        ctx.paper_feed.start()
-        logger.info("PAPER mode — PaperFeed polling SENSEX LTP via REST.")
-
-    classify_session_regime(ctx)
+        # PAPER mode: poll spot LTPs via REST every second (no WebSocket)
+        shared_paper_feed.on_tick(tick_handler)
+        shared_paper_feed.start()
+        logger.info("PAPER mode — PaperFeed polling %s LTPs via REST.", ", ".join(enabled_underlyings))
 
     # Main loop — runs until operator stops manually (Ctrl+C or Stop Bot button).
-    # EOD square-off is logged as a warning but the bot keeps running.
     force_exit_time = parse_time_ist(settings.FORCE_EXIT_TIME)
-    # If we're already past the force-exit time at startup, don't immediately square off —
-    # the bot was started outside market hours.  Mark EOD done so the guard never fires.
     _eod_done = is_after_or_equal(now_ist().time(), force_exit_time)
     if _eod_done:
         logger.info(
@@ -3003,7 +3294,7 @@ def main() -> None:
     _last_reconcile: float = 0.0
     _RECONCILE_INTERVAL = 30   # seconds between broker reconciliation checks
     _last_feed_warn: float = 0.0
-    _FEED_WARN_INTERVAL = 60   # warn every 60s if SENSEX LTP is still 0 during market hours
+    _FEED_WARN_INTERVAL = 60   # warn every 60s if spot LTP is still 0 during market hours
 
     try:
         while True:
@@ -3015,106 +3306,84 @@ def main() -> None:
                 except Exception:
                     logger.exception("Expiry fly tick failed (ignored; trading unaffected).")
 
+            # ── Dead option feed: poll REST every loop so stops keep working ──
+            # (the candle handler only runs every 5 minutes — far too slow for a stop).
+            for c in contexts.values():
+                if c.sm.state == State.POSITION_OPEN:
+                    with _tick_lock, log_underlying(c.underlying):
+                        _rest_option_fallback(c)
+
             # ── Dead-feed detection: warn if no price received during market hours ──
             now_mono = time.monotonic()
-            if (
-                ctx.sensex_ltp == 0.0
-                and is_after_or_equal(now_ist().time(), _MARKET_OPEN_TIME)
-                and not _eod_done
-                and now_mono - _last_feed_warn >= _FEED_WARN_INTERVAL
-            ):
-                _last_feed_warn = now_mono
-                # Check whether the thread(s) are still alive
-                ws_ok = ctx.ws is not None  # WS liveness tracked by KiteTicker internally
-                pf_ok = ctx.paper_feed.is_alive() if ctx.paper_feed else False
-                logger.error(
-                    "No SENSEX price received since market open — "
-                    "candles and signals are frozen. "
-                    "websocket=%s paper_feed_alive=%s. "
-                    "Check authentication and network.",
-                    "active" if ws_ok else "none", pf_ok,
-                )
+            for c in contexts.values():
+                if (
+                    c.spot_ltp == 0.0
+                    and is_after_or_equal(now_ist().time(), _MARKET_OPEN_TIME)
+                    and not _eod_done
+                    and now_mono - _last_feed_warn >= _FEED_WARN_INTERVAL
+                ):
+                    _last_feed_warn = now_mono
+                    ws_ok = c.ws is not None
+                    pf_ok = c.paper_feed.is_alive() if c.paper_feed else False
+                    logger.error(
+                        "No %s price received since market open — candles and signals are frozen. "
+                        "websocket=%s paper_feed_alive=%s. Check authentication and network.",
+                        c.underlying, "active" if ws_ok else "none", pf_ok,
+                    )
 
-            # ── Periodic reconciliation: detect external closes ────────────────
+            # ── Periodic reconciliation: detect external closes across all contexts ──
             now_mono = time.monotonic()
-            if (
-                ctx.sm.state == State.POSITION_OPEN
-                and ctx.trade_id
-                and ctx.tradingsymbol
-                and settings.TRADING_MODE == "LIVE"
-                and now_mono - _last_reconcile >= _RECONCILE_INTERVAL
-            ):
+            if settings.TRADING_MODE == "LIVE" and now_mono - _last_reconcile >= _RECONCILE_INTERVAL:
                 _last_reconcile = now_mono
-                try:
-                    from broker.position_repository import get_net_position_qty
-                    actual_qty = get_net_position_qty(ctx.tradingsymbol)
-                    if actual_qty is None:
-                        # API failure — cannot determine if position is open or closed;
-                        # do nothing and let the next reconcile cycle retry.
-                        logger.warning(
-                            "Reconciliation skipped — broker API unavailable for %s.",
-                            ctx.tradingsymbol,
-                        )
-                    elif actual_qty == 0:
-                        # Position closed externally (manual exit, SL hit at broker, etc.)
-                        logger.warning(
-                            "Position %s has qty=0 at broker — closed externally. "
-                            "Reconciling DB and resetting state.",
-                            ctx.tradingsymbol,
-                        )
-                        # Fetch fill price from broker orders
-                        exit_price = ctx.entry_price  # fallback
+                for c in contexts.values():
+                    if c.sm.state == State.POSITION_OPEN and c.trade_id and c.tradingsymbol:
                         try:
-                            orders = ctx.broker._kite.orders()
-                            sells = [
-                                o for o in orders
-                                if o.get("tradingsymbol") == ctx.tradingsymbol
-                                and o.get("transaction_type") == "SELL"
-                                and o.get("status") == "COMPLETE"
-                            ]
-                            if sells:
-                                exit_price = float(sells[-1].get("average_price", exit_price))
-                        except Exception:
-                            pass
-                        pnl = (exit_price - ctx.entry_price) * ctx.quantity
-                        mark_trade_closed(ctx.trade_id, exit_price, now_ist().isoformat(), pnl)
-                        notify("EXIT_FILLED", symbol=ctx.tradingsymbol,
-                               exit_price=exit_price, pnl=pnl, reason="EXTERNAL_CLOSE")
-                        log_event(logger, "EXTERNAL_CLOSE_DETECTED",
-                                  symbol=ctx.tradingsymbol, exit_price=exit_price, pnl=pnl)
-                        # Cancel any lingering stop order
-                        if ctx.stop_order_id:
-                            ctx.broker.cancel_order(ctx.stop_order_id)
-                        # PAPER/SHADOW: the real broker has no position but the
-                        # PaperBroker._positions dict still holds the entry qty.
-                        # Decrement it now so the next entry for the same symbol
-                        # doesn't accumulate a stale qty, which would cause
-                        # PRE_SELL_QTY_MISMATCH on the next SL hit.
-                        if settings.TRADING_MODE in ("PAPER", "SHADOW"):
-                            _pb_positions = getattr(ctx.broker, "_positions", {})
-                            _stale_qty = _pb_positions.get(ctx.tradingsymbol, 0)
-                            if _stale_qty > 0:
-                                _pb_positions[ctx.tradingsymbol] = max(0, _stale_qty - ctx.quantity)
-                                logger.debug(
-                                    "EXTERNAL_CLOSE: cleared paper broker position %s "
-                                    "(%d → %d).",
-                                    ctx.tradingsymbol, _stale_qty,
-                                    _pb_positions[ctx.tradingsymbol],
+                            from broker.position_repository import get_net_position_qty
+                            actual_qty = get_net_position_qty(c.tradingsymbol)
+                            if actual_qty is None:
+                                logger.warning(
+                                    "Reconciliation skipped — broker API unavailable for %s (%s).",
+                                    c.tradingsymbol, c.underlying,
                                 )
-                        # POSITION_OPEN -> CLOSED is not a valid direct transition;
-                        # must pass through EXIT_PENDING first.
-                        ctx.sm.transition(State.EXIT_PENDING, reason="external close detected")
-                        ctx.sm.transition(State.CLOSED, reason="external close detected")
-                        ctx.sm.transition(State.IDLE, reason="ready for next trade")
-                        _close_trade_context(ctx)
-                        _write_state(ctx)
-                except Exception as exc:
-                    logger.error("Reconciliation check failed: %s", exc)
+                            elif actual_qty == 0:
+                                logger.warning(
+                                    "Position %s (%s) has qty=0 at broker — closed externally. "
+                                    "Reconciling DB and resetting state.",
+                                    c.tradingsymbol, c.underlying,
+                                )
+                                exit_price = c.entry_price
+                                try:
+                                    orders = c.broker._kite.orders()
+                                    sells = [
+                                        o for o in orders
+                                        if o.get("tradingsymbol") == c.tradingsymbol
+                                        and o.get("transaction_type") == "SELL"
+                                        and o.get("status") == "COMPLETE"
+                                    ]
+                                    if sells:
+                                        exit_price = float(sells[-1].get("average_price", exit_price))
+                                except Exception:
+                                    pass
+                                pnl = (exit_price - c.entry_price) * c.quantity
+                                mark_trade_closed(c.trade_id, exit_price, now_ist().isoformat(), pnl)
+                                notify("EXIT_FILLED", symbol=c.tradingsymbol,
+                                       exit_price=exit_price, pnl=pnl, reason="EXTERNAL_CLOSE")
+                                log_event(logger, "EXTERNAL_CLOSE_DETECTED",
+                                          symbol=c.tradingsymbol, exit_price=exit_price, pnl=pnl)
+                                if c.stop_order_id:
+                                    c.broker.cancel_order(c.stop_order_id)
+                                c.sm.transition(State.CLOSED, reason="EXTERNAL_CLOSE")
+                                c.sm.transition(State.IDLE, reason="ready for next trade")
+                                _close_trade_context(c)
+                        except Exception as exc:
+                            logger.error("Reconciliation error for %s: %s", c.tradingsymbol, exc)
 
-            # ── EOD forced exit ────────────────────────────────────────────────
+            # EOD force exit check
             if not _eod_done and is_after_or_equal(now_ist().time(), force_exit_time):
-                _run_eod_exit(ctx)
-                _eod_done = True   # only attempt once per session
+                for c in contexts.values():
+                    with log_underlying(c.underlying):
+                        _run_eod_exit(c)
+                _eod_done = True
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt — shutting down.")
     finally:
@@ -3123,10 +3392,10 @@ def main() -> None:
                 ctx.orderflow_recorder.close()
             except Exception as exc:
                 logger.debug("Order-flow recorder close failed (non-critical): %s", exc)
-        if ctx.ws:
-            ctx.ws.stop()
-        if ctx.paper_feed:
-            ctx.paper_feed.stop()
+        if shared_ws:
+            shared_ws.stop()
+        if shared_paper_feed:
+            shared_paper_feed.stop()
         logger.info("Bot stopped.")
 
 

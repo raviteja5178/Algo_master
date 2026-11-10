@@ -6,9 +6,39 @@ API secrets must never appear in log output.
 
 import logging
 import sys
-from typing import Any
+import threading
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 from config import settings
+
+# Index (SENSEX / NIFTY / ...) the current thread is working for.  The bot runs
+# several indices in one process and one log file; _UnderlyingFilter stamps this
+# onto each record so the UI can show a per-index log.
+_current = threading.local()
+
+
+@contextmanager
+def log_underlying(name: str | None) -> Iterator[None]:
+    """Tag every log line emitted by this thread inside the block with `name`."""
+    prev = getattr(_current, "name", None)
+    _current.name = name
+    try:
+        yield
+    finally:
+        _current.name = prev
+
+
+class _UnderlyingFilter(logging.Filter):
+    """Prefix messages with `[INDEX] ` when emitted inside log_underlying()."""
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+        name = getattr(_current, "name", None)
+        if name and not getattr(record, "_idx_tagged", False):
+            record.msg = f"[{name}] {record.getMessage()}"
+            record.args = ()
+            record._idx_tagged = True
+        return True
 
 
 class _SanitiserFilter(logging.Filter):
@@ -60,6 +90,7 @@ def configure_logging() -> None:
     try:
         fh = logging.FileHandler("bot.log", encoding="utf-8")
         fh.setFormatter(logging.Formatter(fmt, datefmt=date_fmt))
+        fh.addFilter(_UnderlyingFilter())
         fh.addFilter(_SanitiserFilter())
         fh.setLevel(level)
         root.addHandler(fh)

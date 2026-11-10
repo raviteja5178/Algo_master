@@ -96,6 +96,7 @@ def live_signal_kwargs() -> dict:
         swing_pivot_use_atr_sl=settings.PIVOT_SWING_USE_ATR_SL,
         swing_pivot_atr_mult=settings.PIVOT_SWING_ATR_MULT,
         swing_pivot_max_sl_atr=settings.PIVOT_SWING_MAX_SL_ATR,
+        swing_pivot_max_risk_pts=settings.PIVOT_SWING_MAX_RISK_PTS,
     )
 
 

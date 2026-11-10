@@ -188,20 +188,37 @@ def upsert_trade(row: dict) -> None:
             con.execute(sql, row)
 
 
-def fetch_active_trade() -> dict | None:
-    """Return the most recent OPEN or PENDING trade, or None.
+def fetch_active_trade(underlying: str | None = None) -> dict | None:
+    """Return the most recent OPEN or PENDING trade (optionally filtered by underlying), or None.
 
     PENDING rows are written atomically by claim_entry_slot_atomic() before
-    the order is placed, so a concurrent process that races through the
-    fetch_active_trade() check will see the row and block itself even if
-    the first process hasn't received a fill yet.
+    the order is placed, so a concurrent check will see the row and block itself.
     """
     with _conn() as con:
-        row = con.execute(
-            "SELECT * FROM trades WHERE status IN ('OPEN','PENDING') "
-            "ORDER BY created_at DESC LIMIT 1"
-        ).fetchone()
+        if underlying:
+            norm = underlying.upper().strip()
+            row = con.execute(
+                "SELECT * FROM trades WHERE status IN ('OPEN','PENDING') "
+                "AND option_symbol LIKE ? "
+                "ORDER BY created_at DESC LIMIT 1",
+                (f"{norm}%",),
+            ).fetchone()
+        else:
+            row = con.execute(
+                "SELECT * FROM trades WHERE status IN ('OPEN','PENDING') "
+                "ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
     return dict(row) if row else None
+
+
+def fetch_active_trades() -> list[dict]:
+    """Return all currently OPEN or PENDING trades across all underlyings."""
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT * FROM trades WHERE status IN ('OPEN','PENDING') "
+            "ORDER BY created_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def claim_entry_slot_atomic(trade_id: str, signal_type: str,
@@ -503,7 +520,12 @@ def fetch_today_realised_pnl() -> float:
     return float(row[0]) if row else 0.0
 
 
-def fetch_today_pivot_trade_count(day: str) -> int:
+def _underlying_like(underlying: str | None) -> str:
+    """LIKE pattern matching option_symbol for one index ('%' = all indexes)."""
+    return f"{underlying.upper().strip()}%" if underlying else "%"
+
+
+def fetch_today_pivot_trade_count(day: str, underlying: str | None = None) -> int:
     """
     Return the number of CE_PIVOT / PE_PIVOT trades that have been filled today.
 
@@ -518,13 +540,14 @@ def fetch_today_pivot_trade_count(day: str) -> int:
             "WHERE strategy_type LIKE '%_PIVOT' "
             "  AND entry_order_id != 'IMPORTED' "
             "  AND (entry_time LIKE ? OR signal_timestamp LIKE ?) "
-            "  AND status IN ('OPEN', 'CLOSED')",
-            (f"{day}%", f"{day}%"),
+            "  AND status IN ('OPEN', 'CLOSED') "
+            "  AND option_symbol LIKE ?",
+            (f"{day}%", f"{day}%", _underlying_like(underlying)),
         ).fetchone()
     return int(row[0]) if row else 0
 
 
-def fetch_today_mom_trade_count(day: str) -> int:
+def fetch_today_mom_trade_count(day: str, underlying: str | None = None) -> int:
     """Return the number of CE_MOM / PE_MOM trades filled on *day* (YYYY-MM-DD)."""
     with _conn() as con:
         row = con.execute(
@@ -532,13 +555,14 @@ def fetch_today_mom_trade_count(day: str) -> int:
             "WHERE strategy_type LIKE '%_MOM' "
             "  AND entry_order_id != 'IMPORTED' "
             "  AND (entry_time LIKE ? OR signal_timestamp LIKE ?) "
-            "  AND status IN ('OPEN', 'CLOSED')",
-            (f"{day}%", f"{day}%"),
+            "  AND status IN ('OPEN', 'CLOSED') "
+            "  AND option_symbol LIKE ?",
+            (f"{day}%", f"{day}%", _underlying_like(underlying)),
         ).fetchone()
     return int(row[0]) if row else 0
 
 
-def fetch_today_side_trade_count(side: str, day: str) -> int:
+def fetch_today_side_trade_count(side: str, day: str, underlying: str | None = None) -> int:
     """Return the number of trades on a given side (CE or PE) filled on *day*.
 
     Counts every filled trade (any strategy) that starts with *side* ('CE' or
@@ -552,8 +576,9 @@ def fetch_today_side_trade_count(side: str, day: str) -> int:
             "WHERE strategy_type LIKE ? "
             "  AND entry_order_id != 'IMPORTED' "
             "  AND (entry_time LIKE ? OR signal_timestamp LIKE ?) "
-            "  AND status IN ('OPEN', 'CLOSED')",
-            (prefix, f"{day}%", f"{day}%"),
+            "  AND status IN ('OPEN', 'CLOSED') "
+            "  AND option_symbol LIKE ?",
+            (prefix, f"{day}%", f"{day}%", _underlying_like(underlying)),
         ).fetchone()
     return int(row[0]) if row else 0
 

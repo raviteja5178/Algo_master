@@ -15,6 +15,7 @@ from kiteconnect import KiteConnect  # type: ignore
 
 from broker.kite_client import get_kite
 from config import settings
+from utils.exchange_utils import option_exchange
 from utils.logging_config import log_event
 from utils.price_utils import round_to_tick
 
@@ -63,7 +64,7 @@ class OrderManager:
         self,
         tradingsymbol: str,
         quantity: int,
-        exchange: str = "BFO",
+        exchange: str | None = None,
         ltp_hint: float | None = None,
     ) -> dict:
         """
@@ -77,6 +78,7 @@ class OrderManager:
                    cutting ~200 ms off the signal-to-order latency.
                    If None, the LTP is fetched fresh via kite.ltp().
         """
+        exchange = exchange or option_exchange(tradingsymbol)
         if ltp_hint is not None and ltp_hint > 0:
             ltp = ltp_hint
             logger.debug("place_buy_order: using caller-supplied LTP %.2f for %s", ltp, tradingsymbol)
@@ -133,7 +135,7 @@ class OrderManager:
         self,
         tradingsymbol: str,
         quantity: int,
-        exchange: str = "BFO",
+        exchange: str | None = None,
         tag: str = "",
         ltp_hint: float | None = None,
     ) -> dict:
@@ -149,6 +151,7 @@ class OrderManager:
           - If actual qty < quantity → cap the sell to actual qty and log a warning.
             Sending the originally intended quantity could overshoot into a short.
         """
+        exchange = exchange or option_exchange(tradingsymbol)
         # ── Pre-sell position guard ────────────────────────────────────────────
         actual_qty = self.get_position_qty(tradingsymbol)
         if actual_qty <= 0:
@@ -201,8 +204,9 @@ class OrderManager:
         tradingsymbol: str,
         quantity: int,
         trigger_price: float,
-        exchange: str = "BFO",
+        exchange: str | None = None,
     ) -> str:
+        exchange = exchange or option_exchange(tradingsymbol)
         log_event(
             logger, "INITIAL_SL_PLACED",
             symbol=tradingsymbol, sl=trigger_price, qty=quantity,

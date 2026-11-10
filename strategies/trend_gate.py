@@ -43,7 +43,7 @@ def trend_15m_ok(side: str, candles_15m: Sequence[Candle]) -> bool:
 def daily_trend_from_closes(closes: Sequence[float], period: int = 20) -> str:
     """'UP' / 'DOWN' from the last close vs the EMA(period) of *closes*
     (oldest first, completed sessions only); 'UNKNOWN' when too short."""
-    if len(closes) < period:
+    if period < 1 or len(closes) < period:
         return "UNKNOWN"
     e = ema(list(closes), period)[-1]
     if e is None or closes[-1] == e:

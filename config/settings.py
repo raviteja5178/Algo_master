@@ -44,9 +44,205 @@ KITE_TOKEN_DATE: str = _get("KITE_TOKEN_DATE")   # ISO date when token was gener
 TRADING_MODE: Literal["PAPER", "SHADOW", "LIVE"] = _get("TRADING_MODE", "PAPER").upper()  # type: ignore[assignment]
 ENABLE_LIVE_TRADING: bool = _getbool("ENABLE_LIVE_TRADING", False)
 
-# ── Instrument ────────────────────────────────────────────────────────────────
+# ── Instrument & Multi-Underlying Toggles ──────────────────────────────────────
 UNDERLYING: str = _get("UNDERLYING", "SENSEX")
-QUANTITY: int = _getint("QUANTITY", 20)
+
+# Individual instrument toggles to enable/disable specific underlyings
+ENABLE_SENSEX: bool   = _getbool("ENABLE_SENSEX", True)
+ENABLE_NIFTY: bool    = _getbool("ENABLE_NIFTY", False)
+ENABLE_FINNIFTY: bool = _getbool("ENABLE_FINNIFTY", False)
+ENABLE_BANKNIFTY: bool = _getbool("ENABLE_BANKNIFTY", False)
+
+# Comma-separated list to explicitly select active underlyings (e.g. "SENSEX,NIFTY,FINNIFTY")
+ACTIVE_UNDERLYINGS: str = _get("ACTIVE_UNDERLYINGS", _get("UNDERLYINGS", ""))
+
+# Base default lot sizes per index: SENSEX (20), NIFTY (65), FINNIFTY (60), etc.
+DEFAULT_LOT_SIZES: dict[str, int] = {
+    "SENSEX": 20,
+    "NIFTY": 65,
+    "FINNIFTY": 60,
+    "FINIFTY": 60,
+    "BANKNIFTY": 15,
+    "BANKEX": 15,
+    "MIDCPNIFTY": 120,
+}
+
+# Number of lots (multiplies base lot size when computing default quantity)
+NUM_LOTS: int = _getint("NUM_LOTS", _getint("LOTS", 1))
+
+
+def normalize_index_name(name: str) -> str:
+    """Normalize index symbol / name across variations (e.g. 'NSE:NIFTY 50' -> 'NIFTY', 'FINIFTY' -> 'FINNIFTY')."""
+    cleaned = (name or "").upper().strip()
+    if ":" in cleaned:
+        cleaned = cleaned.split(":")[-1].strip()
+    cleaned = cleaned.replace(" ", "").replace("_", "").replace("-", "")
+    if "FIN" in cleaned:
+        return "FINNIFTY"
+    if "BANKEX" in cleaned:
+        return "BANKEX"
+    if "BANK" in cleaned:
+        return "BANKNIFTY"
+    if "MID" in cleaned:
+        return "MIDCPNIFTY"
+    if "SENSEX" in cleaned:
+        return "SENSEX"
+    if "NIFTY" in cleaned:
+        return "NIFTY"
+    return cleaned
+
+
+def _load_lot_sizes() -> dict[str, int]:
+    """
+    Load configurable lot sizes with fallback to DEFAULT_LOT_SIZES.
+    Supports:
+      1. Per-index env vars: LOT_SIZE_<IDX>, <IDX>_LOT_SIZE, <IDX>_LOT_QTY, <IDX>_QUANTITY
+      2. INDEX_LOT_SIZES / LOT_SIZES env var (JSON or 'SENSEX:20,NIFTY:65,FINNIFTY:60')
+    """
+    import json
+    lot_sizes = dict(DEFAULT_LOT_SIZES)
+
+    # 1. Check per-index env overrides (e.g. SENSEX_LOT_SIZE, LOT_SIZE_NIFTY, FINNIFTY_LOT_QTY)
+    checked_indices = list(DEFAULT_LOT_SIZES.keys()) + ["SENSEX", "NIFTY", "FINNIFTY", "FINIFTY", "BANKNIFTY", "BANKEX", "MIDCPNIFTY"]
+    for idx in checked_indices:
+        for env_key in [
+            f"LOT_SIZE_{idx}", f"{idx}_LOT_SIZE",
+            f"LOT_QTY_{idx}", f"{idx}_LOT_QTY",
+            f"{idx}_QUANTITY",
+        ]:
+            val = os.environ.get(env_key, "").strip()
+            if val:
+                try:
+                    norm = normalize_index_name(idx)
+                    lot_sizes[norm] = int(val)
+                    if norm == "FINNIFTY":
+                        lot_sizes["FINIFTY"] = int(val)
+                except ValueError:
+                    pass
+
+    # 2. Dynamic scan for any LOT_SIZE_* or *_LOT_SIZE / *_LOT_QTY in os.environ
+    for env_key, val in os.environ.items():
+        key_upper = env_key.upper().strip()
+        val_str = val.strip()
+        if not val_str:
+            continue
+        if key_upper.startswith("LOT_SIZE_"):
+            idx_name = key_upper[len("LOT_SIZE_"):]
+            try:
+                norm = normalize_index_name(idx_name)
+                lot_sizes[norm] = int(val_str)
+            except ValueError:
+                pass
+        elif key_upper.endswith("_LOT_SIZE"):
+            idx_name = key_upper[:-len("_LOT_SIZE")]
+            try:
+                norm = normalize_index_name(idx_name)
+                lot_sizes[norm] = int(val_str)
+            except ValueError:
+                pass
+        elif key_upper.endswith("_LOT_QTY"):
+            idx_name = key_upper[:-len("_LOT_QTY")]
+            try:
+                norm = normalize_index_name(idx_name)
+                lot_sizes[norm] = int(val_str)
+            except ValueError:
+                pass
+
+    # 3. Parse from INDEX_LOT_SIZES or LOT_SIZES env variable
+    raw_map = _get("INDEX_LOT_SIZES", _get("LOT_SIZES", ""))
+    if raw_map:
+        if raw_map.startswith("{"):
+            try:
+                parsed = json.loads(raw_map)
+                for k, v in parsed.items():
+                    norm_k = normalize_index_name(str(k))
+                    lot_sizes[norm_k] = int(v)
+                    if norm_k == "FINNIFTY":
+                        lot_sizes["FINIFTY"] = int(v)
+            except Exception:
+                pass
+        else:
+            for pair in raw_map.split(","):
+                if ":" in pair:
+                    k, v = pair.split(":", 1)
+                    norm_k = normalize_index_name(k.strip())
+                    try:
+                        lot_sizes[norm_k] = int(v.strip())
+                        if norm_k == "FINNIFTY":
+                            lot_sizes["FINIFTY"] = int(v.strip())
+                    except ValueError:
+                        pass
+
+    return lot_sizes
+
+
+LOT_SIZES: dict[str, int] = _load_lot_sizes()
+
+
+def get_enabled_underlyings() -> list[str]:
+    """
+    Return the list of enabled underlying instruments to trade today.
+    Priority:
+      1. ACTIVE_UNDERLYINGS / UNDERLYINGS env var (comma-separated, e.g. "SENSEX,NIFTY,FINNIFTY")
+      2. Individual booleans ENABLE_SENSEX, ENABLE_NIFTY, ENABLE_FINNIFTY, ENABLE_BANKNIFTY
+      3. Fallback to single UNDERLYING setting
+    """
+    if ACTIVE_UNDERLYINGS.strip():
+        items = [normalize_index_name(s) for s in ACTIVE_UNDERLYINGS.split(",") if s.strip()]
+        if items:
+            # Preserve order without duplicates
+            seen = set()
+            res = []
+            for item in items:
+                if item not in seen:
+                    seen.add(item)
+                    res.append(item)
+            return res
+
+    enabled = []
+    if ENABLE_SENSEX:
+        enabled.append("SENSEX")
+    if ENABLE_NIFTY:
+        enabled.append("NIFTY")
+    if ENABLE_FINNIFTY:
+        enabled.append("FINNIFTY")
+    if ENABLE_BANKNIFTY:
+        enabled.append("BANKNIFTY")
+
+    if not enabled:
+        # Fallback to single configured UNDERLYING
+        enabled.append(normalize_index_name(UNDERLYING))
+
+    return enabled
+
+
+def get_lot_size(underlying: str | None = None) -> int:
+    """Return the configurable lot size for the given underlying (defaults to UNDERLYING)."""
+    target = underlying if underlying is not None else UNDERLYING
+    norm = normalize_index_name(target)
+    return LOT_SIZES.get(norm, DEFAULT_LOT_SIZES.get(norm, 20))
+
+
+def get_quantity(underlying: str | None = None, num_lots: int | None = None) -> int:
+    """Return total trade quantity = lot_size * num_lots."""
+    lots = num_lots if num_lots is not None else NUM_LOTS
+    return get_lot_size(underlying) * max(1, lots)
+
+
+def _resolve_initial_quantity() -> int:
+    raw_qty = os.environ.get("QUANTITY", "").strip()
+    if raw_qty:
+        try:
+            val = int(raw_qty)
+            if val > 0:
+                return val
+        except ValueError:
+            pass
+    return get_quantity(UNDERLYING, NUM_LOTS)
+
+
+QUANTITY: int = _resolve_initial_quantity()
+
 # EMA-specific overrides — applied only when the signal is CE or PE (pure EMA strategy).
 # When set, these override the global value for EMA trades only.
 # 0 / empty = use the global value.
@@ -840,6 +1036,7 @@ PIVOT_SWING_RR_T3: float        = _getfloat("PIVOT_SWING_RR_T3", 3.5)
 PIVOT_SWING_USE_ATR_SL: bool    = _getbool("PIVOT_SWING_USE_ATR_SL", False)    # False = structural swing low/high
 PIVOT_SWING_ATR_MULT: float     = _getfloat("PIVOT_SWING_ATR_MULT", 1.2)
 PIVOT_SWING_MAX_SL_ATR: float   = _getfloat("PIVOT_SWING_MAX_SL_ATR", 1.5)    # 0 = uncapped; caps wide swing SLs
+PIVOT_SWING_MAX_RISK_PTS: float = _getfloat("PIVOT_SWING_MAX_RISK_PTS", 0.0)   # 0 = off; skip swing signals whose index risk exceeds this
 
 # Move to breakeven after +N R.  1.5 (was 1.0): replay showed +10% total points; win rate
 # drops (58% -> ~50%) because fewer trades are protected early.
@@ -863,6 +1060,44 @@ PIVOT_NO_FRIDAY: bool           = _getbool("PIVOT_NO_FRIDAY", False)
 PIVOT_SKIP_LULLS: bool          = _getbool("PIVOT_SKIP_LULLS", False)
 # PIVOT_LULL_WINDOWS: comma-separated HH:MM-HH:MM intervals read from .env (e.g. "11:20-11:55,13:10-13:35")
 PIVOT_LULL_WINDOWS: str         = _get("PIVOT_LULL_WINDOWS", "")
+
+# ── Pine "Pivot Reversal + SL & Targets" engine (strategies/pivot_reversal.py) ─
+# PIVOT_PINE_MODE: when true this engine REPLACES every legacy pivot mode
+# (open-direction / rejection / acceptance / bounce / old swing).  Requires
+# ENABLE_PIVOT_STRATEGY=true.  Entries follow the TradingView script exactly:
+# swing-level breakout + EMA filter, one trade per swing level, opposite signal
+# flips the position.  Exits are index-based: Pine swing stop, then a wide ATR
+# chandelier trail (no break-even, no fixed target) so winners can run.
+PIVOT_PINE_MODE: bool             = _getbool("PIVOT_PINE_MODE", False)
+PIVOT_PINE_LEFT: int              = _getint("PIVOT_PINE_LEFT", 4)
+PIVOT_PINE_RIGHT: int             = _getint("PIVOT_PINE_RIGHT", 2)
+PIVOT_PINE_EMA: int               = _getint("PIVOT_PINE_EMA", 50)             # 0 = no trend filter
+PIVOT_PINE_RR_T1: float           = _getfloat("PIVOT_PINE_RR_T1", 1.5)        # chart reference only
+PIVOT_PINE_RR_T2: float           = _getfloat("PIVOT_PINE_RR_T2", 2.5)        # Pine's virtual exit
+PIVOT_PINE_USE_ATR_SL: bool       = _getbool("PIVOT_PINE_USE_ATR_SL", False)  # False = opposite swing level
+PIVOT_PINE_ATR_MULT: float        = _getfloat("PIVOT_PINE_ATR_MULT", 1.5)
+# Take the breakout the moment price crosses the level instead of at bar close.
+PIVOT_PINE_TICK_ENTRY: bool       = _getbool("PIVOT_PINE_TICK_ENTRY", True)
+# Skip signals whose swing stop is wider than N x ATR (0 = off).  A stale swing
+# level can sit 800+ index points away; that is not a tradeable option stop.
+PIVOT_PINE_MAX_RISK_ATR: float    = _getfloat("PIVOT_PINE_MAX_RISK_ATR", 4.0)
+# Skip a (late) bar-close signal when price already ran N x ATR past the level.
+PIVOT_PINE_MAX_CHASE_ATR: float   = _getfloat("PIVOT_PINE_MAX_CHASE_ATR", 0.5)
+# Trail: activates once profit >= ACT_R x risk, then stop = best -/+ MULT x ATR.
+PIVOT_PINE_TRAIL_ACT_R: float     = _getfloat("PIVOT_PINE_TRAIL_ACT_R", 1.0)
+PIVOT_PINE_TRAIL_ATR_MULT: float  = _getfloat("PIVOT_PINE_TRAIL_ATR_MULT", 2.5)
+# Trail arms at min(TRAIL_ACT_R x risk, TRAIL_ACT_ATR x ATR); break-even (stop at
+# entry +/- BE_BUF_ATR x ATR) arms at BE_ATR x ATR.  0 disables each.  A stale
+# swing stop can be 4+ ATR away, so a pure "1R" trigger never fired (4 Nov SELL).
+PIVOT_PINE_TRAIL_ACT_ATR: float   = _getfloat("PIVOT_PINE_TRAIL_ACT_ATR", 1.0)
+PIVOT_PINE_BE_ATR: float          = _getfloat("PIVOT_PINE_BE_ATR", 1.0)
+PIVOT_PINE_BE_BUF_ATR: float      = _getfloat("PIVOT_PINE_BE_BUF_ATR", 0.2)
+# Option-premium broker stop is only a disaster backstop in this mode.
+PIVOT_PINE_BACKSTOP_CUSHION: float = _getfloat("PIVOT_PINE_BACKSTOP_CUSHION", 2.5)
+# Close an open trade when Pine flips to the opposite side.
+PIVOT_PINE_REVERSAL_EXIT: bool    = _getbool("PIVOT_PINE_REVERSAL_EXIT", True)
+# Lull windows hide valid Pine breakouts, so they are opt-in for this engine.
+PIVOT_PINE_SKIP_LULLS: bool       = _getbool("PIVOT_PINE_SKIP_LULLS", False)
 
 
 # ── PDHL (Previous Day High/Low) Breakout strategy ───────────────────────────
@@ -1029,6 +1264,9 @@ def validate() -> None:
         raise ValueError("KITE_API_KEY is required for LIVE mode.")
     if QUANTITY <= 0:
         raise ValueError("QUANTITY must be a positive integer.")
+    for idx, sz in LOT_SIZES.items():
+        if sz <= 0:
+            raise ValueError(f"Lot size for {idx} must be a positive integer, got {sz}.")
     if EXPIRY_MODE not in ("CONFIGURED", "AUTO"):
         raise ValueError("EXPIRY_MODE must be CONFIGURED or AUTO.")
     if EXPIRY_MODE == "CONFIGURED" and not CONFIGURED_EXPIRY:

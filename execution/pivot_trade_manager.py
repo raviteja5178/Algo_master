@@ -53,6 +53,17 @@ _STOP_EPSILON = 0.25
 
 
 class PivotTradeManager:
+    # Trail-only mode (Pine engine).  Class-level defaults so manager states
+    # saved before this mode existed still load (load() restores via __dict__).
+    trail_only: bool = False
+    trail_act_r: float = 1.0
+    trail_mult: float = 3.0
+    # ATR-based triggers (0 = off).  A stale swing stop can sit 4-5 ATR away, so
+    # "1R" alone would never arm the trail/BE on a 2-ATR move.
+    trail_act_atr: float = 0.0
+    be_atr: float = 0.0
+    be_buf_atr: float = 0.2
+
     def __init__(
         self,
         side: str,
@@ -74,7 +85,19 @@ class PivotTradeManager:
         hard_sl_cushion: float = 1.25,
         max_sl_pct: float = 0.5,
         signal_risk: float | None = None,
+        trail_only: bool = False,
+        trail_act_r: float = 1.0,
+        trail_mult: float = 3.0,
+        trail_act_atr: float = 0.0,
+        be_atr: float = 0.0,
+        be_buf_atr: float = 0.2,
     ) -> None:
+        self.trail_only = trail_only
+        self.trail_act_atr = trail_act_atr
+        self.be_atr = be_atr
+        self.be_buf_atr = be_buf_atr
+        self.trail_act_r = trail_act_r
+        self.trail_mult = trail_mult
         self.side = side
         self.sign = 1 if side == "CE" else -1
         self.entry_index = entry_index
@@ -178,6 +201,28 @@ class PivotTradeManager:
                 "BE":      "PIVOT_BE_STOP",
             }.get(self.stage, "PIVOT_TSL_HIT")
             return ("EXIT", reason)
+
+        # Trail-only (Pine engine): no fixed target, no break-even, no T1/T2
+        # locks.  The initial stop stays until profit reaches trail_act_r x risk,
+        # then a wide ATR chandelier ratchets behind the best price.
+        if self.trail_only:
+            if self._fav(price) > self._fav(self.best_index):
+                self.best_index = price
+            fav_best = self._fav(self.best_index)
+            moved = False
+            # Break-even (slightly in profit) once price has run be_atr x ATR.
+            if (self.be_atr > 0 and self.stage == "INITIAL"
+                    and fav_best >= self.be_atr * self.atr):
+                moved |= self._move_stop(
+                    self.entry_index + self.sign * self.be_buf_atr * self.atr, "BE")
+            # Chandelier trail from the EARLIER of 1R or trail_act_atr x ATR.
+            act = self.trail_act_r * self.risk
+            if self.trail_act_atr > 0:
+                act = min(act, self.trail_act_atr * self.atr)
+            if self.trail_mult > 0 and fav_best >= act:
+                moved |= self._move_stop(
+                    self.best_index - self.sign * self.trail_mult * self.atr, "TRAIL")
+            return ("STOP_MOVED", self.option_stop) if moved else None
 
         # 2. final target T3
         if self._fav(price) >= self._fav(self.t3):
