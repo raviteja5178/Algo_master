@@ -143,6 +143,10 @@ class PivotTradeManager:
         return max(0.05, round_to_tick(self.option_entry + dist))
 
     def _move_stop(self, new_stop: float, stage: str) -> bool:
+        # Compare at stored precision: a sub-paisa difference would otherwise count as
+        # a "move" on every tick (same rounded stop, but a broker/DB update + a trail
+        # step counted each time).
+        new_stop = round(new_stop, 2)
         if self._fav(new_stop) <= self._fav(self.stop_index):
             logger.debug(
                 "PIVOT_STOP_NOOP side=%s stage=%s proposed=%.2f current=%.2f",

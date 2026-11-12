@@ -857,7 +857,8 @@ def _merge_live_trade_state(trade: dict, idx: str) -> dict | None:
                                        float(trade.get("highest_ltp") or 0))
         if at.get("target") is not None:
             trade["target_reference"] = at["target"]
-        for k in ("break_even_activated", "trail_steps_completed", "be_points"):
+        for k in ("break_even_activated", "trail_steps_completed", "be_points",
+                  "index_target", "index_stop"):
             if at.get(k) is not None:
                 trade[k] = at[k]
     return st
@@ -1770,7 +1771,7 @@ _SAFE_KEYS = {
     "EMA_SWING_LENGTH", "EMA_SWING_BUFFER_ATR", "EMA_SL_MIN_ATR", "EMA_SL_MAX_ATR",
     "EMA_SL_FALLBACK_ATR", "EMA_OPTION_DELTA", "EMA_EXPIRY_DELTA", "EMA_MAX_SL_PCT",
     "EMA_EXPIRY_MAX_SL_PCT", "EMA_HARD_SL_CUSHION", "EMA_MAX_RISK_RUPEES",
-    "EMA_BE_TRIGGER_R", "EMA_BE_BUFFER_PTS", "EMA_TRAIL_ATR_MULT", "EMA_TRAIL_EMA9_EXIT",
+    "EMA_BE_TRIGGER_R", "EMA_BE_BUFFER_PTS", "EMA_TRAIL_ATR_MULT", "EMA_TRAIL_EMA9_EXIT", "EMA_PREMIUM_GIVEBACK_PCT",
     "EMA_TIME_STOP_BARS", "EMA_TIME_STOP_MIN_R", "EMA_MIN_ROOM_R", "EMA_COLLAPSE_CLOSES",
     "EMA_PROFIT_LOCK", "EMA_MAX_TRADES_PER_DAY", "EMA_MAX_CONSEC_LOSSES",
     "EMA_EXPIRY_NO_ENTRY_AFTER",
@@ -1835,7 +1836,7 @@ _EDITABLE_KEYS = {
     "EMA_SWING_LENGTH", "EMA_SWING_BUFFER_ATR", "EMA_SL_MIN_ATR", "EMA_SL_MAX_ATR",
     "EMA_SL_FALLBACK_ATR", "EMA_OPTION_DELTA", "EMA_EXPIRY_DELTA", "EMA_MAX_SL_PCT",
     "EMA_EXPIRY_MAX_SL_PCT", "EMA_HARD_SL_CUSHION", "EMA_MAX_RISK_RUPEES",
-    "EMA_BE_TRIGGER_R", "EMA_BE_BUFFER_PTS", "EMA_TRAIL_ATR_MULT", "EMA_TRAIL_EMA9_EXIT",
+    "EMA_BE_TRIGGER_R", "EMA_BE_BUFFER_PTS", "EMA_TRAIL_ATR_MULT", "EMA_TRAIL_EMA9_EXIT", "EMA_PREMIUM_GIVEBACK_PCT",
     "EMA_TIME_STOP_BARS", "EMA_TIME_STOP_MIN_R", "EMA_MIN_ROOM_R", "EMA_COLLAPSE_CLOSES",
     "EMA_PROFIT_LOCK", "EMA_MAX_TRADES_PER_DAY", "EMA_MAX_CONSEC_LOSSES",
     "EMA_EXPIRY_NO_ENTRY_AFTER",

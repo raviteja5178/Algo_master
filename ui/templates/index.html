@@ -2033,7 +2033,7 @@ function renderActiveTrade(at){
   document.getElementById('trade-status-pill').className='pill p-green';document.getElementById('trade-status-pill').textContent=at.status||'OPEN';
   const entry=parseFloat(at.entry_price)||0,sl=parseFloat(at.current_stop)||0,high=parseFloat(at.highest_ltp)||entry,target=parseFloat(at.target_reference)||(entry+50),qty=parseInt(at.quantity)||0;
   document.getElementById('td-entry').textContent=fmt(entry);document.getElementById('td-ltp').textContent=_optLtp!=null?fmt(_optLtp):fmt(high);
-  document.getElementById('td-sl').textContent=fmt(sl);document.getElementById('td-target').textContent=fmt(target);
+  document.getElementById('td-sl').textContent=fmt(sl);document.getElementById('td-target').textContent=fmt(target)+(at.index_target!=null?` (idx ${fmt(parseFloat(at.index_target))})`:'');
   document.getElementById('td-high').textContent=fmt(high);document.getElementById('td-qty').textContent=qty;
   document.getElementById('td-etime').textContent=fmtDate(at.entry_time);
   const ltp=_optLtp!=null?_optLtp:high;

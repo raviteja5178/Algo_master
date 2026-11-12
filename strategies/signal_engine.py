@@ -850,7 +850,8 @@ def evaluate_signals(
     if settings.ENABLE_EMA_STRATEGY and _ema_window_ok and not _sq_blocked and not _candle_already_attempted():
         _ema_kwargs = dict(
             rsi_period=settings.EMA_RSI_PERIOD,
-            pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS,
+            pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS
+            * settings.index_scale(underlying, candles_5m[-1].close),
             ema_cross=settings.EMA_CROSS_TRIGGER,
             cross_without_15m=settings.EMA_CROSS_IGNORE_15M,
             cross_only=settings.EMA_CROSS_ONLY,

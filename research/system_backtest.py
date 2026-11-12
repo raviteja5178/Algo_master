@@ -92,6 +92,19 @@ EXPIRY_SCHEDULE: list[tuple[date, int]] = [
     (date(2025, 9, 1), 3),    # Thursday
 ]
 
+# Per-index expiry rules: (effective from, weekday, monthly?).  monthly=True means only
+# the LAST such weekday of each month is listed (no weeklies).
+#   NIFTY     weekly Thursday; NSE moved it to Tuesday on 2025-09-01.
+#   FINNIFTY  weekly Tuesday; weeklies were withdrawn after 2024-11-19 (SEBI one-weekly-
+#             benchmark rule) leaving the monthly (last Tuesday).
+EXPIRY_RULES: dict[str, list[tuple[date, int, bool]]] = {
+    "SENSEX": [(d, w, False) for d, w in EXPIRY_SCHEDULE],
+    "NIFTY": [(date(2000, 1, 1), 3, False), (date(2025, 9, 1), 1, False)],
+    "FINNIFTY": [(date(2000, 1, 1), 1, False), (date(2024, 11, 20), 1, True)],
+}
+STRIKE_STEP = {"SENSEX": 100, "NIFTY": 50, "FINNIFTY": 50}
+LOT_SIZE = {"SENSEX": 20, "NIFTY": 65, "FINNIFTY": 60}
+
 # Simulated wall clock (IST-aware datetime), shared by the patches below.
 _CLOCK: list[datetime] = []
 
@@ -121,11 +134,18 @@ class FakeDatetime(_REAL_DATETIME, metaclass=_FakeDatetimeMeta):
 class MarketData:
     """Cached history, indexed for fast 'what had completed by time T' lookups."""
 
-    def __init__(self) -> None:
-        for f in (MINUTE_CSV, DAILY_CSV, VIX_CSV):
+    def __init__(self, underlying: str = "SENSEX") -> None:
+        self.underlying = underlying.upper()
+        if self.underlying == "SENSEX":
+            minute_csv, daily_csv = MINUTE_CSV, DAILY_CSV
+        else:
+            u = self.underlying.lower()
+            minute_csv, daily_csv = DATA_DIR / f"{u}_1m_full.csv", DATA_DIR / f"{u}_daily_full.csv"
+        for f in (minute_csv, daily_csv, VIX_CSV):
             if not f.exists():
-                sys.exit(f"Missing {f} — run: python -m research.fetch_history")
-        m1 = pd.read_csv(MINUTE_CSV, parse_dates=["timestamp"])
+                sys.exit(f"Missing {f} — run: python -m research.fetch_history "
+                         f"--underlying {self.underlying}")
+        m1 = pd.read_csv(minute_csv, parse_dates=["timestamp"])
         m1 = m1[(m1.timestamp.dt.time >= dtime(9, 15)) & (m1.timestamp.dt.time < dtime(15, 30))]
         self.m1 = m1.reset_index(drop=True)
         self.sessions: list[date] = sorted(self.m1.timestamp.dt.date.unique())
@@ -136,7 +156,7 @@ class MarketData:
         for iv, mins in (("5minute", 5), ("15minute", 15)):
             self.bars[iv] = self._as_records(self._resample(mins), mins)
 
-        daily = pd.read_csv(DAILY_CSV, parse_dates=["date"])
+        daily = pd.read_csv(daily_csv, parse_dates=["date"])
         self.daily = [
             {"date": _REAL_DATETIME.combine(r.date.date(), dtime(0, 0)),
              "open": r.open, "high": r.high, "low": r.low, "close": r.close, "volume": 0,
@@ -209,10 +229,13 @@ def tick_round(px: float) -> float:
 
 
 class Contracts:
-    """Synthetic SENSEX option chain: symbols, tokens, expiries, premiums."""
+    """Synthetic index option chain (SENSEX / NIFTY / FINNIFTY): symbols, tokens, expiries, premiums."""
 
-    def __init__(self, md: MarketData) -> None:
+    def __init__(self, md: MarketData, underlying: str | None = None) -> None:
         self.md = md
+        self.name = (underlying or getattr(md, "underlying", "SENSEX")).upper()
+        self.rules = EXPIRY_RULES[self.name]
+        self.step = STRIKE_STEP[self.name]
         self.by_token: dict[int, dict] = {}
         self.by_symbol: dict[str, dict] = {}
         self._future_min: dict[tuple[date, date], float] = {}
@@ -252,44 +275,69 @@ class Contracts:
             self._future_min[key] = fut
         return (mins + fut) / self.year_min
 
-    def expiry_weekday(self, d: date) -> int:
-        wd = EXPIRY_SCHEDULE[0][1]
-        for since, w in EXPIRY_SCHEDULE:
+    def _rule(self, d: date) -> tuple[int, bool]:
+        """(expiry weekday, monthly-only?) in force on *d*."""
+        wd, monthly = self.rules[0][1], self.rules[0][2]
+        for since, w, m in self.rules:
             if d >= since:
-                wd = w
-        return wd
+                wd, monthly = w, m
+        return wd, monthly
+
+    def expiry_weekday(self, d: date) -> int:
+        return self._rule(d)[0]
+
+    def _holiday_adjust(self, exp: date) -> date:
+        """Holiday on the expiry day → the previous trading session."""
+        if self.md.sessions[0] <= exp <= self.md.sessions[-1]:
+            for _ in range(4):
+                if exp in self.md.session_set:
+                    break
+                exp -= timedelta(days=1)
+        return exp
 
     def expiries_from(self, d: date, n: int = 3) -> list[date]:
-        out: list[date] = []
+        found: set[date] = set()
         cur = d - timedelta(days=d.weekday())        # Monday of d's week
-        while len(out) < n:
-            exp = cur + timedelta(days=self.expiry_weekday(cur))
-            # Holiday on the expiry weekday → the previous trading session.
-            if self.md.sessions[0] <= exp <= self.md.sessions[-1]:
-                for _ in range(4):
-                    if exp in self.md.session_set:
-                        break
-                    exp -= timedelta(days=1)
-            if exp >= d:
-                out.append(exp)
+        weeks = 0
+        while weeks < 80 and len([e for e in found if e >= d]) < n:
+            wd, monthly = self._rule(cur)
+            if not monthly:
+                exp = self._holiday_adjust(cur + timedelta(days=wd))
+                if exp >= d:
+                    found.add(exp)
             cur += timedelta(days=7)
-        return out
+            weeks += 1
+        # Monthly-only periods: the last <weekday> of each month.
+        y, m = d.year, d.month
+        for _ in range(14):
+            first_next = date(y + (m == 12), m % 12 + 1, 1)
+            last = first_next - timedelta(days=1)
+            wd, monthly = self._rule(last)
+            if monthly:
+                exp = last - timedelta(days=(last.weekday() - wd) % 7)
+                exp = self._holiday_adjust(exp)
+                if exp >= d:
+                    found.add(exp)
+            y, m = first_next.year, first_next.month
+        return sorted(e for e in found if e >= d)[:n]
 
     def contract(self, expiry: date, strike: float, opt: str) -> dict:
-        sym = f"SENSEX{expiry:%y%m%d}{int(strike)}{opt}"
+        sym = f"{self.name}{expiry:%y%m%d}{int(strike)}{opt}"
         c = self.by_symbol.get(sym)
         if c is None:
             token = 10_000_000 + zlib.crc32(sym.encode()) % 900_000_000
+            nse = self.name != "SENSEX"
             c = {"tradingsymbol": sym, "instrument_token": token, "strike": float(strike),
-                 "expiry": expiry, "instrument_type": opt, "name": "SENSEX",
-                 "segment": "BFO-OPT", "exchange": "BFO", "lot_size": 20}
+                 "expiry": expiry, "instrument_type": opt, "name": self.name,
+                 "segment": "NFO-OPT" if nse else "BFO-OPT", "exchange": "NFO" if nse else "BFO",
+                 "lot_size": LOT_SIZE[self.name]}
             self.by_symbol[sym] = c
             self.by_token[token] = c
         return c
 
     def chain(self, expiry: date, opt: str, spot: float) -> list[dict]:
-        atm = round(spot / 100) * 100
-        return [self.contract(expiry, atm + k * 100, opt) for k in range(-15, 16)]
+        atm = round(spot / self.step) * self.step
+        return [self.contract(expiry, atm + k * self.step, opt) for k in range(-15, 16)]
 
     def premium(self, c: dict, spot: float, at: datetime) -> float:
         """Premium of contract *c* at naive-IST time *at* with SENSEX at *spot*."""
@@ -303,8 +351,10 @@ class Contracts:
 class FakeKite:
     """The subset of KiteConnect the bot calls in SHADOW mode, served from history."""
 
-    def __init__(self, md: MarketData, chain: Contracts, sensex_token: int) -> None:
+    def __init__(self, md: MarketData, chain: Contracts, sensex_token: int,
+                 spot_key: str | None = None) -> None:
         self.md, self.chain, self.sensex_token = md, chain, sensex_token
+        self.spot_key = spot_key          # quote key of the index itself, e.g. "NSE:NIFTY 50"
         self.spot = 0.0
 
     @staticmethod
@@ -335,7 +385,7 @@ class FakeKite:
 
     def _quote_one(self, key: str) -> dict:
         now = _CLOCK[0].replace(tzinfo=None)
-        if key.endswith(":SENSEX"):
+        if key.endswith(":SENSEX") or key == self.spot_key:
             return {"last_price": self.spot}
         sym = key.split(":", 1)[1]
         c = self.chain.by_symbol[sym]
@@ -416,7 +466,8 @@ def _coerce(cur, raw: str):
     return raw
 
 
-def install(md: MarketData, tmp: Path, overrides: dict[str, str], mode: str = "SHADOW"):
+def install(md: MarketData, tmp: Path, overrides: dict[str, str], mode: str = "SHADOW",
+            underlying: str = "SENSEX"):
     """Import the bot with every outside-world dependency simulated. Returns (main, kite, chain)."""
     from config import settings
 
@@ -427,6 +478,7 @@ def install(md: MarketData, tmp: Path, overrides: dict[str, str], mode: str = "S
             sys.exit(f"--set {key}: unknown setting")
         setattr(settings, key, _coerce(getattr(settings, key), raw))
     settings.TRADING_MODE = mode
+    settings.UNDERLYING = underlying
     settings.ENABLE_LIVE_TRADING = False
     settings.ENABLE_AI_CONFIRMATION = False
     settings.ENABLE_AI_EXIT = False
@@ -453,8 +505,8 @@ def install(md: MarketData, tmp: Path, overrides: dict[str, str], mode: str = "S
     for mod in (tu, cagg, hd, mvwap):
         mod.datetime = FakeDatetime
 
-    chain = Contracts(md)
-    kite = FakeKite(md, chain, hd.SENSEX_TOKEN)
+    chain = Contracts(md, underlying)
+    kite = FakeKite(md, chain, hd.get_spot_token(underlying), hd.get_exchange_symbol(underlying))
     for mod in list(sys.modules.values()):
         if mod is not None and getattr(mod, "get_kite", None) is kc.get_kite and mod is not kc:
             mod.get_kite = lambda: kite
@@ -463,7 +515,7 @@ def install(md: MarketData, tmp: Path, overrides: dict[str, str], mode: str = "S
     def _today() -> date:
         return _CLOCK[0].date()
 
-    def resolve_expiry() -> date:
+    def resolve_expiry(underlying: str | None = None) -> date:
         exps = chain.expiries_from(_today())
         if exps[0] == _today() and settings.EXPIRY_DAY_ROLLOVER_TIME:
             from utils.time_utils import is_after_or_equal, parse_time_ist
@@ -471,7 +523,7 @@ def install(md: MarketData, tmp: Path, overrides: dict[str, str], mode: str = "S
                 return exps[1]
         return exps[0]
 
-    def get_sensex_options(expiry, option_type):
+    def get_sensex_options(expiry, option_type, underlying=None):
         return chain.chain(expiry, option_type, kite.spot)
 
     def is_expiry_day() -> bool:
@@ -531,17 +583,19 @@ def _install_entry_filters(main, windows: list[tuple[dtime, dtime]], skip: set[s
 
 def run(md: MarketData, start: date, end: date, overrides: dict[str, str], out_dir: Path,
         block_windows: list[tuple[dtime, dtime]] | None = None,
-        skip_signals: set[str] | None = None, mode: str = "SHADOW") -> dict:
+        skip_signals: set[str] | None = None, mode: str = "SHADOW",
+        underlying: str = "SENSEX") -> dict:
     tmp = Path(tempfile.mkdtemp(prefix="sysbt_"))
     cap = EventCapture()
     root = logging.getLogger()
     root.handlers[:] = [cap]
     root.setLevel(logging.INFO)
 
-    main, kite, chain = install(md, tmp, overrides, mode)
+    main, kite, chain = install(md, tmp, overrides, mode, underlying)
     _install_entry_filters(main, block_windows or [], skip_signals or set())
     from config import settings
-    from market.historical_data import SENSEX_TOKEN
+    from market.historical_data import get_spot_token
+    SENSEX_TOKEN = get_spot_token(underlying)       # the index under test (name kept for diff)
     from execution.position_manager import State
     from utils.time_utils import IST, parse_time_ist
 
@@ -555,7 +609,7 @@ def run(md: MarketData, start: date, end: date, overrides: dict[str, str], out_d
         bars = md.by_day[day]
         kite.spot = float(bars.iloc[0].open)
 
-        ctx = main.BotContext()
+        ctx = main.BotContext(underlying)
         main.recover_from_restart(ctx)
         main.bootstrap_session(ctx)
         main.classify_session_regime(ctx)
@@ -598,6 +652,7 @@ def run(md: MarketData, start: date, end: date, overrides: dict[str, str], out_d
     meta = {
         "start": str(days[0]) if days else None, "end": str(days[-1]) if days else None,
         "sessions": len(days), "overrides": overrides, "halted_days": halted_days, "mode": mode,
+        "underlying": underlying,
         "experiments": {
             "block_entry_windows": [f"{a:%H:%M}-{b:%H:%M}" for a, b in (block_windows or [])],
             "skip_signals": sorted(skip_signals or []),
@@ -625,13 +680,15 @@ def main_cli() -> None:
                     help="backtest-only: no new entries in this window (repeatable)")
     ap.add_argument("--skip-signals", default="", metavar="SIG,SIG",
                     help="backtest-only: never enter these signal types, e.g. CE_PIVOT")
+    ap.add_argument("--underlying", default="SENSEX", choices=["SENSEX", "NIFTY", "FINNIFTY"],
+                    help="index to replay (needs research/data/<idx>_1m_full.csv)")
     ap.add_argument("--mode", choices=["SHADOW", "PAPER"], default="SHADOW",
                     help="SHADOW = modelled option premiums (default); PAPER = the bot's "
                          "PAPER mode, which prices the option as the index (delta 1)")
     ap.add_argument("--no-report", action="store_true")
     a = ap.parse_args()
 
-    md = MarketData()
+    md = MarketData(a.underlying)
     # Leave ~2 weeks of history for the 5-day candle seed and indicator warm-up.
     start = (_REAL_DATETIME.strptime(a.start, "%Y-%m-%d").date() if a.start else md.sessions[10])
     end = _REAL_DATETIME.strptime(a.end, "%Y-%m-%d").date() if a.end else md.sessions[-1]
@@ -644,7 +701,7 @@ def main_cli() -> None:
     skip = {x.strip() for x in a.skip_signals.split(",") if x.strip()}
     out_dir = OUT_ROOT / a.label
     print(f"System backtest {start} -> {end}  label={a.label}  overrides={overrides or 'none'}")
-    meta = run(md, start, end, overrides, out_dir, windows, skip, a.mode)
+    meta = run(md, start, end, overrides, out_dir, windows, skip, a.mode, a.underlying)
     print(f"Done: {meta['sessions']} sessions in {meta['runtime_s']}s -> {out_dir}")
     if not a.no_report:
         from research.backtest_report import build_report

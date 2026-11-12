@@ -229,6 +229,22 @@ def get_quantity(underlying: str | None = None, num_lots: int | None = None) -> 
     return get_lot_size(underlying) * max(1, lots)
 
 
+# Index-level scaling of SENSEX-tuned absolute settings (index points / option premium).
+# Settings such as EMA_PULLBACK_TOL_PTS, EMA_BE_BUFFER_PTS and MIN_OPTION_ENTRY_PRICE were
+# tuned on SENSEX (~INDEX_SCALE_REF_LEVEL).  For any other index they are multiplied by
+# (index level / INDEX_SCALE_REF_LEVEL) so NIFTY / FINNIFTY / BANKNIFTY behave in
+# proportion to their own price.  SENSEX is never scaled.  0 = disable scaling.
+INDEX_SCALE_REF_LEVEL: float = _getfloat("INDEX_SCALE_REF_LEVEL", 82000.0)
+
+
+def index_scale(underlying: str | None, price: float | None) -> float:
+    """Factor for SENSEX-tuned absolute settings on `underlying` at index level `price`."""
+    if (INDEX_SCALE_REF_LEVEL <= 0 or not price or price <= 0
+            or normalize_index_name(underlying or UNDERLYING) == "SENSEX"):
+        return 1.0
+    return min(1.5, max(0.1, price / INDEX_SCALE_REF_LEVEL))
+
+
 def _resolve_initial_quantity() -> int:
     raw_qty = os.environ.get("QUANTITY", "").strip()
     if raw_qty:
@@ -487,6 +503,12 @@ EMA_BE_TRIGGER_R: float        = _getfloat("EMA_BE_TRIGGER_R", 1.0)
 EMA_BE_BUFFER_PTS: float       = _getfloat("EMA_BE_BUFFER_PTS", 4.0)
 EMA_TRAIL_ATR_MULT: float      = _getfloat("EMA_TRAIL_ATR_MULT", 2.0)
 EMA_TRAIL_EMA9_EXIT: bool      = _getbool("EMA_TRAIL_EMA9_EXIT", True)
+# EMA_PREMIUM_GIVEBACK_PCT: exit when the option premium falls this fraction of the profit
+#   it made (peak - entry), e.g. 0.25 = give back at most a quarter of the open profit.
+#   Runs on option ticks, in addition to the index-based trail (which cannot see the
+#   premium shrinking faster than the index, e.g. IV crush on a bounce).  Armed after
+#   break-even.  0 = off.
+EMA_PREMIUM_GIVEBACK_PCT: float = _getfloat("EMA_PREMIUM_GIVEBACK_PCT", 0.0)
 # EMA_NATR_RISK: true = EMA trades are risk-managed by the NATR trailing line
 #   ("ATR 5 Min Index Study", NATR_PERIOD / NATR_MULT) instead of swing SL + BE +
 #   chandelier: initial SL = NATR line (or entry ∓ NATR_MULT × ATR if the line is

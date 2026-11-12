@@ -90,6 +90,7 @@ from strategies.pivot_reversal import PineReversalEngine, PineSignal
 from strategies.pivot_strategy import PivotSetup
 from market.indicators import atr_at, ema as calc_ema, swing_levels
 from utils.exchange_utils import option_exchange, option_quote_key
+from utils.option_delta import option_delta_from_premium
 from utils.latency import LatencyTracker
 from utils.logging_config import configure_logging, log_event, log_underlying
 from utils.price_utils import round_to_tick
@@ -554,6 +555,33 @@ def _plan_ema_entry(ctx: BotContext, side: str, sensex_ltp: float):
     return plan, delta, max_sl_pct, reason
 
 
+def _real_option_delta(instrument: dict, option_type: str, spot: float,
+                       premium: float, fallback: float) -> float:
+    """
+    Delta the contract actually has, implied from its filled premium.
+
+    Used only to convert the index target into an option-premium target
+    reference (a deep ITM strike is ~0.7, not the configured 0.4-0.5).  PAPER
+    prices the index itself (delta 1) and keeps `fallback`; so does any case
+    where the delta cannot be estimated.
+    """
+    if settings.TRADING_MODE == "PAPER":
+        return fallback
+    try:
+        d = option_delta_from_premium(
+            spot, float(instrument["strike"]), instrument["expiry"],
+            option_type, premium, now_ist(),
+        )
+    except Exception as exc:
+        logger.warning("Real option delta estimate failed (%s) — using %.2f", exc, fallback)
+        return fallback
+    if d is None or not (0.05 <= d <= 1.0):
+        return fallback
+    log_event(logger, "OPTION_DELTA_ESTIMATED", symbol=instrument["tradingsymbol"],
+              delta=d, configured=fallback, premium=premium, spot=round(spot, 2))
+    return d
+
+
 def _live_event(event_type: str, **fields) -> None:
     """Record an order event for the LIVE order panel (LIVE mode only; never raises)."""
     if settings.TRADING_MODE != "LIVE":
@@ -643,12 +671,8 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         logger.warning("Entry blocked [%s]: %s.", signal_type, ctx.entry_block_reason())
         return
     _target_underlying = getattr(ctx, "underlying", settings.UNDERLYING)
-    # Apply EMA-specific quantity override
-    _is_ema_signal = signal_type in ("CE", "PE")
-    if _is_ema_signal and settings.EMA_QUANTITY > 0:
-        ctx.quantity = settings.EMA_QUANTITY
-    else:
-        ctx.quantity = settings.get_quantity(_target_underlying, settings.NUM_LOTS)
+    # Quantity is always per-index lot size * NUM_LOTS (EMA_QUANTITY is not applied).
+    ctx.quantity = settings.get_quantity(_target_underlying, settings.NUM_LOTS)
 
     action_id = f"{_target_underlying}_{signal_type}_ENTRY_{now_ist().strftime('%Y-%m-%d_%H-%M')}"
     if has_action(action_id):
@@ -754,7 +778,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
             settings.NATR_MIN_OPTION_ENTRY_PRICE
             if _is_natr and settings.NATR_MIN_OPTION_ENTRY_PRICE > 0
             else settings.MIN_OPTION_ENTRY_PRICE
-        )
+        ) * settings.index_scale(ctx.underlying, sensex_ltp)   # SENSEX-tuned floor, scaled per index
         _below_min = (
             _effective_min > 0
             and _ltp is not None
@@ -1160,7 +1184,10 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         )
         _pv_delta = ctx.pivot_mgr.delta
         sl_pts     = round(ctx.entry_price - ctx.pivot_mgr.option_stop, 2)
-        target_pts = round(abs(_pv_setup.t3 - sensex_ltp) * _pv_delta, 2)
+        # Premium target reference: index distance to T3 x the contract's real delta
+        # (the exit itself is decided on the index price at T3).
+        target_pts = round(abs(_pv_setup.t3 - sensex_ltp) * _real_option_delta(
+            instrument, _option_type, sensex_ltp, ctx.entry_price, _pv_delta), 2)
         if _pine_trade:
             be_pts    = round(settings.PIVOT_PINE_TRAIL_ACT_R * ctx.pivot_mgr.risk * _pv_delta, 2)
             trail_pts = round(settings.PIVOT_PINE_TRAIL_ATR_MULT * _pv_setup.atr * _pv_delta, 2)
@@ -1187,7 +1214,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
             _trail_atr, ctx.entry_price,
             delta=_ema_delta,
             be_trigger_r=settings.EMA_BE_TRIGGER_R,
-            be_buffer_pts=settings.EMA_BE_BUFFER_PTS,
+            be_buffer_pts=settings.EMA_BE_BUFFER_PTS * settings.index_scale(ctx.underlying, sensex_ltp),
             trail_atr_mult=settings.EMA_TRAIL_ATR_MULT,
             trail_ema9_exit=settings.EMA_TRAIL_EMA9_EXIT,
             time_stop_bars=settings.EMA_TIME_STOP_BARS,
@@ -1196,9 +1223,13 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
             max_sl_pct=_ema_max_sl_pct,
             natr_mode=settings.EMA_NATR_RISK,
             natr_broker_trail=settings.EMA_NATR_BROKER_TRAIL,
+            premium_giveback_pct=settings.EMA_PREMIUM_GIVEBACK_PCT,
         )
         sl_pts     = round(ctx.entry_price - ctx.pivot_mgr.option_stop, 2)
-        target_pts = round(abs(_ema_plan["target"] - sensex_ltp) * _ema_delta, 2)
+        # Premium target reference: index distance x the contract's real delta
+        # (the exit itself is decided on the index price at the plan target).
+        target_pts = round(abs(_ema_plan["target"] - sensex_ltp) * _real_option_delta(
+            instrument, _option_type, sensex_ltp, ctx.entry_price, _ema_delta), 2)
         be_pts     = round(settings.EMA_BE_TRIGGER_R * ctx.pivot_mgr.risk * _ema_delta, 2)
         trail_pts  = round(settings.EMA_TRAIL_ATR_MULT * _trail_atr * _ema_delta, 2)
         log_event(
@@ -1437,9 +1468,14 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
     if signal_type and signal_type.endswith("_PIVOT"):
         from strategies import signal_engine as _se_ref
         _se_ref.note_pivot_trade(str(now_ist().date()), ctx.underlying)
+    _idx_exit = ""
+    if ctx.pivot_mgr is not None:
+        # The exit is decided on the index: show the level that actually closes the trade.
+        _idx_exit = f" | index_target={ctx.pivot_mgr.t3:.2f} | index_stop={ctx.pivot_mgr.stop_index:.2f}"
     logger.info(
-        "Position open | %s | entry=%.2f | sl=%.2f | target_ref=%.2f",
+        "Position open | %s | entry=%.2f | sl=%.2f | target_ref=%.2f%s",
         ctx.tradingsymbol, ctx.entry_price, ctx.trailing.current_stop, ctx.target.target_reference,
+        _idx_exit,
     )
 
 
@@ -1666,6 +1702,15 @@ def on_option_ltp(ctx: BotContext, ltp: float) -> None:
     # backstop above applies here. Track the option high for reporting.
     if ctx.pivot_mgr is not None:
         ctx.trailing.highest_ltp = max(ctx.trailing.highest_ltp, ltp)
+        # EMA premium give-back: the index trail cannot see the premium shrinking
+        # faster than the index (IV crush on a bounce), so also cap the give-back here.
+        if (isinstance(ctx.pivot_mgr, EmaTradeManager)
+                and ctx.pivot_mgr.premium_giveback_hit(ltp, ctx.trailing.highest_ltp)):
+            log_event(logger, "EMA_PREMIUM_GIVEBACK", ltp=ltp, high=ctx.trailing.highest_ltp,
+                      entry=ctx.entry_price, giveback_pct=ctx.pivot_mgr.premium_giveback_pct,
+                      stage=ctx.pivot_mgr.stage)
+            execute_exit(ctx, reason="EMA_PREMIUM_GIVEBACK", exit_ltp=ltp)
+            return
         # EMA index engine: keep the daily-loss / time-decay smart exits active
         # (profit lock is skipped for EMA unless EMA_PROFIT_LOCK=true).
         if isinstance(ctx.pivot_mgr, EmaTradeManager) and ctx.smart_exit is not None:
@@ -2080,7 +2125,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
         "TIME_DECAY", "DAILY_LOSS_LIMIT", "PINE_REVERSAL",
         "PIVOT_SL_HIT", "PIVOT_BE_STOP", "PIVOT_TSL_HIT", "PIVOT_TARGET_T2", "PIVOT_TARGET_T3",
         "EMA_SL_HIT", "EMA_BE_STOP", "EMA_TSL_HIT", "EMA_TARGET",
-        "EMA_TRAIL_EMA9", "EMA_TIME_STOP",
+        "EMA_TRAIL_EMA9", "EMA_TIME_STOP", "EMA_PREMIUM_GIVEBACK",
         "IDX_SL_HIT", "IDX_BE_STOP", "IDX_TSL_HIT", "IDX_TARGET",
         "VWAP_CROSS_EXIT",
     }
@@ -2517,6 +2562,9 @@ def _write_state(ctx: BotContext) -> None:
                 "current_stop": ctx.trailing.current_stop if ctx.trailing else None,
                 "highest_ltp":  ctx.trailing.highest_ltp if ctx.trailing else None,
                 "target":       ctx.target.target_reference if ctx.target else None,
+                # Index levels that actually trigger EMA / Pivot / index-engine exits
+                "index_target": ctx.pivot_mgr.t3 if ctx.pivot_mgr else None,
+                "index_stop":   ctx.pivot_mgr.stop_index if ctx.pivot_mgr else None,
                 "break_even_activated": ctx.trailing.break_even_activated if ctx.trailing else False,
                 "trail_steps_completed": ctx.trailing.trail_steps_completed if ctx.trailing else 0,
                 "be_points":    ctx.trailing.break_even_trigger_points if ctx.trailing else None,
@@ -2808,7 +2856,9 @@ def _make_candle_handler_5m(ctx: BotContext):
                     and not _emgr.natr_mode):
                 from strategies.ce_strategy import is_ce_signal as _ce_sig
                 from strategies.pe_strategy import is_pe_signal as _pe_sig
-                _kw = dict(rsi_period=settings.EMA_RSI_PERIOD, pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS,
+                _kw = dict(rsi_period=settings.EMA_RSI_PERIOD,
+                           pullback_tol_pts=settings.EMA_PULLBACK_TOL_PTS
+                           * settings.index_scale(ctx.underlying, candles_5m[-1].close),
                            ignore_15m=settings.EMA_IGNORE_15M)
                 if ctx.strategy_type == "CE" and _pe_sig(candles_5m, candles_15m, rsi_max=settings.EMA_RSI_PE_MAX, **_kw):
                     _ema_reason = "REVERSAL_SIGNAL"

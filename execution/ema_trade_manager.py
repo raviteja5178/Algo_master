@@ -118,6 +118,17 @@ class EmaTradeManager(PivotTradeManager):
     natr_line: float | None = None
     _stop_dirty: bool = False
     natr_broker_trail: bool = True
+    # Premium give-back exit: close once the option has given back this fraction of the
+    # profit it made (peak - entry).  0 = off.  Armed after break-even, so a trade that
+    # has not yet earned its keep is left to the index stop.
+    premium_giveback_pct: float = 0.0
+
+    def premium_giveback_hit(self, ltp: float, high: float) -> bool:
+        """True when the option premium has fallen `premium_giveback_pct` of its peak profit."""
+        if self.premium_giveback_pct <= 0 or self.stage == "INITIAL":
+            return False
+        profit = high - self.option_entry
+        return profit > 0 and (high - ltp) >= self.premium_giveback_pct * profit
 
     def __init__(
         self,
@@ -139,6 +150,7 @@ class EmaTradeManager(PivotTradeManager):
         max_sl_pct: float = 0.30,
         natr_mode: bool = False,
         natr_broker_trail: bool = True,
+        premium_giveback_pct: float = 0.0,
     ) -> None:
         super().__init__(
             side, entry_index, stop_index, target_index, target_index, target_index,
@@ -154,6 +166,7 @@ class EmaTradeManager(PivotTradeManager):
         self.natr_mode = natr_mode
         self.natr_line = None
         self.natr_broker_trail = natr_broker_trail
+        self.premium_giveback_pct = premium_giveback_pct
 
     def set_natr_line(self, line: float | None, close: float) -> bool:
         """NATR mode: ratchet the stop to the NATR line (call on each 5m close).

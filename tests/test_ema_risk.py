@@ -286,3 +286,48 @@ class TestPullbackSide:
         below = e21 - 50
         c5[-1] = Candle(c5[-1].timestamp, below, below + 1, below - 1, below)
         assert is_ce_signal(c5, c15, rsi_min=0, pullback_tol_pts=1000) is False
+
+
+# ── Premium give-back exit ─────────────────────────────────────────────────────
+
+class TestPremiumGiveback:
+    """Option premium falling a fraction of its peak profit closes the trade."""
+
+    def _armed(self, pct=0.25):
+        m = _mgr(premium_giveback_pct=pct)          # option entry 400
+        m.on_index_price(1100)                      # +1R -> BE stage
+        assert m.stage != "INITIAL"
+        return m
+
+    def test_off_by_default(self):
+        m = _mgr()
+        m.on_index_price(1100)
+        assert m.premium_giveback_hit(ltp=401.0, high=500.0) is False
+
+    def test_not_armed_before_break_even(self):
+        m = _mgr(premium_giveback_pct=0.25)
+        assert m.stage == "INITIAL"
+        assert m.premium_giveback_hit(ltp=401.0, high=500.0) is False
+
+    def test_hits_at_quarter_of_peak_profit(self):
+        m = self._armed()
+        # profit 100 -> exit when premium <= 475
+        assert m.premium_giveback_hit(ltp=476.0, high=500.0) is False
+        assert m.premium_giveback_hit(ltp=475.0, high=500.0) is True
+
+    def test_nifty_trade_example(self):
+        m = EmaTradeManager("PE", 25305.95, 25359.54, 25145.18, 26.8, 272.1,
+                            delta=0.5, premium_giveback_pct=0.25)
+        m.on_index_price(25240.0)                   # past 1R -> BE
+        # profit 98.1 -> 25% = 24.53 -> exit at <= 345.68
+        assert m.premium_giveback_hit(ltp=345.6, high=370.2) is True
+        assert m.premium_giveback_hit(ltp=346.0, high=370.2) is False
+
+    def test_no_profit_never_fires(self):
+        m = self._armed()
+        assert m.premium_giveback_hit(ltp=380.0, high=400.0) is False
+        assert m.premium_giveback_hit(ltp=380.0, high=390.0) is False
+
+    def test_state_without_field_loads_with_rule_off(self):
+        m = EmaTradeManager.__new__(EmaTradeManager)   # state saved before this feature
+        assert m.premium_giveback_pct == 0.0
