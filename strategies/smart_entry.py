@@ -95,6 +95,20 @@ Seven independent filters (all opt-in, all default OFF):
   Recommended value: 1.5 (block when option has already doubled + 50%).
   Set to 0 to disable (default).
 
+  Filter 8 — Candle color alignment  (SMART_ENTRY_REQUIRE_CANDLE_COLOR = true)
+  ───────────────────────────────────────────────────────────────────────────
+  CE trades require a bullish candle (close > open). Blocks entry if close <= open.
+  PE trades require a bearish candle (close < open). Blocks entry if close >= open.
+  Prevents entering on counter-momentum candles (e.g. green hammer on a breakdown).
+
+  Filter 9 — Rejection wick ceiling  (SMART_ENTRY_MAX_REJECTION_WICK_PCT / ATR > 0)
+  ─────────────────────────────────────────────────────────────────────────────────
+  CE: upper wick (overhead selling pressure) must not exceed MAX_REJECTION_WICK_PCT
+      fraction of candle range, or MAX_REJECTION_WICK_ATR × ATR(14).
+  PE: lower wick (buying absorption / hammer tail) must not exceed MAX_REJECTION_WICK_PCT
+      fraction of candle range, or MAX_REJECTION_WICK_ATR × ATR(14).
+  Set to 0 to disable. Recommended: pct=0.35, atr=0.5.
+
 All filters are applied in signal_engine.evaluate_signals() after the raw
 signal check passes.  A blocked signal is logged at DEBUG level.
 
@@ -201,6 +215,9 @@ class SmartEntryFilter:
         bounce_exempt_strategies: set | None = None,
         slope_exempt_strategies: set | None = None,
         squeeze_exempt_strategies: set | None = None,
+        require_candle_color: bool = False,
+        max_rejection_wick_pct: float = 0.0,
+        max_rejection_wick_atr: float = 0.0,
     ) -> None:
         self._min_body_atr       = min_body_atr_ratio
         self._require_slope      = require_ema_slope
@@ -217,6 +234,9 @@ class SmartEntryFilter:
         self._max_ext_pct        = max_premium_extension_pct  # 0 = disabled
         self._structure_bypass_n = max(0, structure_bypass_candles)
         self._structure_bypass_ema_confirm = structure_bypass_ema_confirm
+        self._require_candle_color = require_candle_color
+        self._max_rejection_wick_pct = max(0.0, max_rejection_wick_pct)
+        self._max_rejection_wick_atr = max(0.0, max_rejection_wick_atr)
         # None → documented defaults; an explicit empty set disables the exemption.
         self._bounce_exempt      = {"VWAP", "NATR", "ORB"} if bounce_exempt_strategies is None else set(bounce_exempt_strategies)
         self._slope_exempt       = {"NATR"} if slope_exempt_strategies is None else set(slope_exempt_strategies)
@@ -430,6 +450,63 @@ class SmartEntryFilter:
                 candles=self._squeeze_n,
                 reason="consecutive same-direction 5m candles — bypassing 15m/slope filters",
             )
+
+        # ── Filter 8: Candle color alignment ──────────────────────────────────
+        if self._require_candle_color:
+            if side == "CE" and c0.close <= c0.open:
+                log_event(
+                    logger, "SMART_ENTRY_BLOCKED_CANDLE_COLOR",
+                    direction=direction,
+                    close=round(c0.close, 2),
+                    open=round(c0.open, 2),
+                    reason="candle not bullish for CE (close <= open)",
+                )
+                return False
+            elif side == "PE" and c0.close >= c0.open:
+                log_event(
+                    logger, "SMART_ENTRY_BLOCKED_CANDLE_COLOR",
+                    direction=direction,
+                    close=round(c0.close, 2),
+                    open=round(c0.open, 2),
+                    reason="candle not bearish for PE (close >= open)",
+                )
+                return False
+
+        # ── Filter 9: Rejection wick ceiling ─────────────────────────────────
+        if self._max_rejection_wick_pct > 0 or self._max_rejection_wick_atr > 0:
+            c_range = c0.high - c0.low
+            upper_wick = c0.high - max(c0.open, c0.close)
+            lower_wick = min(c0.open, c0.close) - c0.low
+            counter_wick = upper_wick if side == "CE" else lower_wick
+            wick_name = "upper" if side == "CE" else "lower"
+
+            if self._max_rejection_wick_pct > 0 and c_range > 0:
+                wick_pct = counter_wick / c_range
+                if wick_pct > self._max_rejection_wick_pct:
+                    log_event(
+                        logger, "SMART_ENTRY_BLOCKED_REJECTION_WICK_PCT",
+                        direction=direction,
+                        wick=round(counter_wick, 2),
+                        range=round(c_range, 2),
+                        wick_pct=round(wick_pct * 100, 1),
+                        max_pct=round(self._max_rejection_wick_pct * 100, 1),
+                        reason=f"{wick_name} rejection wick {wick_pct * 100:.1f}% exceeds limit {self._max_rejection_wick_pct * 100:.0f}%",
+                    )
+                    return False
+
+            if self._max_rejection_wick_atr > 0:
+                atr_val = atr_at(candles_5m, period=14)
+                if atr_val and counter_wick > self._max_rejection_wick_atr * atr_val:
+                    log_event(
+                        logger, "SMART_ENTRY_BLOCKED_REJECTION_WICK_ATR",
+                        direction=direction,
+                        wick=round(counter_wick, 2),
+                        atr=round(atr_val, 2),
+                        max_atr_mult=self._max_rejection_wick_atr,
+                        threshold=round(self._max_rejection_wick_atr * atr_val, 2),
+                        reason=f"{wick_name} rejection wick {counter_wick:.2f} exceeds {self._max_rejection_wick_atr}xATR",
+                    )
+                    return False
 
         # ── Filter 1: body / ATR ratio ────────────────────────────────────────
         # During a squeeze move, use the relaxed ratio (squeeze_body_atr_ratio)

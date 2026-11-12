@@ -877,3 +877,116 @@ class TestNatrPremiumFloorLogic:
         ltp = 100.0
         effective_min = self._effective_min("CE_NATR", global_min=300, natr_min=150)
         assert ltp < effective_min  # correctly blocked
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Filter 8: Candle Color Alignment (SMART_ENTRY_REQUIRE_CANDLE_COLOR)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestFilter8_CandleColor:
+    """Filter 8: CE requires bullish candle (close > open); PE requires bearish (close < open)."""
+
+    def test_ce_allowed_with_green_candle(self) -> None:
+        flt = SmartEntryFilter(require_candle_color=True)
+        candle = _make_candle(_ts(9, 25), open_=100, high=110, low=95, close=105)
+        assert flt.allow("CE", [candle]) is True
+
+    def test_ce_blocked_with_red_candle(self) -> None:
+        flt = SmartEntryFilter(require_candle_color=True)
+        candle = _make_candle(_ts(9, 25), open_=100, high=110, low=95, close=95)
+        assert flt.allow("CE", [candle]) is False
+
+    def test_ce_blocked_with_doji_flat_candle(self) -> None:
+        flt = SmartEntryFilter(require_candle_color=True)
+        candle = _make_candle(_ts(9, 25), open_=100, high=110, low=95, close=100)
+        assert flt.allow("CE", [candle]) is False
+
+    def test_pe_allowed_with_red_candle(self) -> None:
+        flt = SmartEntryFilter(require_candle_color=True)
+        candle = _make_candle(_ts(9, 25), open_=100, high=110, low=90, close=95)
+        assert flt.allow("PE", [candle]) is True
+
+    def test_pe_blocked_with_green_candle(self) -> None:
+        flt = SmartEntryFilter(require_candle_color=True)
+        candle = _make_candle(_ts(9, 25), open_=100, high=110, low=90, close=105)
+        assert flt.allow("PE", [candle]) is False
+
+    def test_pe_blocked_with_doji_flat_candle(self) -> None:
+        flt = SmartEntryFilter(require_candle_color=True)
+        candle = _make_candle(_ts(9, 25), open_=100, high=110, low=90, close=100)
+        assert flt.allow("PE", [candle]) is False
+
+    def test_disabled_by_default(self) -> None:
+        flt = SmartEntryFilter(require_candle_color=False)
+        red_candle = _make_candle(_ts(9, 25), open_=100, high=110, low=90, close=95)
+        green_candle = _make_candle(_ts(9, 25), open_=100, high=110, low=90, close=105)
+        assert flt.allow("CE", [red_candle]) is True
+        assert flt.allow("PE", [green_candle]) is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Filter 9: Rejection Wick Ceiling (MAX_REJECTION_WICK_PCT / MAX_REJECTION_WICK_ATR)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestFilter9_RejectionWick:
+    """Filter 9: Rejects counter-directional absorption wicks (hammers on PE, shooting stars on CE)."""
+
+    def test_pe_blocked_by_large_lower_wick_pct(self) -> None:
+        """PE blocked when lower wick is > 35% of total range (hammer absorption)."""
+        flt = SmartEntryFilter(max_rejection_wick_pct=0.35)
+        # Open=100, High=105, Low=70, Close=90
+        # Range = 35. Lower wick = min(100, 90) - 70 = 20. Wick pct = 20/35 = 57.1% > 35%
+        candle = _make_candle(_ts(9, 25), open_=100, high=105, low=70, close=90)
+        assert flt.allow("PE", [candle]) is False
+
+    def test_pe_allowed_with_small_lower_wick_pct(self) -> None:
+        """PE allowed when lower wick is small fraction of range."""
+        flt = SmartEntryFilter(max_rejection_wick_pct=0.35)
+        # Open=100, High=105, Low=88, Close=90
+        # Range = 17. Lower wick = 90 - 88 = 2. Wick pct = 2/17 = 11.8% <= 35%
+        candle = _make_candle(_ts(9, 25), open_=100, high=105, low=88, close=90)
+        assert flt.allow("PE", [candle]) is True
+
+    def test_ce_blocked_by_large_upper_wick_pct(self) -> None:
+        """CE blocked when upper wick is > 35% of total range (shooting star rejection)."""
+        flt = SmartEntryFilter(max_rejection_wick_pct=0.35)
+        # Open=90, High=120, Low=85, Close=100
+        # Range = 35. Upper wick = 120 - max(90, 100) = 20. Wick pct = 20/35 = 57.1% > 35%
+        candle = _make_candle(_ts(9, 25), open_=90, high=120, low=85, close=100)
+        assert flt.allow("CE", [candle]) is False
+
+    def test_ce_allowed_with_small_upper_wick_pct(self) -> None:
+        """CE allowed when upper wick is small fraction of range."""
+        flt = SmartEntryFilter(max_rejection_wick_pct=0.35)
+        # Open=90, High=102, Low=85, Close=100
+        # Range = 17. Upper wick = 102 - 100 = 2. Wick pct = 2/17 = 11.8% <= 35%
+        candle = _make_candle(_ts(9, 25), open_=90, high=102, low=85, close=100)
+        assert flt.allow("CE", [candle]) is True
+
+    def test_rejection_wick_atr_blocking(self) -> None:
+        """Filter blocks when counter rejection wick > max_rejection_wick_atr * ATR."""
+        flt = SmartEntryFilter(max_rejection_wick_atr=0.5)
+        # Warmup candles to generate ATR ≈ 20.0
+        candles = []
+        base = 74000.0
+        for i in range(20):
+            price = base if i % 2 == 0 else base + 20.0
+            candles.append(_make_candle(_yesterday_ts(i), price, price + 1, price - 1, price))
+
+        # Test PE with lower wick = 15 pts (15 > 0.5 * 20 = 10 pts) -> blocked
+        # open=74050, high=74055, low=74015, close=74030 -> lower wick = 74030 - 74015 = 15
+        pe_blocked_candle = _make_candle(_ts(9, 25), 74050, 74055, 74015, 74030)
+        assert flt.allow("PE", candles + [pe_blocked_candle]) is False
+
+        # Test PE with lower wick = 5 pts (5 <= 10 pts) -> allowed
+        pe_allowed_candle = _make_candle(_ts(9, 25), 74050, 74055, 74025, 74030)
+        assert flt.allow("PE", candles + [pe_allowed_candle]) is True
+
+        # Test CE with upper wick = 15 pts (15 > 10 pts) -> blocked
+        # open=74020, high=74055, low=74015, close=74040 -> upper wick = 74055 - 74040 = 15
+        ce_blocked_candle = _make_candle(_ts(9, 25), 74020, 74055, 74015, 74040)
+        assert flt.allow("CE", candles + [ce_blocked_candle]) is False
+
+        # Test CE with upper wick = 5 pts (5 <= 10 pts) -> allowed
+        ce_allowed_candle = _make_candle(_ts(9, 25), 74020, 74045, 74015, 74040)
+        assert flt.allow("CE", candles + [ce_allowed_candle]) is True

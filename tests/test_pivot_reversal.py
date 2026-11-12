@@ -314,3 +314,62 @@ def test_restore_rejects_previous_session_and_changed_settings():
     assert other.restore({}, candles) is False
     assert other.restore({**snap, "last_ts": "garbage"}, candles) is False
     assert other.restore({k: v for k, v in snap.items() if k != "pos"}, candles) is False
+
+
+def test_pine_gate_candle_color_and_rejection_wick(monkeypatch):
+    from main import _pine_gate_reason, BotContext
+    from strategies.pivot_reversal import PineSignal
+    import config.settings as s
+
+    monkeypatch.setattr(s, "PIVOT_NO_FRIDAY", False)
+    monkeypatch.setattr(s, "PIVOT_NO_NEW_ENTRY_AFTER", "")
+    monkeypatch.setattr(s, "PIVOT_PINE_SKIP_LULLS", False)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_CHASE_ATR", 0.0)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_RISK_ATR", 0.0)
+    import main
+    monkeypatch.setattr(main, "pivot_day_cap_reason", lambda day, und: None)
+    monkeypatch.setattr(main, "side_block_reason", lambda side, day, und: None)
+
+    ctx = BotContext.__new__(BotContext)
+    ctx.underlying = "SENSEX"
+    from market.candle_aggregator import CandleAggregator
+    ctx.agg_5m = CandleAggregator(5)
+
+    ts = datetime(2026, 11, 12, 12, 15)
+    # Green hammer candle: Open=100, High=105, Low=70, Close=102
+    # lower_wick = 30, range = 35 -> wick_pct = 85.7%
+    hammer = Candle(ts, 100, 105, 70, 102)
+    ctx.agg_5m.seed([hammer])
+
+    sig_pe = PineSignal(
+        side="PE", bar_ts=ts, entry=100.0, stop=120.0,
+        risk=20.0, atr=20.0, level=100.0, source="tick",
+    )
+
+    # 1. Require candle color: PE on green candle should be blocked
+    monkeypatch.setattr(s, "PIVOT_PINE_REQUIRE_CANDLE_COLOR", True)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_PCT", 0.0)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_ATR", 0.0)
+    reason = _pine_gate_reason(ctx, sig_pe, 98.0)
+    assert reason is not None
+    assert "candle not bearish" in reason
+
+    # 2. Rejection wick pct: PE with 85.7% lower wick should be blocked if limit is 0.35
+    monkeypatch.setattr(s, "PIVOT_PINE_REQUIRE_CANDLE_COLOR", False)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_PCT", 0.35)
+    reason = _pine_gate_reason(ctx, sig_pe, 98.0)
+    assert reason is not None
+    assert "lower rejection wick" in reason
+
+    # 3. Rejection wick ATR: lower wick is 30 pts, ATR is 20 pts (1.5x ATR). Blocked if limit is 0.5x ATR
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_PCT", 0.0)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_ATR", 0.5)
+    reason = _pine_gate_reason(ctx, sig_pe, 98.0)
+    assert reason is not None
+    assert "lower rejection wick" in reason
+
+    # 4. When all guards pass / disabled
+    monkeypatch.setattr(s, "PIVOT_PINE_REQUIRE_CANDLE_COLOR", False)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_PCT", 0.0)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_ATR", 0.0)
+    assert _pine_gate_reason(ctx, sig_pe, 98.0) is None

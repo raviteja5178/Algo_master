@@ -251,6 +251,9 @@ class BotContext:
             bounce_exempt_strategies    = settings.SMART_ENTRY_BOUNCE_EXEMPT_STRATEGIES,
             slope_exempt_strategies     = settings.SMART_ENTRY_SLOPE_EXEMPT_STRATEGIES,
             squeeze_exempt_strategies   = settings.SMART_ENTRY_SQUEEZE_EXEMPT_STRATEGIES,
+            require_candle_color        = settings.SMART_ENTRY_REQUIRE_CANDLE_COLOR,
+            max_rejection_wick_pct      = settings.SMART_ENTRY_MAX_REJECTION_WICK_PCT,
+            max_rejection_wick_atr      = settings.SMART_ENTRY_MAX_REJECTION_WICK_ATR,
         )
 
         # AI Confirmation Filter (created only when ENABLE_AI_CONFIRMATION=true)
@@ -1581,6 +1584,32 @@ def _pine_gate_reason(ctx: BotContext, sig: PineSignal, price: float) -> str | N
         risk_now = abs(price - sig.stop)
         if settings.PIVOT_PINE_MAX_RISK_ATR > 0 and risk_now > settings.PIVOT_PINE_MAX_RISK_ATR * atr:
             return f"stop {risk_now:.0f} pts away (> {settings.PIVOT_PINE_MAX_RISK_ATR}xATR)"
+
+    candles_5m = ctx.agg_5m.get_completed()
+    if candles_5m:
+        c0 = candles_5m[-1]
+        if settings.PIVOT_PINE_REQUIRE_CANDLE_COLOR:
+            if sig.side == "CE" and c0.close <= c0.open:
+                return "confirmation candle not bullish (close <= open)"
+            elif sig.side == "PE" and c0.close >= c0.open:
+                return "confirmation candle not bearish (close >= open)"
+
+        if settings.PIVOT_PINE_MAX_REJECTION_WICK_PCT > 0 or settings.PIVOT_PINE_MAX_REJECTION_WICK_ATR > 0:
+            c_range = c0.high - c0.low
+            upper_wick = c0.high - max(c0.open, c0.close)
+            lower_wick = min(c0.open, c0.close) - c0.low
+            counter_wick = upper_wick if sig.side == "CE" else lower_wick
+            wick_name = "upper" if sig.side == "CE" else "lower"
+
+            if settings.PIVOT_PINE_MAX_REJECTION_WICK_PCT > 0 and c_range > 0:
+                wick_pct = counter_wick / c_range
+                if wick_pct > settings.PIVOT_PINE_MAX_REJECTION_WICK_PCT:
+                    return f"{wick_name} rejection wick {wick_pct * 100:.1f}% exceeds max {settings.PIVOT_PINE_MAX_REJECTION_WICK_PCT * 100:.0f}%"
+
+            if settings.PIVOT_PINE_MAX_REJECTION_WICK_ATR > 0 and atr > 0:
+                if counter_wick > settings.PIVOT_PINE_MAX_REJECTION_WICK_ATR * atr:
+                    return f"{wick_name} rejection wick {counter_wick:.1f} pts exceeds {settings.PIVOT_PINE_MAX_REJECTION_WICK_ATR}xATR"
+
     return None
 
 

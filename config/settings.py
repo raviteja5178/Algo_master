@@ -589,6 +589,9 @@ SMART_ENTRY_STRUCTURE_BYPASS_EMA_CONFIRM: bool = _getbool("SMART_ENTRY_STRUCTURE
 SMART_ENTRY_MIN_BODY_ATR_RATIO: float    = _getfloat("SMART_ENTRY_MIN_BODY_ATR_RATIO",    0.0)
 SMART_ENTRY_REQUIRE_EMA_SLOPE: bool      = _getbool("SMART_ENTRY_REQUIRE_EMA_SLOPE",      False)
 SMART_ENTRY_COOLDOWN_CANDLES: int        = _getint("SMART_ENTRY_COOLDOWN_CANDLES",         0)
+SMART_ENTRY_REQUIRE_CANDLE_COLOR: bool    = _getbool("SMART_ENTRY_REQUIRE_CANDLE_COLOR",   False)
+SMART_ENTRY_MAX_REJECTION_WICK_PCT: float = _getfloat("SMART_ENTRY_MAX_REJECTION_WICK_PCT", 0.0)
+SMART_ENTRY_MAX_REJECTION_WICK_ATR: float = _getfloat("SMART_ENTRY_MAX_REJECTION_WICK_ATR", 0.0)
 # Filter 4 — minimum EMA gap (0 = disabled; recommended: 10)
 #
 # Filter 4b — gap rate-of-change bypass (0 = disabled; recommended: 15)
@@ -1120,6 +1123,9 @@ PIVOT_PINE_BACKSTOP_CUSHION: float = _getfloat("PIVOT_PINE_BACKSTOP_CUSHION", 2.
 PIVOT_PINE_REVERSAL_EXIT: bool    = _getbool("PIVOT_PINE_REVERSAL_EXIT", True)
 # Lull windows hide valid Pine breakouts, so they are opt-in for this engine.
 PIVOT_PINE_SKIP_LULLS: bool       = _getbool("PIVOT_PINE_SKIP_LULLS", False)
+PIVOT_PINE_REQUIRE_CANDLE_COLOR: bool     = _getbool("PIVOT_PINE_REQUIRE_CANDLE_COLOR", False)
+PIVOT_PINE_MAX_REJECTION_WICK_PCT: float  = _getfloat("PIVOT_PINE_MAX_REJECTION_WICK_PCT", 0.0)
+PIVOT_PINE_MAX_REJECTION_WICK_ATR: float  = _getfloat("PIVOT_PINE_MAX_REJECTION_WICK_ATR", 0.0)
 
 
 # ── PDHL (Previous Day High/Low) Breakout strategy ───────────────────────────
