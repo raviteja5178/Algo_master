@@ -171,6 +171,49 @@ def test_tick_trigger_respects_ema_filter():
     ts = candles[-1].timestamp + timedelta(minutes=5)
     assert eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts) is None
 
+def _tick_short_setup():
+    eng, candles = _armed_engine()
+    eng.pos = 0
+    eng.se = True
+    eng.lprice = candles[-1].close - 50
+    eng.hprice = candles[-1].close + 300
+    eng._ema_prev = candles[-1].close + 200
+    ts = candles[-1].timestamp + timedelta(minutes=5)
+    return eng, ts
+
+
+def test_revert_signal_restores_arm_flags_and_flat_position():
+    eng, ts = _tick_short_setup()
+    before = eng._state()
+    sig = eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts)
+    assert sig is not None and eng.pos == -1 and eng.se is False
+    assert eng.revert_signal(sig) is True
+    assert eng._state() == before
+    assert eng.pos == 0 and eng.se is True
+
+
+def test_revert_signal_mutes_tick_refire_for_that_bar_only():
+    eng, ts = _tick_short_setup()
+    sig = eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts)
+    assert eng.revert_signal(sig)
+    assert eng.on_tick(eng.lprice - 8, eng.lprice + 20, ts) is None          # same bar: muted
+    nxt = eng.on_tick(eng.lprice - 8, eng.lprice + 20, ts + timedelta(minutes=5))
+    assert nxt is not None and nxt.side == "PE"                              # next bar: armed again
+
+
+def test_revert_signal_rejects_stale_or_unknown_signal():
+    eng, ts = _tick_short_setup()
+    sig = eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts)
+    assert eng.revert_signal(sig) is True
+    assert eng.revert_signal(sig) is False        # already reverted
+    eng2, ts2 = _tick_short_setup()
+    sig2 = eng2.on_tick(eng2.lprice - 5, eng2.lprice + 20, ts2)
+    other = type(sig2)(**{**sig2.__dict__, "side": "CE"})
+    assert eng2.revert_signal(other) is False     # different side
+    assert eng2.pos == -1                         # untouched
+
+
+
 
 # â”€â”€ trail-only manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -373,3 +416,34 @@ def test_pine_gate_candle_color_and_rejection_wick(monkeypatch):
     monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_PCT", 0.0)
     monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_ATR", 0.0)
     assert _pine_gate_reason(ctx, sig_pe, 98.0) is None
+
+def test_pine_signal_blocked_only_by_schedule_is_reverted(monkeypatch):
+    import main
+    from main import BotContext, _pine_handle_signal
+    from strategies.pivot_reversal import PineSignal
+    import config.settings as s
+
+    eng = PineReversalEngine()
+    eng.pos, eng.se, eng.lprice, eng.hprice = 0, True, 100.0, 400.0
+    eng._atr_prev, eng._ema_prev = 10.0, 500.0
+    ts = datetime(2026, 11, 16, 15, 5)
+    sig = eng.on_tick(95.0, 110.0, ts)
+    assert sig is not None and eng.pos == -1
+
+    ctx = BotContext.__new__(BotContext)
+    ctx.underlying = "SENSEX"
+    ctx.pine = eng
+    ctx.sm = type("SM", (), {"state": main.State.IDLE})()
+    monkeypatch.setattr(main, "market_open", lambda: True)
+    monkeypatch.setattr(main, "_pine_save_state", lambda c: None)
+    monkeypatch.setattr(main, "_pine_schedule_reason", lambda c, sg: "after 14:30")
+    _pine_handle_signal(ctx, sig, 95.0)
+    assert eng.pos == 0 and eng.se is True            # reverted: stays armed
+
+    # a non-schedule block (e.g. wick filter) must keep the consumed state
+    sig = eng.on_tick(95.0, 110.0, ts + timedelta(minutes=5))
+    assert sig is not None and eng.pos == -1
+    monkeypatch.setattr(main, "_pine_schedule_reason", lambda c, sg: None)
+    monkeypatch.setattr(main, "_pine_gate_reason", lambda c, sg, p: "upper rejection wick")
+    _pine_handle_signal(ctx, sig, 95.0)
+    assert eng.pos == -1 and eng.se is False

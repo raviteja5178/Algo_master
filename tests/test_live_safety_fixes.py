@@ -391,7 +391,7 @@ def entry_env(monkeypatch):
         agg_5m=MagicMock(get_completed=MagicMock(return_value=[])),
         smart_entry=MagicMock(), smart_exit=None, pivot_mgr=None, ws=None,
         intraday_regime=None, trade_id=None, tradingsymbol=None, instrument_token=None,
-        stop_order_id=None, trailing=None, target=None, latency=None,
+        stop_order_id=None, trailing=None, target=None, latency=None, pivot_levels=None,
         can_create_entry=lambda signal_type="": sm.can_enter(),
         entry_block_reason=lambda: "",
     )

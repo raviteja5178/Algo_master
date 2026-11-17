@@ -19,6 +19,12 @@ Stage machine:
   EXIT     stop crossed           → reason SL_HIT / BE_STOP / TSL_HIT
            T3 / R3/S3 touched     → reason TARGET_T3
 
+Fixed-point trail (trail_pts > 0, all stages): once price is trail_pts in
+profit the stop follows best price at a constant distance
+(CE: best − trail_pts, PE: best + trail_pts).  It runs alongside BE and the
+T1/T2 ratchet — whichever stop is tighter wins — and the caller passes the
+final target (R4 / S4) as ``t3``.
+
 Single-lot design: SENSEX quantity 20 is one lot, so there is no partial
 booking — instead the T1/T2 locks + chandelier trail let the whole lot run
 toward T3 while protecting gains at each milestone.
@@ -63,6 +69,14 @@ class PivotTradeManager:
     trail_act_atr: float = 0.0
     be_atr: float = 0.0
     be_buf_atr: float = 0.2
+    # Milestone-buffered ratchet (0 = off).  Class defaults keep states saved
+    # before this feature existed loadable.
+    t1_cushion_pts: float = 0.0
+    t1_extend_pts: float = 0.0
+    t2_cushion_pts: float = 0.0
+    t2_extend_pts: float = 0.0
+    # Fixed-point trail distance in index pts (0 = off).
+    trail_pts: float = 0.0
 
     def __init__(
         self,
@@ -91,13 +105,23 @@ class PivotTradeManager:
         trail_act_atr: float = 0.0,
         be_atr: float = 0.0,
         be_buf_atr: float = 0.2,
+        t1_cushion_pts: float = 0.0,
+        t1_extend_pts: float = 0.0,
+        t2_cushion_pts: float = 0.0,
+        t2_extend_pts: float = 0.0,
+        trail_pts: float = 0.0,
     ) -> None:
+        self.trail_pts = trail_pts
         self.trail_only = trail_only
         self.trail_act_atr = trail_act_atr
         self.be_atr = be_atr
         self.be_buf_atr = be_buf_atr
         self.trail_act_r = trail_act_r
         self.trail_mult = trail_mult
+        self.t1_cushion_pts = t1_cushion_pts
+        self.t1_extend_pts = t1_extend_pts if t1_extend_pts > 0 else (t1_cushion_pts * 2.0 if t1_cushion_pts > 0 else 0.0)
+        self.t2_cushion_pts = t2_cushion_pts if t2_cushion_pts > 0 else t1_cushion_pts
+        self.t2_extend_pts = t2_extend_pts if t2_extend_pts > 0 else self.t1_extend_pts
         self.side = side
         self.sign = 1 if side == "CE" else -1
         self.entry_index = entry_index
@@ -236,28 +260,51 @@ class PivotTradeManager:
             self.best_index = price
         moved = False
 
-        # 3a. T2 reached → lock more profit, tighten trail multiplier.
+        # 3. Milestone-Buffered Ratchet TSL (when t1_cushion_pts > 0)
+        if self.t1_cushion_pts > 0:
+            fav_best = self._fav(self.best_index)
+            # Stage 2 Extension: Price extends beyond T2 -> lock exact T2
+            if fav_best >= self._fav(self.t2) + self.t2_extend_pts:
+                moved |= self._move_stop(self.t2, "T2_HARD_LOCK")
+            # Stage 2: T2 touched -> lock T2 - cushion
+            elif fav_best >= self._fav(self.t2):
+                lock = self.t2 - self.sign * self.t2_cushion_pts
+                moved |= self._move_stop(lock, "T2_CUSHION")
+            # Stage 1 Extension: Price extends beyond T1 -> lock exact T1
+            elif fav_best >= self._fav(self.t1) + self.t1_extend_pts:
+                moved |= self._move_stop(self.t1, "T1_HARD_LOCK")
+            # Stage 1: T1 touched -> lock T1 - cushion
+            elif fav_best >= self._fav(self.t1):
+                lock = self.t1 - self.sign * self.t1_cushion_pts
+                moved |= self._move_stop(lock, "T1_CUSHION")
+
+        # 3a. Legacy T2 reached → lock more profit, tighten trail multiplier.
         #     Evaluated before T1 so we don't double-fire if T2 was just hit.
-        if self.stage == "T1" and self._fav(self.best_index) >= self._fav(self.t2):
+        elif self.stage == "T1" and self._fav(self.best_index) >= self._fav(self.t2):
             lock = (self.t1 + self.sign * self.t2_lock_pct
                     * abs(self._fav(self.t2) - self._fav(self.t1)))
             moved |= self._move_stop(lock, "T2")
             self.stage = "T2"
             return ("STOP_MOVED", self.option_stop) if moved else None
 
-        # 3b. T1 reached → lock profit, start chandelier trail.
-        #     Return immediately so the chandelier fires on the NEXT tick once
-        #     best_index has been updated, preventing a double-fire this tick.
-        if self.stage not in ("T1", "T2") and self._fav(self.best_index) >= self._fav(self.t1):
+        # 3b. Legacy T1 reached → lock profit, start chandelier trail.
+        elif self.stage not in ("T1", "T2") and self._fav(self.best_index) >= self._fav(self.t1):
             lock = self.entry_index + self.sign * self.t1_lock_pct * self._fav(self.t1)
             moved |= self._move_stop(lock, "T1")
             self.stage = "T1"
             return ("STOP_MOVED", self.option_stop) if moved else None
 
-        # 4. break-even after be_trigger_r × risk (only in INITIAL stage)
-        if self.stage == "INITIAL" and self._fav(self.best_index) >= self.be_trigger_r * self.risk:
+        # 4. break-even after be_trigger_r × risk (INITIAL stage, or TRAIL when the
+        #    fixed trail armed first — _move_stop keeps whichever stop is tighter)
+        if self.stage in ("INITIAL", "TRAIL") and self._fav(self.best_index) >= self.be_trigger_r * self.risk:
             moved |= self._move_stop(
                 self.entry_index + self.sign * self.be_buffer_pts, "BE"
+            )
+
+        # 4a. fixed-point trail: stop = best price -/+ trail_pts once in profit by that much
+        if self.trail_pts > 0 and self._fav(self.best_index) >= self.trail_pts:
+            moved |= self._move_stop(
+                self.best_index - self.sign * self.trail_pts, "TRAIL"
             )
 
         # 5. chandelier trail after T1 / T2

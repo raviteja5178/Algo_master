@@ -222,32 +222,64 @@ def _make_setup(
     min_room_r: float,
     targets: tuple[float, float, float] | None = None,
     stop: float | None = None,
+    buffer_pts: float = 0.0,
+    room_target: str = "T1",
 ) -> PivotSetup | None:
     """Build a PivotSetup for one direction, applying SL + room filter.
 
     ``targets`` / ``stop`` override the default R1-R3 / S1-S3 targets and the
     sl_mode-derived stop (used by the level-bounce setup).
+
+    sl_mode "LEVEL" (ATR-free, per-index ``buffer_pts``):
+      stop    = the nearest pivot-grid level at/behind entry ∓ buffer_pts
+                (entry between P and R1 → P − buf; between R1 and R2 → R1 − buf;
+                 PE mirrors with S-levels / Pivot).
+      targets = the next three grid levels ahead of entry (unless given).
+    ``room_target`` "T1" | "T3" selects which target the min-room check uses.
     """
+    if sl_mode == "LEVEL" and buffer_pts > 0 and (targets is None or stop is None):
+        grid, r_step, s_step = _level_grid(pivot_levels)
+        if side == "CE":
+            behind = [lv for lv in grid if lv <= entry]
+            if behind and stop is None:
+                stop = max(behind) - buffer_pts
+            if targets is None:
+                ahead = [lv for lv in grid if lv > entry]
+                if ahead:
+                    targets = _extend_targets(ahead, 1, r_step)
+        else:
+            behind = [lv for lv in grid if lv >= entry]
+            if behind and stop is None:
+                stop = min(behind) + buffer_pts
+            if targets is None:
+                ahead = sorted((lv for lv in grid if lv < entry), reverse=True)
+                if ahead:
+                    targets = _extend_targets(ahead, -1, s_step)
+
     if side == "CE":
         t1, t2, t3 = targets or (pivot_levels.r1, pivot_levels.r2, pivot_levels.r3)
         if stop is None:
-            stop = (
-                min(c.low for c in window) - sl_buffer_atr * atr
-                if sl_mode == "SIGNAL_LOW"
-                else entry - sl_atr_mult * atr
-            )
+            if sl_mode == "SIGNAL_LOW":
+                stop = min(c.low for c in window) - sl_buffer_atr * atr
+            elif sl_mode == "PIVOT_LEVEL":
+                p_level = getattr(pivot_levels, "pivot", min(c.low for c in window))
+                stop = p_level - sl_buffer_atr * atr
+            else:
+                stop = entry - sl_atr_mult * atr
         risk = entry - stop
-        room = t1 - entry
+        room = (t3 if room_target == "T3" else t1) - entry
     else:
         t1, t2, t3 = targets or (pivot_levels.s1, pivot_levels.s2, pivot_levels.s3)
         if stop is None:
-            stop = (
-                max(c.high for c in window) + sl_buffer_atr * atr
-                if sl_mode == "SIGNAL_LOW"
-                else entry + sl_atr_mult * atr
-            )
+            if sl_mode == "SIGNAL_LOW":
+                stop = max(c.high for c in window) + sl_buffer_atr * atr
+            elif sl_mode == "PIVOT_LEVEL":
+                p_level = getattr(pivot_levels, "pivot", max(c.high for c in window))
+                stop = p_level + sl_buffer_atr * atr
+            else:
+                stop = entry + sl_atr_mult * atr
         risk = stop - entry
-        room = entry - t1
+        room = entry - (t3 if room_target == "T3" else t1)
 
     if risk <= 0 or room <= 0 or room < min_room_r * risk:
         return None
@@ -281,6 +313,8 @@ def _check_open_direction(
     min_od_gap_atr: float = 0.0,
     first_candle_confirm: bool = False,
     max_first_wick_atr: float = 0.0,
+    buffer_pts: float = 0.0,
+    room_target: str = "T1",
 ) -> PivotSetup | None:
     """
     Open-Direction mode: fire when the open committed to one side and the
@@ -393,6 +427,7 @@ def _check_open_direction(
         setup = _make_setup(
             side, "OPEN_DIRECTION", entry, window,
             atr, pivot_levels, sl_mode, sl_atr_mult, sl_buffer_atr, min_room_r,
+            buffer_pts=buffer_pts, room_target=room_target,
         )
         if setup is not None:
             return setup
@@ -415,6 +450,8 @@ def _check_rejection(
     sl_buffer_atr: float,
     min_room_r: float,
     rejection_zone_atr: float,
+    buffer_pts: float = 0.0,
+    room_target: str = "T1",
 ) -> PivotSetup | None:
     """
     Rejection mode: price came from the wrong side, probed the Pivot zone,
@@ -464,6 +501,7 @@ def _check_rejection(
         setup = _make_setup(
             side, "REJECTION", entry, window,
             atr, pivot_levels, sl_mode, sl_atr_mult, sl_buffer_atr, min_room_r,
+            buffer_pts=buffer_pts, room_target=room_target,
         )
         if setup is not None:
             return setup
@@ -474,6 +512,78 @@ def _check_rejection(
 # ─────────────────────────────────────────────────────────────────────────────
 # Level Bounce / Rejection (support bounce → CE, resistance rejection → PE)
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Structural (EMA-free) rejection candle: a "strong" candle in the trade
+# direction, or a counter-wick that dominates the other wick.
+_STRUCT_BODY_PCT = 0.5     # body >= 50% of range counts as a strong candle
+_STRUCT_WICK_PCT = 0.35    # dominant rejection wick must be >= 35% of range
+
+
+def _level_grid(pivot_levels) -> tuple[list[float], float, float]:
+    """Return (sorted S5..R5 incl. Pivot, r_step, s_step).
+
+    R4/R5/S4/S5 are derived from the R3-R2 / S2-S3 spacing when missing.
+    """
+    r_step = (pivot_levels.r3 - pivot_levels.r2) if (pivot_levels.r3 > pivot_levels.r2) else (pivot_levels.r2 - pivot_levels.r1)
+    s_step = (pivot_levels.s2 - pivot_levels.s3) if (pivot_levels.s2 > pivot_levels.s3) else (pivot_levels.s1 - pivot_levels.s2)
+    r4 = getattr(pivot_levels, "r4", 0.0) or (pivot_levels.r3 + r_step)
+    r5 = getattr(pivot_levels, "r5", 0.0) or (r4 + r_step)
+    s4 = getattr(pivot_levels, "s4", 0.0) or (pivot_levels.s3 - s_step)
+    s5 = getattr(pivot_levels, "s5", 0.0) or (s4 - s_step)
+    grid = sorted({
+        s5, s4, pivot_levels.s3, pivot_levels.s2, pivot_levels.s1, pivot_levels.pivot,
+        pivot_levels.r1, pivot_levels.r2, pivot_levels.r3, r4, r5,
+    })
+    return grid, r_step, s_step
+
+
+def r4_s4_target(pivot_levels, side: str, t3: float) -> float:
+    """Final target = R4 (CE) / S4 (PE).  Never closer than the setup's own T3,
+    so entries already past R3/S3 keep their further level."""
+    grid, _, _ = _level_grid(pivot_levels)
+    if side == "CE":
+        r4 = next(g for g in grid if g > pivot_levels.r3)     # derived when r4 is missing
+        return max(t3, r4)
+    s4 = next(g for g in reversed(grid) if g < pivot_levels.s3)
+    return min(t3, s4)
+
+
+
+def _extend_targets(ahead: list[float], sign: int, step: float) -> tuple[float, float, float]:
+    """First three levels ahead (nearest first); when the grid runs out, extend
+    by the last level gap (or ``step``) so T1/T2/T3 never collapse together."""
+    out = list(ahead[:3])
+    while len(out) < 3:
+        gap = abs(out[-1] - out[-2]) if len(out) >= 2 else step
+        out.append(out[-1] + sign * gap)
+    return out[0], out[1], out[2]
+
+
+def _is_structural_bounce(c: Candle, prev: Candle, level: float, zone_half: float, side: str) -> bool:
+    """EMA-free rejection of ``level``.
+
+    CE (support): prev closed above the level, ``c`` wicked into the zone and
+    closed back above it as a strong green candle OR with a lower wick that is
+    larger than the upper wick.  PE (resistance) mirrors.
+    """
+    rng = c.high - c.low
+    if rng <= 0:
+        return False
+    body = abs(c.close - c.open)
+    upper = c.high - max(c.open, c.close)
+    lower = min(c.open, c.close) - c.low
+    if side == "CE":
+        if not (prev.close > level and c.low <= level + zone_half and c.close > level):
+            return False
+        strong = c.close > c.open and body >= _STRUCT_BODY_PCT * rng
+        wick = lower > upper and lower >= _STRUCT_WICK_PCT * rng
+        return strong or wick
+    if not (prev.close < level and c.high >= level - zone_half and c.close < level):
+        return False
+    strong = c.close < c.open and body >= _STRUCT_BODY_PCT * rng
+    wick = upper > lower and upper >= _STRUCT_WICK_PCT * rng
+    return strong or wick
+
 
 def _is_bounce(c: Candle, prev: Candle, level: float, zone_half: float, side: str) -> bool:
     """True when ``c`` is a confirmed rejection of ``level``.
@@ -507,8 +617,16 @@ def _check_bounce(
     min_wick_pct: float = 0.0,
     trend_ema: int = 0,
     confirm_next: bool = False,
+    structural: bool = False,
+    level_min_room_r: float = 0.0,
+    sl_mode: str = "SIGNAL_LOW",
+    buffer_pts: float = 0.0,
+    room_target: str = "T1",
 ) -> PivotSetup | None:
     """Bounce off a support level (CE) or rejection at a resistance (PE).
+
+    sl_mode "LEVEL" (with buffer_pts > 0, ATR-free): the touch zone is
+    ±buffer_pts and the stop is the rejected level ∓ buffer_pts.
 
     Levels: S3..S1, Pivot, R1..R3.  The nearest level to price is tested first.
     Stop  : beyond the zone / signal-candle extreme, padded by sl_buffer_atr×ATR.
@@ -525,6 +643,10 @@ def _check_bounce(
       confirm_next  — the signal candle is the PREVIOUS candle; the latest
                       candle must close above its high (CE) / below its
                       low (PE).  Entry = confirmation candle close.
+      structural    — EMA-free candle rule (``_is_structural_bounce``): strong
+                      candle OR dominant rejection wick.  Replaces the 50%-wick
+                      geometry and ``min_wick_pct``.
+      level_min_room_r — T1 room floor for level trades (0 = use min_room_r).
     """
     need = 3 if confirm_next else 2
     if len(today) < need:
@@ -534,20 +656,12 @@ def _check_bounce(
     if not atr or atr <= 0:
         return None
 
-    zone_half = zone_atr * atr
-    raw_levels = {
-        pivot_levels.s3, pivot_levels.s2, pivot_levels.s1, pivot_levels.pivot,
-        pivot_levels.r1, pivot_levels.r2, pivot_levels.r3,
-    }
-    if getattr(pivot_levels, "s4", 0) > 0:
-        raw_levels.add(pivot_levels.s4)
-    if getattr(pivot_levels, "s5", 0) > 0:
-        raw_levels.add(pivot_levels.s5)
-    if getattr(pivot_levels, "r4", 0) > 0:
-        raw_levels.add(pivot_levels.r4)
-    if getattr(pivot_levels, "r5", 0) > 0:
-        raw_levels.add(pivot_levels.r5)
-    levels = sorted(raw_levels)
+    level_mode = sl_mode == "LEVEL" and buffer_pts > 0
+    zone_half = buffer_pts if level_mode else zone_atr * atr
+    # Levels S5..S1, Pivot, R1..R5 (R4/R5/S4/S5 derived when missing)
+    levels, r_step, s_step = _level_grid(pivot_levels)
+    room_r = level_min_room_r if level_min_room_r > 0 else min_room_r
+    is_hit = _is_structural_bounce if structural else _is_bounce
     k = -2 if confirm_next else -1           # index of the signal candle
     c, prev = today[k], today[k - 1]
     prev2 = today[k - 2] if len(today) >= -k + 2 else None
@@ -568,7 +682,7 @@ def _check_bounce(
     for side in ("CE", "PE"):
         if trend is not None and (entry <= trend if side == "CE" else entry >= trend):
             continue
-        if min_wick_pct > 0:
+        if min_wick_pct > 0 and not structural:
             wick = (min(c.open, c.close) - c.low) if side == "CE" else (c.high - max(c.open, c.close))
             if wick < min_wick_pct * rng:
                 continue
@@ -581,30 +695,107 @@ def _check_bounce(
             candidates = sorted(lv for lv in levels if lv > c.close)
 
         for level in candidates:
-            if not _is_bounce(c, prev, level, zone_half, side):
+            if not is_hit(c, prev, level, zone_half, side):
                 continue
-            if prev2 is not None and _is_bounce(prev, prev2, level, zone_half, side):
+            if prev2 is not None and is_hit(prev, prev2, level, zone_half, side):
                 continue   # already signalled on this touch
 
             if side == "CE":
-                stop = min(c.low, level - zone_half) - sl_buffer_atr * atr
+                stop = (level - buffer_pts if level_mode
+                        else min(c.low, level - zone_half) - sl_buffer_atr * atr)
                 ahead = [lv for lv in levels if lv > entry]
             else:
-                stop = max(c.high, level + zone_half) + sl_buffer_atr * atr
+                stop = (level + buffer_pts if level_mode
+                        else max(c.high, level + zone_half) + sl_buffer_atr * atr)
                 ahead = sorted((lv for lv in levels if lv < entry), reverse=True)
             if not ahead:
                 continue
-            t1, t2, t3 = (ahead + [ahead[-1]] * 2)[:3]
+            t1, t2, t3 = _extend_targets(ahead, 1 if side == "CE" else -1,
+                                         r_step if side == "CE" else s_step)
 
             setup = _make_setup(
                 side, "BOUNCE", entry, [c], atr, pivot_levels,
-                "SIGNAL_LOW", 0.0, sl_buffer_atr, min_room_r,
-                targets=(t1, t2, t3), stop=stop,
+                "SIGNAL_LOW", 0.0, sl_buffer_atr, room_r,
+                targets=(t1, t2, t3), stop=stop, room_target=room_target,
             )
             if setup is not None:
                 return setup
 
     return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Level Hold / Continuation (accepted above R1..R5 → CE, below S1..S5 → PE)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _check_level_hold(
+    today: list[Candle],
+    all_candles: Sequence[Candle],
+    pivot_levels,
+    sustain_candles: int,
+    atr_period: int,
+    sl_buffer_atr: float,
+    min_room_r: float,
+    sl_mode: str = "SIGNAL_LOW",
+    buffer_pts: float = 0.0,
+    room_target: str = "T1",
+) -> PivotSetup | None:
+    """Price crossed an outer level and is ACCEPTED beyond it (no EMA).
+
+    CE: the latest ``sustain_candles`` candles all close and hold (low) above
+        resistance R_k, the candle before closed at/below it (first clean
+        window → one signal per cross) and the signal candle is green.
+        Stop = R_k − buffer.  Targets = the next three levels above entry.
+    PE mirrors with supports S1..S5.
+
+    The highest level held (CE) / lowest level held (PE) is used so the stop
+    sits on the nearest level behind price.
+    """
+    n = sustain_candles
+    if len(today) < n + 1:
+        return None
+    atr = atr_at(_atr_series(today, all_candles), period=atr_period)
+    if not atr or atr <= 0:
+        return None
+
+    levels, r_step, s_step = _level_grid(pivot_levels)
+    window = today[-n:]
+    before = today[-n - 1]
+    last = window[-1]
+    entry = last.close
+    buf = buffer_pts if (sl_mode == "LEVEL" and buffer_pts > 0) else sl_buffer_atr * atr
+    p = pivot_levels.pivot
+
+    # CE — resistances R1..R5 (levels above the Pivot), nearest below price first
+    if last.close > last.open:
+        for lv in sorted((x for x in levels if x > p and x < entry), reverse=True):
+            if before.close <= lv and all(c.close > lv and c.low > lv for c in window):
+                ahead = [x for x in levels if x > entry]
+                t1, t2, t3 = _extend_targets(ahead, 1, r_step) if ahead else (
+                    entry + r_step, entry + 2 * r_step, entry + 3 * r_step)
+                setup = _make_setup("CE", "LEVEL_HOLD", entry, window, atr, pivot_levels,
+                                    "SIGNAL_LOW", 0.0, sl_buffer_atr, min_room_r,
+                                    targets=(t1, t2, t3), stop=lv - buf, room_target=room_target)
+                if setup is not None:
+                    return setup
+                break
+
+    # PE — supports S1..S5 (levels below the Pivot), nearest above price first
+    if last.close < last.open:
+        for lv in sorted(x for x in levels if x < p and x > entry):
+            if before.close >= lv and all(c.close < lv and c.high < lv for c in window):
+                ahead = sorted((x for x in levels if x < entry), reverse=True)
+                t1, t2, t3 = _extend_targets(ahead, -1, s_step) if ahead else (
+                    entry - s_step, entry - 2 * s_step, entry - 3 * s_step)
+                setup = _make_setup("PE", "LEVEL_HOLD", entry, window, atr, pivot_levels,
+                                    "SIGNAL_LOW", 0.0, sl_buffer_atr, min_room_r,
+                                    targets=(t1, t2, t3), stop=lv + buf, room_target=room_target)
+                if setup is not None:
+                    return setup
+                break
+
+    return None
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -778,6 +969,8 @@ def _check_acceptance(
     min_room_r_accept: float = 0.0,
     blocked_sides: frozenset[str] = frozenset(),
     require_confirm_body: bool = False,
+    buffer_pts: float = 0.0,
+    room_target: str = "T1",
 ) -> PivotSetup | None:
     """
     Acceptance mode: price closed (or opened) on the wrong side of the Pivot,
@@ -875,6 +1068,7 @@ def _check_acceptance(
             side, "ACCEPTANCE", today[-1].close, today[-n:],
             atr, pivot_levels, sl_mode, sl_atr_mult, sl_buffer_atr,
             max(min_room_r, min_room_r_accept),
+            buffer_pts=buffer_pts, room_target=room_target,
         )
         if setup is not None:
             return setup
@@ -925,6 +1119,17 @@ def find_pivot_setup(
     bounce_min_wick_pct: float = 0.0,
     bounce_trend_ema: int = 0,
     bounce_confirm_next: bool = False,
+    # EMA-free structural candle rule + level-specific room floor (0 = use min_room_r)
+    bounce_structural: bool = False,
+    bounce_level_min_room_r: float = 0.0,
+    # Level-hold continuation above R1..R5 / below S1..S5
+    enable_level_hold: bool = False,
+    # ── ATR-free level design ────────────────────────────────────────────
+    # sl_mode="LEVEL": stop = nearest grid level behind entry ∓ level_buffer_pts,
+    # targets = next grid levels ahead.  room_target "T1" | "T3" = which target
+    # the min-room check measures against.
+    level_buffer_pts: float = 0.0,
+    room_target: str = "T1",
     # ── Swing Pivot (Fractal breakout) ───────────────────────────────────
     enable_swing_pivot: bool = False,
     swing_pivot_left: int = 4,
@@ -1031,6 +1236,7 @@ def find_pivot_setup(
             min_od_gap_atr=min_od_gap_atr,
             first_candle_confirm=first_candle_confirm,
             max_first_wick_atr=max_first_wick_atr,
+            buffer_pts=level_buffer_pts, room_target=room_target,
         )
         if setup is not None:
             return setup
@@ -1042,6 +1248,7 @@ def find_pivot_setup(
             sustain_candles, atr_period,
             sl_mode, sl_atr_mult, sl_buffer_atr, min_room_r,
             rejection_zone_atr,
+            buffer_pts=level_buffer_pts, room_target=room_target,
         )
         if setup is not None:
             return setup
@@ -1056,6 +1263,7 @@ def find_pivot_setup(
             min_room_r_accept=acceptance_min_room_r,
             blocked_sides=acceptance_blocked_sides,
             require_confirm_body=acceptance_require_confirm_body,
+            buffer_pts=level_buffer_pts, room_target=room_target,
         )
         if setup is not None:
             return setup
@@ -1069,6 +1277,20 @@ def find_pivot_setup(
             min_wick_pct=bounce_min_wick_pct,
             trend_ema=bounce_trend_ema,
             confirm_next=bounce_confirm_next,
+            structural=bounce_structural,
+            level_min_room_r=bounce_level_min_room_r,
+            sl_mode=sl_mode, buffer_pts=level_buffer_pts, room_target=room_target,
+        )
+        if setup is not None:
+            return setup
+
+    # ── Level hold / continuation ───────────────────────────────────────────
+    if enable_level_hold:
+        setup = _check_level_hold(
+            today, candles_5m, pivot_levels,
+            sustain_candles, atr_period, sl_buffer_atr,
+            bounce_level_min_room_r if bounce_level_min_room_r > 0 else min_room_r,
+            sl_mode=sl_mode, buffer_pts=level_buffer_pts, room_target=room_target,
         )
         if setup is not None:
             return setup

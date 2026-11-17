@@ -1033,12 +1033,12 @@ PIVOT_ACCEPT_REQUIRE_CONFIRM_BODY: bool = _getbool("PIVOT_ACCEPT_REQUIRE_CONFIRM
 #   every pivot level S3..R3.  Zone half-width = this × ATR; the signal candle
 #   must wick into the zone and close back on its approach side with a
 #   confirming body.  Targets = next levels.  0.0 = disabled (legacy behaviour).
-PIVOT_BOUNCE_ZONE_ATR: float    = _getfloat("PIVOT_BOUNCE_ZONE_ATR", 0.0)
+PIVOT_BOUNCE_ZONE_ATR: float    = _getfloat("PIVOT_BOUNCE_ZONE_ATR", 0.15)
 # Bounce quality filters (only used when PIVOT_BOUNCE_ZONE_ATR > 0):
 #   PIVOT_BOUNCE_MIN_RANGE_ATR : signal candle range >= this × ATR.
 #                                Rejects tiny doji wicks at the level.  Recommended: 0.5.
 #   PIVOT_BOUNCE_MIN_WICK_PCT  : rejection wick >= this × candle range (e.g. 0.5).
-#   PIVOT_BOUNCE_TREND_EMA     : CE only above EMA(N), PE only below.  Recommended: 21.
+#   PIVOT_BOUNCE_TREND_EMA     : CE only above EMA(N), PE only below.  Recommended: 50.
 #   PIVOT_BOUNCE_CONFIRM_NEXT  : next candle must close above signal high (CE) /
 #                                below signal low (PE); entry on that candle.
 #                                STRONGLY RECOMMENDED = true.  Without it the bot enters
@@ -1046,8 +1046,39 @@ PIVOT_BOUNCE_ZONE_ATR: float    = _getfloat("PIVOT_BOUNCE_ZONE_ATR", 0.0)
 #                                evidence that the S/R level is actually holding.
 PIVOT_BOUNCE_MIN_RANGE_ATR: float = _getfloat("PIVOT_BOUNCE_MIN_RANGE_ATR", 0.0)
 PIVOT_BOUNCE_MIN_WICK_PCT: float  = _getfloat("PIVOT_BOUNCE_MIN_WICK_PCT", 0.0)
-PIVOT_BOUNCE_TREND_EMA: int       = _getint("PIVOT_BOUNCE_TREND_EMA", 0)
+PIVOT_BOUNCE_TREND_EMA: int       = _getint("PIVOT_BOUNCE_TREND_EMA", 50)
 PIVOT_BOUNCE_CONFIRM_NEXT: bool   = _getbool("PIVOT_BOUNCE_CONFIRM_NEXT", False)
+# EMA-free level rules (pure pivot-grid price action):
+#   PIVOT_BOUNCE_STRUCTURAL   : bounce/rejection candle = strong candle (body >= 50% of
+#                               range) OR dominant rejection wick (>= 35% and larger than
+#                               the opposite wick).  Replaces MIN_WICK_PCT; set TREND_EMA=0.
+#   PIVOT_BOUNCE_LEVEL_MIN_ROOM_R : T1 room floor for level trades (0 = PIVOT_MIN_ROOM_R).
+#   PIVOT_ENABLE_LEVEL_HOLD   : accepted above R1..R5 (CE) / below S1..S5 (PE) continuation;
+#                               stop at the held level, targets = next levels.
+# ── ATR-free level design ─────────────────────────────────────────────────────
+#   PIVOT_SL_MODE=LEVEL : stop = nearest pivot-grid level behind entry ∓ buffer (index pts);
+#                         targets = next grid levels ahead (T1/T2/T3), ratchet TSL per index.
+#                         e.g. entry between P and R1 -> stop = P - buf; between R1 and R2 -> R1 - buf.
+#   <IDX>_PIVOT_SL_BUFFER_PTS > PIVOT_SL_BUFFER_PTS > built-in per-index table below.
+#   PIVOT_ROOM_TARGET   : T1 | T3 — which target the PIVOT_MIN_ROOM_R check measures against.
+PIVOT_SL_BUFFER_PTS: float        = _getfloat("PIVOT_SL_BUFFER_PTS", 0.0)
+PIVOT_ROOM_TARGET: str            = _get("PIVOT_ROOM_TARGET", "T1").upper()
+_PIVOT_SL_BUFFER_DEFAULTS: dict[str, float] = {"NIFTY": 10.0, "FINNIFTY": 20.0, "SENSEX": 30.0}
+
+
+def pivot_sl_buffer_pts(underlying: str | None) -> float:
+    """Per-index stop buffer (index pts) used when PIVOT_SL_MODE=LEVEL."""
+    idx = normalize_index_name(underlying or UNDERLYING)
+    for name in (f"{idx}_PIVOT_SL_BUFFER_PTS", "PIVOT_SL_BUFFER_PTS"):
+        raw = os.environ.get(name, "").strip()
+        if raw:
+            return float(raw)
+    return _PIVOT_SL_BUFFER_DEFAULTS.get(idx, 20.0)
+
+
+PIVOT_BOUNCE_STRUCTURAL: bool     = _getbool("PIVOT_BOUNCE_STRUCTURAL", False)
+PIVOT_BOUNCE_LEVEL_MIN_ROOM_R: float = _getfloat("PIVOT_BOUNCE_LEVEL_MIN_ROOM_R", 0.0)
+PIVOT_ENABLE_LEVEL_HOLD: bool     = _getbool("PIVOT_ENABLE_LEVEL_HOLD", False)
 
 # ── Fractal Swing Pivot Reversal / Breakout (TradingView Pivot Reversal) ─────
 # PIVOT_ENABLE_SWING: enable fractal swing high/low breakout mode.
@@ -1063,17 +1094,66 @@ PIVOT_SWING_ATR_MULT: float     = _getfloat("PIVOT_SWING_ATR_MULT", 1.2)
 PIVOT_SWING_MAX_SL_ATR: float   = _getfloat("PIVOT_SWING_MAX_SL_ATR", 1.5)    # 0 = uncapped; caps wide swing SLs
 PIVOT_SWING_MAX_RISK_PTS: float = _getfloat("PIVOT_SWING_MAX_RISK_PTS", 0.0)   # 0 = off; skip swing signals whose index risk exceeds this
 
-# Move to breakeven after +N R.  1.5 (was 1.0): replay showed +10% total points; win rate
-# drops (58% -> ~50%) because fewer trades are protected early.
-PIVOT_BE_TRIGGER_R: float       = _getfloat("PIVOT_BE_TRIGGER_R", 1.5)
+# Move to breakeven after +N R.  1.0 locks risk early at +1R.
+PIVOT_BE_TRIGGER_R: float       = _getfloat("PIVOT_BE_TRIGGER_R", 1.0)
 PIVOT_BE_BUFFER_PTS: float      = _getfloat("PIVOT_BE_BUFFER_PTS", 5.0)        # index pts above entry at BE
-PIVOT_T1_LOCK_PCT: float        = _getfloat("PIVOT_T1_LOCK_PCT", 0.5)          # lock 50% of T1 gain at T1
-PIVOT_T2_LOCK_PCT: float        = _getfloat("PIVOT_T2_LOCK_PCT", 0.5)          # lock 50% of T1→T2 range at T2
+# Milestone-buffered Ratchet TSL settings:
+# PIVOT_T1_CUSHION_PTS: pts below T1 (CE) / above T1 (PE) to lock when T1 is touched (e.g. 15 for Nifty, 30 for FinNifty, 45 for Sensex).
+# PIVOT_T1_EXTEND_PTS : pts beyond T1 required to snap the stop to exact T1 (e.g. 30 for Nifty, 45 for FinNifty, 80 for Sensex).
+# Index points differ per index, so the live value comes from pivot_milestone_pts():
+#   <IDX>_PIVOT_T1_CUSHION_PTS (e.g. SENSEX_PIVOT_T1_CUSHION_PTS) > global PIVOT_T1_CUSHION_PTS > built-in table.
+# Set a cushion to 0 to switch the ratchet off and use the PIVOT_T1/T2_LOCK_PCT + chandelier logic.
+PIVOT_T1_CUSHION_PTS: float     = _getfloat("PIVOT_T1_CUSHION_PTS", 15.0)
+PIVOT_T1_EXTEND_PTS: float      = _getfloat("PIVOT_T1_EXTEND_PTS", 30.0)
+PIVOT_T2_CUSHION_PTS: float     = _getfloat("PIVOT_T2_CUSHION_PTS", 15.0)
+PIVOT_T2_EXTEND_PTS: float      = _getfloat("PIVOT_T2_EXTEND_PTS", 30.0)
+
+# (cushion_pts, extend_pts) per index; used when no env override is set.
+_PIVOT_MILESTONE_DEFAULTS: dict[str, tuple[float, float]] = {
+    "NIFTY": (15.0, 30.0), "FINNIFTY": (30.0, 45.0), "SENSEX": (45.0, 80.0),
+}
+
+
+def pivot_milestone_pts(underlying: str | None, stage: str, kind: str) -> float:
+    """Ratchet distance (index pts) for `stage` ("T1"/"T2") and `kind` ("CUSHION"/"EXTEND").
+
+    Order: <IDX>_PIVOT_<stage>_<kind>_PTS env > PIVOT_<stage>_<kind>_PTS env >
+    per-index built-in table > global default.  T2 falls back to the T1 value.
+    """
+    idx = normalize_index_name(underlying or UNDERLYING)
+    key = f"PIVOT_{stage}_{kind}_PTS"
+    for name in (f"{idx}_{key}", key):
+        raw = os.environ.get(name, "").strip()
+        if raw:
+            return float(raw)
+    if stage == "T2":
+        return pivot_milestone_pts(underlying, "T1", kind)
+    cushion, extend = _PIVOT_MILESTONE_DEFAULTS.get(idx, (PIVOT_T1_CUSHION_PTS, PIVOT_T1_EXTEND_PTS))
+    return cushion if kind == "CUSHION" else extend
+
+
+# Fixed-point trail (index pts behind best price, on from the start; 0 = off).
+#   <IDX>_PIVOT_TRAIL_PTS > PIVOT_TRAIL_PTS > built-in per-index table.
+_PIVOT_TRAIL_DEFAULTS: dict[str, float] = {"NIFTY": 15.0, "FINNIFTY": 24.0, "SENSEX": 30.0}
+
+
+def pivot_trail_pts(underlying: str | None) -> float:
+    """Per-index fixed trail distance (index pts); 0 disables the trail."""
+    idx = normalize_index_name(underlying or UNDERLYING)
+    for name in (f"{idx}_PIVOT_TRAIL_PTS", "PIVOT_TRAIL_PTS"):
+        raw = os.environ.get(name, "").strip()
+        if raw:
+            return float(raw)
+    return _PIVOT_TRAIL_DEFAULTS.get(idx, 0.0)
+
+
+PIVOT_T1_LOCK_PCT: float        = _getfloat("PIVOT_T1_LOCK_PCT", 0.5)          # fallback lock %
+PIVOT_T2_LOCK_PCT: float        = _getfloat("PIVOT_T2_LOCK_PCT", 0.5)          # fallback lock %
 PIVOT_TRAIL_ATR_MULT: float     = _getfloat("PIVOT_TRAIL_ATR_MULT", 1.0)       # chandelier after T1
 PIVOT_T2_TRAIL_ATR_MULT: float  = _getfloat("PIVOT_T2_TRAIL_ATR_MULT", 0.75)   # tighter trail after T2 (0=same)
 PIVOT_HARD_SL_CUSHION: float    = _getfloat("PIVOT_HARD_SL_CUSHION", 1.75)     # broker SL backstop width
 PIVOT_OPTION_DELTA: float       = _getfloat("PIVOT_OPTION_DELTA", 0.4)
-PIVOT_MAX_TRADES_PER_DAY: int   = _getint("PIVOT_MAX_TRADES_PER_DAY", 3)
+PIVOT_MAX_TRADES_PER_DAY: int   = _getint("PIVOT_MAX_TRADES_PER_DAY", 2)
 # PIVOT_NO_NEW_ENTRY_AFTER: block new pivot entries at or after this time (HH:MM).
 # Backtest shows 14:00+ entries: 17 trades, 0 wins, −₹11,841 (PF 0.00).
 # Empty string = disabled (use global NO_NEW_ENTRY_AFTER).

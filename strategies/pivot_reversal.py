@@ -104,6 +104,10 @@ class PineReversalEngine:
         self._atr_prev: float | None = None   # ATR at the last completed bar
         self._last_ts: datetime | None = None
         self._index = -1
+        # Pre-signal state of the newest signal, so an execution-side schedule
+        # block (time / lull / day cap) can hand the swing level back.
+        self._undo: tuple[datetime, str, tuple] | None = None
+        self._tick_mute_ts: datetime | None = None   # bar whose tick re-fires are muted
 
     @classmethod
     def from_settings(cls, settings) -> "PineReversalEngine":
@@ -181,6 +185,32 @@ class PineReversalEngine:
         return [self.left, self.right, self.ema_len, self.rr_t1, self.rr_t2,
                 self.use_atr_sl, self.atr_mult, self.atr_period]
 
+    def _state(self) -> tuple:
+        return (self.hprice, self.lprice, self.le, self.se, self.pos,
+                self.v_sl, self.v_t1, self.v_t2)
+
+    def revert_signal(self, sig: PineSignal) -> bool:
+        """Undo `sig` because it could not be traded for a schedule reason.
+
+        The engine flips `pos`/`le`/`se` the instant it emits a signal.  When the
+        bot then refuses the trade only because of the clock (after the entry
+        cut-off, lull window, Friday, day cap) the chart's virtual position would
+        still be held and silently swallow the next day's breakouts (16 Nov
+        15:07 CE blocked "after 14:30" -> every CE ignored until 10:15 on 17 Nov).
+        Reverting keeps the level armed.  Tick re-fires are muted for the rest of
+        the bar; the bar-close check may re-offer it once per bar.
+        """
+        if self._undo is None:
+            return False
+        ts, side, state = self._undo
+        if ts != sig.bar_ts or side != sig.side:
+            return False
+        (self.hprice, self.lprice, self.le, self.se, self.pos,
+         self.v_sl, self.v_t1, self.v_t2) = state
+        self._undo = None
+        self._tick_mute_ts = sig.bar_ts
+        return True
+
     def on_bar_close(self, candles: Sequence[Candle]) -> PineSignal | None:
         """Evaluate the newly completed bar (candles[-1]) exactly as Pine does.
 
@@ -209,6 +239,8 @@ class PineReversalEngine:
     def on_tick(self, price: float, bar_open: float, bar_ts: datetime | None) -> PineSignal | None:
         """Real-time breakout trigger on the forming bar."""
         if price <= 0 or self._atr_prev is None or bar_ts is None:
+            return None
+        if self._tick_mute_ts is not None and bar_ts == self._tick_mute_ts:
             return None
         if self.ema_len > 0:
             if self._ema_prev is None:
@@ -240,6 +272,8 @@ class PineReversalEngine:
         self._ema_prev = self._atr_prev = None
         self._last_ts = None
         self._index = -1
+        self._undo = None
+        self._tick_mute_ts = None
 
     def _ema(self, candles: Sequence[Candle]) -> list[float | None]:
         if self.ema_len <= 0:
@@ -315,6 +349,7 @@ class PineReversalEngine:
 
     def _open(self, side: str, entry: float, level: float, atr_val: float,
               ts: datetime, source: str) -> PineSignal:
+        self._undo = (ts, side, self._state())
         if side == "CE":
             swing = self.lprice
             if self.use_atr_sl or swing is None or swing >= entry:

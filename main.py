@@ -87,7 +87,7 @@ from strategies.signal_engine import (
     _is_in_lull_window, _signal_id,
 )
 from strategies.pivot_reversal import PineReversalEngine, PineSignal
-from strategies.pivot_strategy import PivotSetup
+from strategies.pivot_strategy import PivotSetup, r4_s4_target
 from market.indicators import atr_at, ema as calc_ema, swing_levels
 from utils.exchange_utils import option_exchange, option_quote_key
 from utils.option_delta import option_delta_from_premium
@@ -1160,9 +1160,15 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         # Pine reversal trades: index stop = Pine swing stop, trail-only exits
         # (no BE / T1-T3 locks), broker option stop is a wide disaster backstop.
         _pine_trade = _pv_setup.mode == "PINE_REVERSAL"
+        # Fixed-point trail on (per-index pts) → final target is R4 (CE) / S4 (PE)
+        # instead of T3; the trail keeps running up to it.  Trail 0 = legacy T3 exit.
+        _pv_trail = 0.0 if _pine_trade else settings.pivot_trail_pts(ctx.underlying)
+        _pv_target = _pv_setup.t3
+        if _pv_trail > 0 and ctx.pivot_levels is not None:
+            _pv_target = r4_s4_target(ctx.pivot_levels, _pv_setup.side, _pv_setup.t3)
         ctx.pivot_mgr = PivotTradeManager(
             _pv_setup.side, sensex_ltp, _pv_setup.stop,
-            _pv_setup.t1, _pv_setup.t2, _pv_setup.t3,
+            _pv_setup.t1, _pv_setup.t2, _pv_target,
             _pv_setup.atr, ctx.entry_price,
             # PAPER mode trades the index itself as the "option" price → delta 1
             delta=1.0 if settings.TRADING_MODE == "PAPER" else settings.PIVOT_OPTION_DELTA,
@@ -1184,12 +1190,18 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
             trail_act_atr=settings.PIVOT_PINE_TRAIL_ACT_ATR,
             be_atr=settings.PIVOT_PINE_BE_ATR,
             be_buf_atr=settings.PIVOT_PINE_BE_BUF_ATR,
+            # Milestone-buffered ratchet TSL (legacy pivot trades only; Pine is trail-only)
+            t1_cushion_pts=0.0 if _pine_trade else settings.pivot_milestone_pts(ctx.underlying, "T1", "CUSHION"),
+            t1_extend_pts=0.0 if _pine_trade else settings.pivot_milestone_pts(ctx.underlying, "T1", "EXTEND"),
+            t2_cushion_pts=0.0 if _pine_trade else settings.pivot_milestone_pts(ctx.underlying, "T2", "CUSHION"),
+            t2_extend_pts=0.0 if _pine_trade else settings.pivot_milestone_pts(ctx.underlying, "T2", "EXTEND"),
+            trail_pts=_pv_trail,
         )
         _pv_delta = ctx.pivot_mgr.delta
         sl_pts     = round(ctx.entry_price - ctx.pivot_mgr.option_stop, 2)
-        # Premium target reference: index distance to T3 x the contract's real delta
-        # (the exit itself is decided on the index price at T3).
-        target_pts = round(abs(_pv_setup.t3 - sensex_ltp) * _real_option_delta(
+        # Premium target reference: index distance to the final target (R4/S4 with the
+        # trail on, else T3) x the contract's real delta; the exit is decided on the index.
+        target_pts = round(abs(_pv_target - sensex_ltp) * _real_option_delta(
             instrument, _option_type, sensex_ltp, ctx.entry_price, _pv_delta), 2)
         if _pine_trade:
             be_pts    = round(settings.PIVOT_PINE_TRAIL_ACT_R * ctx.pivot_mgr.risk * _pv_delta, 2)
@@ -1554,11 +1566,13 @@ def _paper_option_price(ctx: BotContext, index_price: float) -> float:
 
 # ── Pine "Pivot Reversal" engine glue ──────────────────────────────────────────
 
-def _pine_gate_reason(ctx: BotContext, sig: PineSignal, price: float) -> str | None:
-    """Why a Pine signal must NOT be traded right now (None = go).
+def _pine_schedule_reason(ctx: BotContext, sig: PineSignal) -> str | None:
+    """Clock / daily-cap reasons a Pine signal cannot be traded right now.
 
-    The engine has already consumed the swing level / flipped its virtual
-    position, exactly as the Pine chart does; these are execution-side guards.
+    These say nothing about the setup itself, so a signal blocked only by one of
+    them is handed back to the engine (PineReversalEngine.revert_signal) instead
+    of leaving a phantom virtual position that swallows the next session's
+    breakouts.
     """
     now_t = now_ist().time()
     day = str(now_ist().date())
@@ -1571,7 +1585,16 @@ def _pine_gate_reason(ctx: BotContext, sig: PineSignal, price: float) -> str | N
         return "lull window"
     if (reason := pivot_day_cap_reason(day, ctx.underlying)):
         return reason
-    if (reason := side_block_reason(sig.side, day, ctx.underlying)):
+    return side_block_reason(sig.side, day, ctx.underlying)
+
+
+def _pine_gate_reason(ctx: BotContext, sig: PineSignal, price: float) -> str | None:
+    """Why a Pine signal must NOT be traded right now (None = go).
+
+    The engine has already consumed the swing level / flipped its virtual
+    position, exactly as the Pine chart does; these are execution-side guards.
+    """
+    if (reason := _pine_schedule_reason(ctx, sig)):
         return reason
     atr = sig.atr
     if atr > 0:
@@ -1637,6 +1660,12 @@ def _pine_handle_signal(ctx: BotContext, sig: PineSignal, price: float,
 
     if (reason := _pine_gate_reason(ctx, sig, price)):
         log_event(logger, "PINE_SIGNAL_BLOCKED", side=sig.side, reason=reason)
+        # Blocked purely by the clock / a daily cap: the setup is untouched, so keep
+        # the swing level armed and the virtual position flat (see _pine_schedule_reason).
+        if (ctx.pine is not None and reason == _pine_schedule_reason(ctx, sig)
+                and ctx.pine.revert_signal(sig)):
+            _pine_save_state(ctx)
+            log_event(logger, "PINE_SIGNAL_REVERTED", side=sig.side, reason=reason)
         return
 
     sig_name = f"{sig.side}_PIVOT"
