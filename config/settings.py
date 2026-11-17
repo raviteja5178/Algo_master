@@ -949,6 +949,12 @@ PIVOT_BREAKOUT_CONFIRM: bool    = _getbool("PIVOT_BREAKOUT_CONFIRM", False)
 # the generic TSL/target/smart-exit logic is bypassed.
 # Requires ENABLE_PIVOT_LEVELS=true.
 ENABLE_PIVOT_STRATEGY: bool     = _getbool("ENABLE_PIVOT_STRATEGY", False)
+# The pivot strategy cannot run without the levels.  A blank/false
+# ENABLE_PIVOT_LEVELS used to silently disable every pivot entry, so the levels
+# are forced on whenever the strategy is on (main.py logs the override).
+PIVOT_LEVELS_FORCED: bool       = ENABLE_PIVOT_STRATEGY and not ENABLE_PIVOT_LEVELS
+if PIVOT_LEVELS_FORCED:
+    ENABLE_PIVOT_LEVELS = True
 # Entry mode: "OPEN_DIRECTION" | "REJECTION" | "BOTH"
 PIVOT_MODE: str                 = _get("PIVOT_MODE", "BOTH").upper()
 PIVOT_SUSTAIN_CANDLES: int      = _getint("PIVOT_SUSTAIN_CANDLES", 2)

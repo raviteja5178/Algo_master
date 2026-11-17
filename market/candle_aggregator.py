@@ -196,6 +196,46 @@ class CandleAggregator:
             self.interval, accepted, skipped,
         )
 
+    def seed_forming(self, minute_candles: list[Candle], now: datetime | None = None) -> int:
+        """
+        Rebuild the in-progress candle from completed 1-minute candles after a
+        mid-candle restart.
+
+        Without this the forming candle is rebuilt from live ticks only, so its
+        open/high/low cover just the minutes after the restart and the first
+        signal evaluation sees a different candle than an uninterrupted run.
+
+        Only acts when no candle is forming yet.  Returns the number of 1-minute
+        candles folded in (0 = nothing to do).
+        """
+        now = now or datetime.now(IST)
+        with self._lock:
+            if self._wip_start is not None or not minute_candles:
+                return 0
+            ordered = sorted(
+                (c for c in minute_candles
+                 if _SESSION_OPEN <= (c.timestamp.hour, c.timestamp.minute) < _SESSION_CLOSE),
+                key=lambda c: c.timestamp,
+            )
+            if not ordered:
+                return 0
+            bucket = self._bucket_start(ordered[-1].timestamp)
+            if bucket.replace(tzinfo=None) + timedelta(minutes=self.interval) <= now.replace(tzinfo=None):
+                return 0                                   # that candle already closed
+            if self._completed and bucket <= self._completed[-1].timestamp:
+                return 0                                   # already seeded as completed
+            part = [c for c in ordered if self._bucket_start(c.timestamp) == bucket]
+            self._wip_start = bucket
+            self._wip_open = part[0].open
+            self._wip_high = max(c.high for c in part)
+            self._wip_low = min(c.low for c in part)
+            self._wip_close = part[-1].close
+            self._wip_volume = sum(c.volume for c in part) or 1
+        logger.info("Rebuilt forming %dm candle %s from %d 1m candle(s): O=%.2f H=%.2f L=%.2f",
+                    self.interval, bucket.strftime("%H:%M"), len(part),
+                    self._wip_open, self._wip_high, self._wip_low)
+        return len(part)
+
     # ── Private ────────────────────────────────────────────────────────────────
 
     def _bucket_start(self, ts: datetime) -> datetime:

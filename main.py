@@ -3177,6 +3177,25 @@ def bootstrap_session(ctx: BotContext) -> None:
             exc,
         )
 
+    # Mid-candle restart: the aggregators rebuild the forming candle from live
+    # ticks only, so its open/high/low would cover just the minutes after the
+    # restart and the first signal would see a different candle than an
+    # uninterrupted run.  Rebuild it from the real 1-minute bars instead.
+    try:
+        _today = now_ist().date()
+        _m1 = [c for c in fetch_historical_candles(_spot_tok, "minute", days_back=1,
+                                                   include_forming=True)
+               if c.timestamp.date() == _today]
+        _n5 = ctx.agg_5m.seed_forming(_m1)
+        _n15 = ctx.agg_15m.seed_forming(_m1)
+        if _n5 or _n15:
+            log_event(logger, "FORMING_CANDLE_REBUILT", m1_for_5m=_n5, m1_for_15m=_n15)
+    except Exception as exc:
+        logger.warning(
+            "Forming-candle rebuild failed (%s) — the first candle after this restart "
+            "may carry a partial OHLC; pivot signals on it can differ from a normal run.", exc,
+        )
+
     # Fetch previous day High / Low for PDHL strategy.
     # Fetch previous day H/L/C — always done when PDHL or Pivot is enabled.
     # fetch_previous_day_hl now returns a 3-tuple (H, L, C).
@@ -3194,9 +3213,19 @@ def bootstrap_session(ctx: BotContext) -> None:
             # is temporarily unreachable.  Only used when the fetch truly fails.
             try:
                 import json as _json
-                _saved = _json.loads(_STATE_FILE.read_text())
+                # Per-instrument file: the shared one holds whichever index wrote last.
+                _saved = _json.loads((_STATE_FILE.parent
+                                      / f".bot_state_{ctx.underlying.lower()}.json").read_text())
                 _pl = _saved.get("pivot_levels") or {}
-                if _pl.get("prev_high") and _pl.get("prev_low") and _pl.get("prev_close"):
+                # Never trust a snapshot from an earlier session: its prev-day
+                # levels belong to the wrong day.
+                _saved_day = str(_saved.get("updated_at") or "")[:10]
+                if _saved_day != now_ist().date().isoformat():
+                    logger.warning(
+                        "State file is from %s, not today — ignoring its pivot levels.",
+                        _saved_day or "an unknown date",
+                    )
+                elif _pl.get("prev_high") and _pl.get("prev_low") and _pl.get("prev_close"):
                     ctx.prev_day_high  = float(_pl["prev_high"])
                     ctx.prev_day_low   = float(_pl["prev_low"])
                     ctx.prev_day_close = float(_pl["prev_close"])
@@ -3228,6 +3257,8 @@ def bootstrap_session(ctx: BotContext) -> None:
             settings.PIVOT_FORMULA, pl.pivot, pl.r1, pl.r2, pl.r3, pl.s1, pl.s2, pl.s3,
         )
 
+    _startup_checks(ctx)
+
     # Seed the intraday regime from the historical candles so the dashboard has a
     # value immediately after a restart instead of waiting for the next candle.
     _refresh_intraday_regime(ctx, log=False)
@@ -3249,6 +3280,50 @@ def bootstrap_session(ctx: BotContext) -> None:
 
     # Wire 5m candle handler (signal evaluation fires on every completed 5m candle)
     ctx.agg_5m.subscribe(_make_candle_handler_5m(ctx))
+
+
+def _startup_checks(ctx: BotContext) -> None:
+    """Verify, and log loudly, that this session starts from valid, non-stale state."""
+    problems: list[str] = []
+    today = now_ist().date()
+
+    if settings.PIVOT_LEVELS_FORCED:
+        logger.warning("ENABLE_PIVOT_LEVELS is blank/false but ENABLE_PIVOT_STRATEGY is on — "
+                       "levels forced on (set ENABLE_PIVOT_LEVELS=true in .env to silence this).")
+    if (settings.ENABLE_PIVOT_STRATEGY and not settings.PIVOT_PINE_MODE
+            and ctx.pivot_levels is None):
+        problems.append("pivot strategy is ON but pivot levels are missing — NO pivot entries today")
+
+    c5 = ctx.agg_5m.get_completed()
+    if len(c5) < 21:
+        problems.append(f"only {len(c5)} completed 5m candles seeded (EMA needs 21)")
+    elif c5[-1].timestamp.date() > today:
+        problems.append(f"seeded candles are dated in the future ({c5[-1].timestamp})")
+    if any(a.timestamp >= b.timestamp for a, b in zip(c5, c5[1:])):
+        problems.append("seeded 5m candles are not strictly increasing (duplicate/out-of-order)")
+
+    if problems:
+        for p in problems:
+            logger.error("STARTUP CHECK FAILED [%s]: %s", ctx.underlying, p)
+        notify("STARTUP_CHECK_FAILED", underlying=ctx.underlying, problems="; ".join(problems))
+    else:
+        log_event(logger, "STARTUP_CHECK_OK", underlying=ctx.underlying,
+                  candles_5m=len(c5), pivot_levels=ctx.pivot_levels is not None,
+                  prev_close=ctx.prev_day_close)
+
+
+def _clear_stale_pivot_state(contexts: dict[str, "BotContext"]) -> None:
+    """Drop .pivot_trade.json when it belongs to no trade that is open now."""
+    from execution import pivot_trade_manager as _ptm
+    try:
+        if not _ptm._STATE_FILE.exists():                      # noqa: SLF001
+            return
+        saved_id = json.loads(_ptm._STATE_FILE.read_text()).get("trade_id")   # noqa: SLF001
+    except Exception:
+        saved_id = None
+    if saved_id is None or saved_id not in {c.trade_id for c in contexts.values()}:
+        PivotTradeManager.clear()
+        log_event(logger, "STALE_PIVOT_STATE_CLEARED", saved_trade_id=saved_id)
 
 
 def classify_session_regime(ctx: BotContext) -> None:
@@ -3315,6 +3390,7 @@ def main() -> None:
             bootstrap_session(c)
             _write_state(c)
             classify_session_regime(c)
+    _clear_stale_pivot_state(contexts)
 
     # Expiry-day iron butterfly (SHADOW only; config.validate() refuses LIVE).
     fly_runner = None
