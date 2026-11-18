@@ -30,9 +30,8 @@ from __future__ import annotations
 
 import argparse
 import logging
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import time as dtime
-from datetime import timedelta
 
 import numpy as np
 import pandas as pd
@@ -44,7 +43,7 @@ from market.historical_data import compute_pivot_levels
 from market.indicators import atr_at
 from research.blueprint_sim import _stats
 from research.cpr_study import OUT_DIR, build_features, load_data
-from strategies.pivot_strategy import find_pivot_setup, r4_s4_target
+from strategies.pivot_strategy import find_pivot_setup
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +61,9 @@ def _t(hhmm: str) -> dtime:
 # Config
 # ─────────────────────────────────────────────────────────────────────────────
 
-def live_signal_kwargs(underlying: str | None = None) -> dict:
+def live_signal_kwargs() -> dict:
     """find_pivot_setup kwargs exactly as strategies/signal_engine.py builds them."""
     return dict(
-        level_buffer_pts=settings.pivot_sl_buffer_pts(underlying),
-        room_target=settings.PIVOT_ROOM_TARGET,
         sustain_candles=settings.PIVOT_SUSTAIN_CANDLES,
         atr_period=settings.PIVOT_ATR_PERIOD,
         sl_mode=settings.PIVOT_SL_MODE,
@@ -89,9 +86,6 @@ def live_signal_kwargs(underlying: str | None = None) -> dict:
         bounce_min_wick_pct=settings.PIVOT_BOUNCE_MIN_WICK_PCT,
         bounce_trend_ema=settings.PIVOT_BOUNCE_TREND_EMA,
         bounce_confirm_next=settings.PIVOT_BOUNCE_CONFIRM_NEXT,
-        bounce_structural=settings.PIVOT_BOUNCE_STRUCTURAL,
-        bounce_level_min_room_r=settings.PIVOT_BOUNCE_LEVEL_MIN_ROOM_R,
-        enable_level_hold=settings.PIVOT_ENABLE_LEVEL_HOLD,
         enable_swing_pivot=settings.PIVOT_ENABLE_SWING,
         swing_pivot_left=settings.PIVOT_SWING_LEFT,
         swing_pivot_right=settings.PIVOT_SWING_RIGHT,
@@ -122,8 +116,8 @@ VARIANT_OVERRIDES: dict[str, dict] = {
 }
 
 
-def manager_kwargs(underlying: str | None = None) -> dict:
-    kw = dict(
+def manager_kwargs() -> dict:
+    return dict(
         delta=1.0,
         be_trigger_r=settings.PIVOT_BE_TRIGGER_R,
         be_buffer_pts=settings.PIVOT_BE_BUFFER_PTS,
@@ -134,15 +128,6 @@ def manager_kwargs(underlying: str | None = None) -> dict:
         hard_sl_cushion=settings.PIVOT_HARD_SL_CUSHION,
         max_sl_pct=0.0,          # index-level study: no premium clamp
     )
-    if underlying:               # per-index milestone-buffered ratchet TSL, as main.py wires it
-        kw.update(
-            t1_cushion_pts=settings.pivot_milestone_pts(underlying, "T1", "CUSHION"),
-            t1_extend_pts=settings.pivot_milestone_pts(underlying, "T1", "EXTEND"),
-            t2_cushion_pts=settings.pivot_milestone_pts(underlying, "T2", "CUSHION"),
-            t2_extend_pts=settings.pivot_milestone_pts(underlying, "T2", "EXTEND"),
-            trail_pts=settings.pivot_trail_pts(underlying),
-        )
-    return kw
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -227,18 +212,10 @@ def backtest_variant(
     max_trades: int | None = None,
     mgr_overrides: dict | None = None,
     formula: str | None = None,
-    underlying: str | None = None,
-    live_gates: bool = False,
 ) -> pd.DataFrame:
-    """``underlying`` selects the per-index stop buffer + ratchet distances.
-    ``live_gates`` mirrors signal_engine: lull window and the no-new-entry cut-off are
-    tested on the signal candle's END time, using PIVOT_NO_NEW_ENTRY_AFTER."""
     max_trades = settings.PIVOT_MAX_TRADES_PER_DAY if max_trades is None else max_trades
-    kw = {**live_signal_kwargs(underlying), **overrides}
-    mkw = {**manager_kwargs(underlying), **(mgr_overrides or {})}
-    no_entry = NO_NEW_ENTRY
-    if live_gates and settings.PIVOT_NO_NEW_ENTRY_AFTER:
-        no_entry = _t(settings.PIVOT_NO_NEW_ENTRY_AFTER)
+    kw = {**live_signal_kwargs(), **overrides}
+    mkw = {**manager_kwargs(), **(mgr_overrides or {})}
 
     daily = daily.sort_values("date").reset_index(drop=True)
     daily["date"] = pd.to_datetime(daily["date"]).dt.normalize()
@@ -275,13 +252,11 @@ def backtest_variant(
         while pos < len(live_idxs) and trades_today < max_trades:
             g = live_idxs[pos]
             c = candles[g]
-            gate_t = ((c.timestamp + timedelta(minutes=5)).time() if live_gates
-                      else c.timestamp.time())
-            if gate_t >= no_entry:
+            if c.timestamp.time() >= NO_NEW_ENTRY:
                 break
             if settings.PIVOT_SKIP_LULLS and settings.PIVOT_LULL_WINDOWS:
                 from strategies.signal_engine import _is_in_lull_window
-                if _is_in_lull_window(gate_t, settings.PIVOT_LULL_WINDOWS):
+                if _is_in_lull_window(c.timestamp.time(), settings.PIVOT_LULL_WINDOWS):
                     pos += 1
                     continue
             hist = candles[max(0, g + 1 - HISTORY_CANDLES): g + 1]
@@ -298,8 +273,6 @@ def backtest_variant(
                 return atr_at(candles[max(0, _base + j + 1 - HISTORY_CANDLES): _base + j + 1],
                               period=settings.PIVOT_ATR_PERIOD)
 
-            if mkw.get("trail_pts", 0.0) > 0:      # live: final target = R4 / S4 when trailing
-                setup = replace(setup, t3=r4_s4_target(levels, setup.side, setup.t3))
             trade, exit_j = simulate_trade(setup, later, atr_after, mkw, day)
             out.append(trade)
             trades_today += 1

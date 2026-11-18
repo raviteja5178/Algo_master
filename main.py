@@ -87,7 +87,7 @@ from strategies.signal_engine import (
     _is_in_lull_window, _signal_id,
 )
 from strategies.pivot_reversal import PineReversalEngine, PineSignal
-from strategies.pivot_strategy import PivotSetup, r4_s4_target
+from strategies.pivot_strategy import PivotSetup
 from market.indicators import atr_at, ema as calc_ema, swing_levels
 from utils.exchange_utils import option_exchange, option_quote_key
 from utils.option_delta import option_delta_from_premium
@@ -1160,15 +1160,9 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         # Pine reversal trades: index stop = Pine swing stop, trail-only exits
         # (no BE / T1-T3 locks), broker option stop is a wide disaster backstop.
         _pine_trade = _pv_setup.mode == "PINE_REVERSAL"
-        # Fixed-point trail on (per-index pts) → final target is R4 (CE) / S4 (PE)
-        # instead of T3; the trail keeps running up to it.  Trail 0 = legacy T3 exit.
-        _pv_trail = 0.0 if _pine_trade else settings.pivot_trail_pts(ctx.underlying)
-        _pv_target = _pv_setup.t3
-        if _pv_trail > 0 and ctx.pivot_levels is not None:
-            _pv_target = r4_s4_target(ctx.pivot_levels, _pv_setup.side, _pv_setup.t3)
         ctx.pivot_mgr = PivotTradeManager(
             _pv_setup.side, sensex_ltp, _pv_setup.stop,
-            _pv_setup.t1, _pv_setup.t2, _pv_target,
+            _pv_setup.t1, _pv_setup.t2, _pv_setup.t3,
             _pv_setup.atr, ctx.entry_price,
             # PAPER mode trades the index itself as the "option" price → delta 1
             delta=1.0 if settings.TRADING_MODE == "PAPER" else settings.PIVOT_OPTION_DELTA,
@@ -1190,18 +1184,12 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
             trail_act_atr=settings.PIVOT_PINE_TRAIL_ACT_ATR,
             be_atr=settings.PIVOT_PINE_BE_ATR,
             be_buf_atr=settings.PIVOT_PINE_BE_BUF_ATR,
-            # Milestone-buffered ratchet TSL (legacy pivot trades only; Pine is trail-only)
-            t1_cushion_pts=0.0 if _pine_trade else settings.pivot_milestone_pts(ctx.underlying, "T1", "CUSHION"),
-            t1_extend_pts=0.0 if _pine_trade else settings.pivot_milestone_pts(ctx.underlying, "T1", "EXTEND"),
-            t2_cushion_pts=0.0 if _pine_trade else settings.pivot_milestone_pts(ctx.underlying, "T2", "CUSHION"),
-            t2_extend_pts=0.0 if _pine_trade else settings.pivot_milestone_pts(ctx.underlying, "T2", "EXTEND"),
-            trail_pts=_pv_trail,
         )
         _pv_delta = ctx.pivot_mgr.delta
         sl_pts     = round(ctx.entry_price - ctx.pivot_mgr.option_stop, 2)
-        # Premium target reference: index distance to the final target (R4/S4 with the
-        # trail on, else T3) x the contract's real delta; the exit is decided on the index.
-        target_pts = round(abs(_pv_target - sensex_ltp) * _real_option_delta(
+        # Premium target reference: index distance to T3 x the contract's real delta
+        # (the exit itself is decided on the index price at T3).
+        target_pts = round(abs(_pv_setup.t3 - sensex_ltp) * _real_option_delta(
             instrument, _option_type, sensex_ltp, ctx.entry_price, _pv_delta), 2)
         if _pine_trade:
             be_pts    = round(settings.PIVOT_PINE_TRAIL_ACT_R * ctx.pivot_mgr.risk * _pv_delta, 2)
@@ -1566,13 +1554,11 @@ def _paper_option_price(ctx: BotContext, index_price: float) -> float:
 
 # ── Pine "Pivot Reversal" engine glue ──────────────────────────────────────────
 
-def _pine_schedule_reason(ctx: BotContext, sig: PineSignal) -> str | None:
-    """Clock / daily-cap reasons a Pine signal cannot be traded right now.
+def _pine_gate_reason(ctx: BotContext, sig: PineSignal, price: float) -> str | None:
+    """Why a Pine signal must NOT be traded right now (None = go).
 
-    These say nothing about the setup itself, so a signal blocked only by one of
-    them is handed back to the engine (PineReversalEngine.revert_signal) instead
-    of leaving a phantom virtual position that swallows the next session's
-    breakouts.
+    The engine has already consumed the swing level / flipped its virtual
+    position, exactly as the Pine chart does; these are execution-side guards.
     """
     now_t = now_ist().time()
     day = str(now_ist().date())
@@ -1585,16 +1571,7 @@ def _pine_schedule_reason(ctx: BotContext, sig: PineSignal) -> str | None:
         return "lull window"
     if (reason := pivot_day_cap_reason(day, ctx.underlying)):
         return reason
-    return side_block_reason(sig.side, day, ctx.underlying)
-
-
-def _pine_gate_reason(ctx: BotContext, sig: PineSignal, price: float) -> str | None:
-    """Why a Pine signal must NOT be traded right now (None = go).
-
-    The engine has already consumed the swing level / flipped its virtual
-    position, exactly as the Pine chart does; these are execution-side guards.
-    """
-    if (reason := _pine_schedule_reason(ctx, sig)):
+    if (reason := side_block_reason(sig.side, day, ctx.underlying)):
         return reason
     atr = sig.atr
     if atr > 0:
@@ -1660,12 +1637,6 @@ def _pine_handle_signal(ctx: BotContext, sig: PineSignal, price: float,
 
     if (reason := _pine_gate_reason(ctx, sig, price)):
         log_event(logger, "PINE_SIGNAL_BLOCKED", side=sig.side, reason=reason)
-        # Blocked purely by the clock / a daily cap: the setup is untouched, so keep
-        # the swing level armed and the virtual position flat (see _pine_schedule_reason).
-        if (ctx.pine is not None and reason == _pine_schedule_reason(ctx, sig)
-                and ctx.pine.revert_signal(sig)):
-            _pine_save_state(ctx)
-            log_event(logger, "PINE_SIGNAL_REVERTED", side=sig.side, reason=reason)
         return
 
     sig_name = f"{sig.side}_PIVOT"
@@ -3177,25 +3148,6 @@ def bootstrap_session(ctx: BotContext) -> None:
             exc,
         )
 
-    # Mid-candle restart: the aggregators rebuild the forming candle from live
-    # ticks only, so its open/high/low would cover just the minutes after the
-    # restart and the first signal would see a different candle than an
-    # uninterrupted run.  Rebuild it from the real 1-minute bars instead.
-    try:
-        _today = now_ist().date()
-        _m1 = [c for c in fetch_historical_candles(_spot_tok, "minute", days_back=1,
-                                                   include_forming=True)
-               if c.timestamp.date() == _today]
-        _n5 = ctx.agg_5m.seed_forming(_m1)
-        _n15 = ctx.agg_15m.seed_forming(_m1)
-        if _n5 or _n15:
-            log_event(logger, "FORMING_CANDLE_REBUILT", m1_for_5m=_n5, m1_for_15m=_n15)
-    except Exception as exc:
-        logger.warning(
-            "Forming-candle rebuild failed (%s) — the first candle after this restart "
-            "may carry a partial OHLC; pivot signals on it can differ from a normal run.", exc,
-        )
-
     # Fetch previous day High / Low for PDHL strategy.
     # Fetch previous day H/L/C — always done when PDHL or Pivot is enabled.
     # fetch_previous_day_hl now returns a 3-tuple (H, L, C).
@@ -3213,19 +3165,9 @@ def bootstrap_session(ctx: BotContext) -> None:
             # is temporarily unreachable.  Only used when the fetch truly fails.
             try:
                 import json as _json
-                # Per-instrument file: the shared one holds whichever index wrote last.
-                _saved = _json.loads((_STATE_FILE.parent
-                                      / f".bot_state_{ctx.underlying.lower()}.json").read_text())
+                _saved = _json.loads(_STATE_FILE.read_text())
                 _pl = _saved.get("pivot_levels") or {}
-                # Never trust a snapshot from an earlier session: its prev-day
-                # levels belong to the wrong day.
-                _saved_day = str(_saved.get("updated_at") or "")[:10]
-                if _saved_day != now_ist().date().isoformat():
-                    logger.warning(
-                        "State file is from %s, not today — ignoring its pivot levels.",
-                        _saved_day or "an unknown date",
-                    )
-                elif _pl.get("prev_high") and _pl.get("prev_low") and _pl.get("prev_close"):
+                if _pl.get("prev_high") and _pl.get("prev_low") and _pl.get("prev_close"):
                     ctx.prev_day_high  = float(_pl["prev_high"])
                     ctx.prev_day_low   = float(_pl["prev_low"])
                     ctx.prev_day_close = float(_pl["prev_close"])
@@ -3257,8 +3199,6 @@ def bootstrap_session(ctx: BotContext) -> None:
             settings.PIVOT_FORMULA, pl.pivot, pl.r1, pl.r2, pl.r3, pl.s1, pl.s2, pl.s3,
         )
 
-    _startup_checks(ctx)
-
     # Seed the intraday regime from the historical candles so the dashboard has a
     # value immediately after a restart instead of waiting for the next candle.
     _refresh_intraday_regime(ctx, log=False)
@@ -3280,50 +3220,6 @@ def bootstrap_session(ctx: BotContext) -> None:
 
     # Wire 5m candle handler (signal evaluation fires on every completed 5m candle)
     ctx.agg_5m.subscribe(_make_candle_handler_5m(ctx))
-
-
-def _startup_checks(ctx: BotContext) -> None:
-    """Verify, and log loudly, that this session starts from valid, non-stale state."""
-    problems: list[str] = []
-    today = now_ist().date()
-
-    if settings.PIVOT_LEVELS_FORCED:
-        logger.warning("ENABLE_PIVOT_LEVELS is blank/false but ENABLE_PIVOT_STRATEGY is on — "
-                       "levels forced on (set ENABLE_PIVOT_LEVELS=true in .env to silence this).")
-    if (settings.ENABLE_PIVOT_STRATEGY and not settings.PIVOT_PINE_MODE
-            and ctx.pivot_levels is None):
-        problems.append("pivot strategy is ON but pivot levels are missing — NO pivot entries today")
-
-    c5 = ctx.agg_5m.get_completed()
-    if len(c5) < 21:
-        problems.append(f"only {len(c5)} completed 5m candles seeded (EMA needs 21)")
-    elif c5[-1].timestamp.date() > today:
-        problems.append(f"seeded candles are dated in the future ({c5[-1].timestamp})")
-    if any(a.timestamp >= b.timestamp for a, b in zip(c5, c5[1:])):
-        problems.append("seeded 5m candles are not strictly increasing (duplicate/out-of-order)")
-
-    if problems:
-        for p in problems:
-            logger.error("STARTUP CHECK FAILED [%s]: %s", ctx.underlying, p)
-        notify("STARTUP_CHECK_FAILED", underlying=ctx.underlying, problems="; ".join(problems))
-    else:
-        log_event(logger, "STARTUP_CHECK_OK", underlying=ctx.underlying,
-                  candles_5m=len(c5), pivot_levels=ctx.pivot_levels is not None,
-                  prev_close=ctx.prev_day_close)
-
-
-def _clear_stale_pivot_state(contexts: dict[str, "BotContext"]) -> None:
-    """Drop .pivot_trade.json when it belongs to no trade that is open now."""
-    from execution import pivot_trade_manager as _ptm
-    try:
-        if not _ptm._STATE_FILE.exists():                      # noqa: SLF001
-            return
-        saved_id = json.loads(_ptm._STATE_FILE.read_text()).get("trade_id")   # noqa: SLF001
-    except Exception:
-        saved_id = None
-    if saved_id is None or saved_id not in {c.trade_id for c in contexts.values()}:
-        PivotTradeManager.clear()
-        log_event(logger, "STALE_PIVOT_STATE_CLEARED", saved_trade_id=saved_id)
 
 
 def classify_session_regime(ctx: BotContext) -> None:
@@ -3390,7 +3286,6 @@ def main() -> None:
             bootstrap_session(c)
             _write_state(c)
             classify_session_regime(c)
-    _clear_stale_pivot_state(contexts)
 
     # Expiry-day iron butterfly (SHADOW only; config.validate() refuses LIVE).
     fly_runner = None

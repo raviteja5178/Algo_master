@@ -81,7 +81,6 @@ def fetch_historical_candles(
     instrument_token: int,
     interval: str,  # "minute", "5minute", "15minute"
     days_back: int = 5,
-    include_forming: bool = False,
 ) -> list[Candle]:
     """
     Fetch historical candles from Zerodha and return in chronological order.
@@ -90,9 +89,6 @@ def fetch_historical_candles(
 
     Pre-market candles (before 09:15 IST) are filtered out — Zerodha can
     return pre-open auction data which must not seed the EMA indicators.
-
-    The still-forming candle is dropped unless *include_forming* is set (used
-    to rebuild the true OHLC of the in-progress candle after a mid-candle restart).
     """
     kite = get_kite()
     to_date = datetime.now(IST).replace(tzinfo=None)
@@ -128,7 +124,7 @@ def fetch_historical_candles(
         if (ts.hour, ts.minute) < (_SESSION_START_HOUR, _SESSION_START_MINUTE):
             skipped += 1
             continue
-        if not include_forming and is_still_forming(ts, interval, to_date):
+        if is_still_forming(ts, interval, to_date):
             continue
         candles.append(Candle(
             timestamp=ts,
