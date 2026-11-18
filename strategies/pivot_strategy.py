@@ -198,6 +198,8 @@ class PivotSetup:
     t3:    float         # R3 (CE) / S3 (PE)
     atr:   float         # ATR(atr_period) at entry
     pivot: float
+    grid:  bool = False  # True -> t1..t3 are pivot-grid levels (Pine grid floor lock)
+    ladder: tuple = ()   # every grid level ahead of entry, nearest first (floor lock at each)
 
 
 def _today(candles: Sequence[Candle]) -> list[Candle]:
@@ -476,23 +478,34 @@ def _check_rejection(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _is_bounce(c: Candle, prev: Candle, level: float, zone_half: float, side: str) -> bool:
-    """True when ``c`` is a confirmed rejection of ``level``.
+    """True when ``c`` is a confirmed rejection / reclaim bounce of ``level``.
 
-    CE (support): prev closed above the level (approach from above), ``c``
-    wicked into the zone (low <= level + zone), closed back above the level
-    with a bullish body and its close in the upper half of the range.
-    PE (resistance) mirrors.
+    CE (support bounce / liquidity sweep reclaim):
+      - Candle low probes into or below the level zone: c.low <= level + zone_half
+      - Candle reclaims and closes back above the level: c.close > level
+      - Candle shows bullish body or lower rejection wick >= 35% of range
+      - Close is in the upper half of the candle range: (c.close - c.low) >= 0.45 * rng
+
+    PE (resistance rejection / false breakout fade):
+      - Candle high probes into or above the level zone: c.high >= level - zone_half
+      - Candle fails and closes back below the level: c.close < level
+      - Candle shows bearish body or upper rejection wick >= 35% of range
+      - Close is in the lower half of the candle range: (c.high - c.close) >= 0.45 * rng
     """
     rng = c.high - c.low
     if rng <= 0:
         return False
+    lower_wick = min(c.open, c.close) - c.low
+    upper_wick = c.high - max(c.open, c.close)
     if side == "CE":
-        return (prev.close > level and c.low <= level + zone_half
-                and c.close > level and c.close > c.open
-                and (c.close - c.low) >= 0.5 * rng)
-    return (prev.close < level and c.high >= level - zone_half
-            and c.close < level and c.close < c.open
-            and (c.high - c.close) >= 0.5 * rng)
+        return (c.low <= level + zone_half
+                and c.close > level
+                and (c.close > c.open or lower_wick >= 0.35 * rng)
+                and (c.close - c.low) >= 0.45 * rng)
+    return (c.high >= level - zone_half
+            and c.close < level
+            and (c.close < c.open or upper_wick >= 0.35 * rng)
+            and (c.high - c.close) >= 0.45 * rng)
 
 
 def _check_bounce(

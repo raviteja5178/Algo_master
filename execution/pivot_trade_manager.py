@@ -39,6 +39,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Sequence
 
 from utils.logging_config import log_event
 from utils.price_utils import round_to_tick
@@ -63,6 +64,11 @@ class PivotTradeManager:
     trail_act_atr: float = 0.0
     be_atr: float = 0.0
     be_buf_atr: float = 0.2
+    # Pivot-grid floor lock (Pine trades).  Class defaults keep older saved states loadable.
+    grid_mode: bool = False
+    grid_exit_at: int = 0          # 0 = no hard target exit, ladder floors only
+    grid_buffer: float = 0.0
+    grid_levels: list = []         # every grid level ahead of entry, nearest first
 
     def __init__(
         self,
@@ -91,13 +97,23 @@ class PivotTradeManager:
         trail_act_atr: float = 0.0,
         be_atr: float = 0.0,
         be_buf_atr: float = 0.2,
+        max_peak_fallback_pts: float = 0.0,
+        grid_mode: bool = False,
+        grid_exit_at: int = 0,
+        grid_buffer: float = 0.0,
+        grid_levels: Sequence[float] | None = None,
     ) -> None:
+        self.grid_mode = grid_mode
+        self.grid_exit_at = min(3, max(0, int(grid_exit_at)))
+        self.grid_buffer = max(0.0, grid_buffer)
+        self.grid_levels = [float(x) for x in (grid_levels or ())]
         self.trail_only = trail_only
         self.trail_act_atr = trail_act_atr
         self.be_atr = be_atr
         self.be_buf_atr = be_buf_atr
         self.trail_act_r = trail_act_r
         self.trail_mult = trail_mult
+        self.max_peak_fallback_pts = max_peak_fallback_pts
         self.side = side
         self.sign = 1 if side == "CE" else -1
         self.entry_index = entry_index
@@ -205,6 +221,33 @@ class PivotTradeManager:
                 "BE":      "PIVOT_BE_STOP",
             }.get(self.stage, "PIVOT_TSL_HIT")
             return ("EXIT", reason)
+
+        # Pivot-grid floor lock (Pine trades): the pivot levels ahead of entry form a
+        # ladder.  The Pine stop is untouched until the first level prints; every
+        # level price then clears flips polarity (resistance -> support for a CE,
+        # support -> resistance for a PE) and the stop ratchets to that level
+        # -/+ buffer.  A pullback to the floor exits the trade.  With grid_exit_at
+        # 1..3 the trade also exits outright when that target prints; 0 = ladder only.
+        if self.grid_mode:
+            if self._fav(price) > self._fav(self.best_index):
+                self.best_index = price
+            if self.grid_exit_at:
+                exit_level = (self.t1, self.t2, self.t3)[self.grid_exit_at - 1]
+                if self._fav(price) >= self._fav(exit_level):
+                    return ("EXIT", f"PIVOT_TARGET_T{self.grid_exit_at}")
+            fav_best = self._fav(self.best_index)
+            ladder = self.grid_levels or [self.t1, self.t2, self.t3]
+            cleared = [lv for lv in ladder if fav_best >= self._fav(lv)]
+            moved = False
+            if cleared:
+                moved = self._move_stop(cleared[-1] - self.sign * self.grid_buffer,
+                                        "T1" if len(cleared) == 1 else "T2")
+            return ("STOP_MOVED", self.option_stop) if moved else None
+
+        # 1b. peak fallback guard (if price gives back >= max_peak_fallback_pts from high-watermark)
+        if self.max_peak_fallback_pts > 0 and self.stage in ("BE", "T1", "T2", "TRAIL"):
+            if (self._fav(self.best_index) - self._fav(price)) >= self.max_peak_fallback_pts:
+                return ("EXIT", "PIVOT_PEAK_FALLBACK")
 
         # Trail-only (Pine engine): no fixed target, no break-even, no T1/T2
         # locks.  The initial stop stays until profit reaches trail_act_r x risk,

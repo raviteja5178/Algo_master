@@ -524,12 +524,16 @@ class TestMinTodayCandles:
 
 def _ce_mgr(**kw) -> PivotTradeManager:
     """entry=1010, stop=990, T1=1100, T2=1200, T3=1300, ATR=10, option=200."""
-    return PivotTradeManager(
-        "CE", 1010, 990, 1100, 1200, 1300, 10, 200,
+    defaults = dict(
         delta=0.4, be_trigger_r=1.0, be_buffer_pts=5,
         t1_lock_pct=0.5, t2_lock_pct=0.5,
         trail_atr_mult=1.0, t2_trail_atr_mult=0.75,
-        hard_sl_cushion=1.25, max_sl_pct=0.5, **kw
+        hard_sl_cushion=1.25, max_sl_pct=0.5,
+    )
+    defaults.update(kw)
+    return PivotTradeManager(
+        "CE", 1010, 990, 1100, 1200, 1300, 10, 200,
+        **defaults
     )
 
 
@@ -613,6 +617,16 @@ class TestPivotTradeManager:
         m.on_index_price(1101)
         m.on_index_price(1201)
         assert m.on_index_price(1300) == ("EXIT", "PIVOT_TARGET_T3")
+
+    def test_peak_fallback_exit_after_advancing(self):
+        # Entry at 1010, T1=1100, max_peak_fallback_pts=50, no chandelier (trail_atr_mult=0)
+        m = _ce_mgr(max_peak_fallback_pts=50.0, trail_atr_mult=0.0)
+        m.on_index_price(1101)   # Reach T1 -> stage='T1', best=1101, stop locked at 1055
+        m.on_index_price(1160)   # Advances to 1160 -> best=1160
+        # 1160 - 40 = 1120 -> no exit yet (1120 > stop 1055 and pullback 40 < 50)
+        assert m.on_index_price(1120) is None
+        # 1160 - 50 = 1110 -> triggers peak fallback exit
+        assert m.on_index_price(1110) == ("EXIT", "PIVOT_PEAK_FALLBACK")
 
     def test_stop_only_ratchets_up(self):
         m = _ce_mgr()

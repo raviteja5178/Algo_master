@@ -55,6 +55,32 @@ logger = logging.getLogger(__name__)
 MINTICK = 0.05  # SENSEX index tick — Pine's syminfo.mintick floor on risk
 
 
+def grid_ladder(levels, side: str, entry: float, atr: float,
+                min_gap_atr: float = 0.0) -> list[float]:
+    """Every pivot-grid level ahead of ``entry`` in the trade direction, nearest first.
+
+    CE -> P/R1..R5 above entry (ascending), PE -> P/S1..S5 below (descending).
+    Levels closer than ``min_gap_atr`` x ATR are skipped so a level the price is
+    already sitting on is not used as "Target 1".
+    """
+    names = ("pivot", "r1", "r2", "r3", "r4", "r5", "s1", "s2", "s3", "s4", "s5")
+    grid = sorted({float(getattr(levels, n, 0.0) or 0.0) for n in names} - {0.0})
+    gap = max(0.0, min_gap_atr) * max(0.0, atr)
+    if side == "CE":
+        return [lv for lv in grid if lv >= entry + max(gap, MINTICK)]
+    return sorted((lv for lv in grid if lv <= entry - max(gap, MINTICK)), reverse=True)
+
+
+def grid_targets(levels, side: str, entry: float, atr: float,
+                 min_gap_atr: float = 0.0) -> tuple[float, float, float] | None:
+    """Next three pivot-grid levels ahead of ``entry`` (T1, T2, T3).
+
+    Returns None when fewer than three levels remain (caller falls back to ATR trail).
+    """
+    ahead = grid_ladder(levels, side, entry, atr, min_gap_atr)
+    return (ahead[0], ahead[1], ahead[2]) if len(ahead) >= 3 else None
+
+
 @dataclass(frozen=True)
 class PineSignal:
     side: str          # "CE" (Pine BUY) | "PE" (Pine SELL)
@@ -210,6 +236,7 @@ class PineReversalEngine:
         """Real-time breakout trigger on the forming bar."""
         if price <= 0 or self._atr_prev is None or bar_ts is None:
             return None
+        self._roll_day(bar_ts)
         if self.ema_len > 0:
             if self._ema_prev is None:
                 return None
@@ -279,12 +306,25 @@ class PineReversalEngine:
         if is_pl:
             self.lprice, self.se = cl, True
 
+    def _roll_day(self, ts: datetime) -> None:
+        """New session: start FLAT but keep yesterday's swing levels.
+
+        hprice / lprice and the le / se arm flags carry over (a level consumed
+        yesterday stays consumed, so a stale level cannot re-fire on the same
+        side).  The virtual position and its stop/targets do NOT: a trade the
+        bot never held, or that never hit its stop/T2 before the close, must
+        not block the first valid break of the new day.  The bot's real open
+        position is the only entry gate (see main._pine_handle_signal).
+        """
+        day = ts.date()
+        if self._day is not None and day != self._day:
+            self.pos = 0
+            self.v_sl = self.v_t1 = self.v_t2 = None
+        self._day = day
+
     def _step(self, candles, i, ema_i, atr_i, source) -> PineSignal | None:
         bar = candles[i]
-        # Pine's virtual position deliberately carries across days, exactly like
-        # the chart: BUY and SELL strictly alternate, so a stale level can never
-        # produce a second same-side "false" signal.  (Resetting it daily gave
-        # CE, CE, CE sequences the chart never shows.)
+        self._roll_day(bar.timestamp)
         self._pivots(candles, i)
         sig: PineSignal | None = None
 

@@ -48,7 +48,11 @@ def _literal_pine(candles: list[Candle], left=4, right=2, ema_len=50, rr2=2.5, a
     pos = 0
     sl = t2 = None
     sigs = []
+    day = None
     for i, c in enumerate(candles):
+        if day is not None and c.timestamp.date() != day:
+            pos, sl, t2 = 0, None, None     # new session starts flat; swing levels carry
+        day = c.timestamp.date()
         kk = i - right
         if kk - left >= 0:
             win = candles[kk - left: i + 1]
@@ -95,6 +99,22 @@ def test_engine_matches_literal_pine_port(seed):
         if s:
             got.append((s.bar_ts, s.side, s.entry, s.stop))
     assert got == expected
+
+
+def test_new_session_starts_flat_but_keeps_yesterdays_swing_levels():
+    """A virtual short left open overnight must not block the first break of the next day."""
+    candles = _walk(300, 21)
+    eng = PineReversalEngine()
+    eng.warm_up(candles)
+    eng.pos, eng.v_sl, eng.v_t2 = -1, 1e9, -1e9          # stale short: stop/T2 never hit
+    eng.se, eng.lprice = True, candles[-1].close - 40
+    eng.hprice, eng._ema_prev = candles[-1].close + 300, candles[-1].close + 200
+    same_day = candles[-1].timestamp
+    assert eng.on_tick(eng.lprice - 5, eng.lprice + 20, same_day) is None   # same session: blocked
+    nxt = same_day + timedelta(days=1)
+    sig = eng.on_tick(eng.lprice - 5, eng.lprice + 20, nxt)
+    assert sig is not None and sig.side == "PE" and sig.level == eng.lprice  # next session: fires
+    assert eng.hprice == candles[-1].close + 300                              # levels carried
 
 
 def test_signals_alternate_like_the_chart():
@@ -252,6 +272,93 @@ def test_atr_trail_arms_before_1r_and_never_loosens():
     s = m.stop_index
     m.on_index_price(77300.0)
     assert m.stop_index == s
+
+# ── pivot-grid floor lock ─────────────────────────────────────────────────────
+
+from market.historical_data import compute_pivot_levels
+from strategies.pivot_reversal import grid_targets
+
+
+def _grid_mgr(side="PE", exit_at=2, ladder=None):
+    entry = 28165.0
+    stop = entry + 107.0 if side == "PE" else entry - 107.0
+    sgn = 1 if side == "CE" else -1
+    t1, t2, t3 = entry + sgn * 120, entry + sgn * 205, entry + sgn * 340
+    return PivotTradeManager(
+        side, entry, stop, t1, t2, t3, 30.0, 260.0,
+        delta=0.5, hard_sl_cushion=2.5, max_sl_pct=0.5, signal_risk=107.0,
+        grid_mode=True, grid_exit_at=exit_at, grid_buffer=6.0, grid_levels=ladder,
+    )
+
+
+def test_grid_targets_pick_next_three_levels_in_trade_direction():
+    lv = compute_pivot_levels(28350.95, 27994.75, 28195.0)       # fib grid
+    t = grid_targets(lv, "PE", 28165.4, atr=31.6, min_gap_atr=0.5)
+    assert t == (lv.s1, lv.s2, lv.s3)                            # P sits above a PE entry
+    t = grid_targets(lv, "CE", 28015.73, atr=34.4, min_gap_atr=0.5)
+    assert t == (lv.s1, lv.pivot, lv.r1)                         # S1 is 28 pts above entry -> kept
+    assert grid_targets(lv, "CE", lv.r5, atr=30.0) is None       # no room left
+
+
+def test_grid_stop_untouched_until_t1_then_flips_to_t1_minus_buffer():
+    m = _grid_mgr("PE")
+    assert m.on_index_price(28100.0) is None                     # +65: no BE, no trail
+    assert m.stop_index == pytest.approx(28272.0)
+    assert m.on_index_price(28045.0) == ("STOP_MOVED", m.option_stop)   # T1 (28045) touched
+    assert m.stop_index == pytest.approx(28045.0 + 6.0) and m.stage == "T1"
+    assert m.on_index_price(28048.0) is None                     # pullback that holds the 28051 floor
+    assert m.on_index_price(28060.0) == ("EXIT", "PIVOT_TSL_HIT")  # through the floor -> out
+
+
+def test_grid_pullback_through_floor_exits_and_target_two_exits_at_t2():
+    m = _grid_mgr("PE")
+    m.on_index_price(28040.0)
+    assert m.on_index_price(28060.0) == ("EXIT", "PIVOT_TSL_HIT")
+    m = _grid_mgr("PE")
+    m.on_index_price(28040.0)
+    assert m.on_index_price(27960.0) == ("EXIT", "PIVOT_TARGET_T2")
+    m = _grid_mgr("CE")
+    assert m.on_index_price(28165.0 + 205) == ("EXIT", "PIVOT_TARGET_T2")
+
+
+def test_grid_exit_at_three_locks_t2_floor_and_exits_at_t3():
+    m = _grid_mgr("CE", exit_at=3)
+    m.on_index_price(28165.0 + 125)                              # T1
+    assert m.stage == "T1" and m.stop_index == pytest.approx(28165.0 + 120 - 6.0)
+    m.on_index_price(28165.0 + 210)                              # T2
+    assert m.stage == "T2" and m.stop_index == pytest.approx(28165.0 + 205 - 6.0)
+    assert m.on_index_price(28165.0 + 345) == ("EXIT", "PIVOT_TARGET_T3")
+
+
+def test_grid_ladder_locks_every_level_with_no_hard_exit():
+    e = 28165.0
+    lad = [e - 120, e - 205, e - 340, e - 450]                    # PE: S1, S2, S3, S4
+    m = _grid_mgr("PE", exit_at=0, ladder=lad)
+    m.on_index_price(e - 125)                                     # clears L1
+    assert m.stop_index == pytest.approx(e - 120 + 6.0)
+    m.on_index_price(e - 210)                                     # clears L2 - no exit at T2
+    assert m.stop_index == pytest.approx(e - 205 + 6.0)
+    m.on_index_price(e - 345)                                     # clears L3 (T3) - still no exit
+    assert m.stop_index == pytest.approx(e - 340 + 6.0)
+    m.on_index_price(e - 455)                                     # clears L4 beyond T3
+    assert m.stop_index == pytest.approx(e - 450 + 6.0)
+    assert m.on_index_price(e - 430) == ("EXIT", "PIVOT_TSL_HIT")  # pullback through the floor
+
+
+def test_grid_ladder_pullback_after_l2_exits_at_l2_floor():
+    e = 28165.0
+    lad = [e + 120, e + 205, e + 340]                             # CE
+    m = _grid_mgr("CE", exit_at=0, ladder=lad)
+    m.on_index_price(e + 210)                                     # L1 + L2 cleared in one jump
+    assert m.stop_index == pytest.approx(e + 205 - 6.0)
+    assert m.on_index_price(e + 195) == ("EXIT", "PIVOT_TSL_HIT")
+
+
+def test_grid_initial_stop_still_exits_as_sl_hit():
+    m = _grid_mgr("PE")
+    assert m.on_index_price(28290.0) == ("EXIT", "PIVOT_SL_HIT")
+
+
 
 
 # ── restart recovery ──────────────────────────────────────────────────────────

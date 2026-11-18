@@ -86,7 +86,7 @@ from strategies.signal_engine import (
     consume_pivot_setup, pivot_day_cap_reason, publish_pivot_setup, side_block_reason,
     _is_in_lull_window, _signal_id,
 )
-from strategies.pivot_reversal import PineReversalEngine, PineSignal
+from strategies.pivot_reversal import PineReversalEngine, PineSignal, grid_ladder, grid_targets
 from strategies.pivot_strategy import PivotSetup
 from market.indicators import atr_at, ema as calc_ema, swing_levels
 from utils.exchange_utils import option_exchange, option_quote_key
@@ -1178,7 +1178,11 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
             # Pine: risk measured from the actual fill, so the 1R trail trigger
             # is real even when the fill is a little past the breakout level.
             signal_risk=(abs(sensex_ltp - _pv_setup.stop) if _pine_trade else _pv_setup.risk),
-            trail_only=_pine_trade,
+            trail_only=_pine_trade and not _pv_setup.grid,
+            grid_mode=_pine_trade and _pv_setup.grid,
+            grid_exit_at=settings.PIVOT_PINE_GRID_EXIT_AT,
+            grid_buffer=settings.PIVOT_PINE_GRID_BUFFER_ATR * _pv_setup.atr,
+            grid_levels=_pv_setup.ladder,
             trail_act_r=settings.PIVOT_PINE_TRAIL_ACT_R,
             trail_mult=settings.PIVOT_PINE_TRAIL_ATR_MULT,
             trail_act_atr=settings.PIVOT_PINE_TRAIL_ACT_ATR,
@@ -1191,7 +1195,11 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
         # (the exit itself is decided on the index price at T3).
         target_pts = round(abs(_pv_setup.t3 - sensex_ltp) * _real_option_delta(
             instrument, _option_type, sensex_ltp, ctx.entry_price, _pv_delta), 2)
-        if _pine_trade:
+        if _pine_trade and _pv_setup.grid:
+            # grid floor lock: first floor = T1 -/+ buffer; no ATR trail
+            be_pts    = round(abs(_pv_setup.t1 - sensex_ltp) * _pv_delta, 2)
+            trail_pts = 0.0
+        elif _pine_trade:
             be_pts    = round(settings.PIVOT_PINE_TRAIL_ACT_R * ctx.pivot_mgr.risk * _pv_delta, 2)
             trail_pts = round(settings.PIVOT_PINE_TRAIL_ATR_MULT * _pv_setup.atr * _pv_delta, 2)
         else:
@@ -1647,13 +1655,31 @@ def _pine_handle_signal(ctx: BotContext, sig: PineSignal, price: float,
     sgn = 1 if sig.side == "CE" else -1
     risk = abs(price - sig.stop)
     pivot_ref = ctx.pivot_levels.pivot if ctx.pivot_levels is not None else 0.0
+    t1 = round(price + sgn * settings.PIVOT_PINE_RR_T1 * risk, 2)
+    t2 = round(price + sgn * settings.PIVOT_PINE_RR_T2 * risk, 2)
+    t3 = round(price + sgn * (settings.PIVOT_PINE_RR_T2 + 1.0) * risk, 2)
+    grid = False
+    ladder: tuple = ()
+    if settings.PIVOT_PINE_GRID_LOCK:
+        # Pivot-grid floor lock: T1/T2/T3 = next pivot levels in the trade direction;
+        # the full ladder is kept so the floor ratchets at every level cleared.
+        _gt = (grid_targets(ctx.pivot_levels, sig.side, price, sig.atr,
+                            settings.PIVOT_PINE_GRID_MIN_GAP_ATR)
+               if ctx.pivot_levels is not None else None)
+        if _gt is not None:
+            t1, t2, t3 = (round(x, 2) for x in _gt)
+            ladder = tuple(round(x, 2) for x in grid_ladder(
+                ctx.pivot_levels, sig.side, price, sig.atr,
+                settings.PIVOT_PINE_GRID_MIN_GAP_ATR))
+            grid = True
+        else:
+            log_event(logger, "PINE_GRID_UNAVAILABLE", side=sig.side, price=round(price, 2),
+                      reason="pivot levels missing or fewer than 3 grid levels ahead - ATR trail used")
     publish_pivot_setup(PivotSetup(
         side=sig.side, mode="PINE_REVERSAL",
         entry=round(price, 2), stop=sig.stop, risk=round(risk, 2),
-        t1=round(price + sgn * settings.PIVOT_PINE_RR_T1 * risk, 2),
-        t2=round(price + sgn * settings.PIVOT_PINE_RR_T2 * risk, 2),
-        t3=round(price + sgn * (settings.PIVOT_PINE_RR_T2 + 1.0) * risk, 2),
-        atr=sig.atr, pivot=pivot_ref,
+        t1=t1, t2=t2, t3=t3,
+        atr=sig.atr, pivot=pivot_ref, grid=grid, ladder=ladder,
     ), ctx.underlying)
     execute_entry(ctx, sig_name, price, signal_candle_ts=sig.bar_ts,
                   candle_completed_ts=candle_completed_ts)
@@ -2194,6 +2220,21 @@ def recover_from_restart(ctx: BotContext) -> None:
     active = fetch_active_trade(ctx.underlying)
     if not active:
         logger.info("No active trade found in DB for %s — starting fresh.", ctx.underlying)
+        return
+
+    # Overnight stale guard: an active trade from a prior calendar session must never
+    # be restored into today's fresh intraday market session.
+    trade_created = str(active.get("created_at") or "")[:10]
+    today_str = str(now_ist().date())
+    if trade_created and trade_created < today_str:
+        logger.warning(
+            "Found stale trade %s from prior session (%s) for %s — auto-closing and starting fresh.",
+            active["trade_id"], trade_created, ctx.underlying,
+        )
+        exit_price = float(active.get("entry_price") or 0.0)
+        pnl = (exit_price - float(active.get("entry_price") or 0.0)) * int(active.get("quantity") or 0)
+        mark_trade_closed(active["trade_id"], exit_price, now_ist().isoformat(), pnl)
+        ctx.sm._state = State.IDLE  # noqa: SLF001
         return
 
     logger.info("Active trade found: %s — reconciling with broker.", active["trade_id"])
@@ -3151,7 +3192,9 @@ def bootstrap_session(ctx: BotContext) -> None:
     # Fetch previous day High / Low for PDHL strategy.
     # Fetch previous day H/L/C — always done when PDHL or Pivot is enabled.
     # fetch_previous_day_hl now returns a 3-tuple (H, L, C).
-    if settings.ENABLE_PDHL_STRATEGY or settings.ENABLE_PIVOT_LEVELS:
+    _need_levels = settings.ENABLE_PIVOT_LEVELS or (
+        settings.PIVOT_PINE_MODE and settings.PIVOT_PINE_GRID_LOCK)
+    if settings.ENABLE_PDHL_STRATEGY or _need_levels:
         try:
             ctx.prev_day_high, ctx.prev_day_low, ctx.prev_day_close = fetch_previous_day_hl(_spot_tok)
             logger.info(
@@ -3160,23 +3203,35 @@ def bootstrap_session(ctx: BotContext) -> None:
             )
         except Exception as exc:
             logger.warning("Prev-day fetch failed at startup (%s) — trying state file fallback.", exc)
-            # Fallback: read prev-day H/L/C from the last saved state file.
+            # Fallback: read prev-day H/L/C from the last saved state file for THIS underlying.
             # This keeps PivotLevels alive on an intraday restart when the API
-            # is temporarily unreachable.  Only used when the fetch truly fails.
+            # is temporarily unreachable.  Only used when the fetch truly fails AND
+            # the state file belongs to TODAY's session (never load yesterday's stale levels).
             try:
                 import json as _json
-                _saved = _json.loads(_STATE_FILE.read_text())
-                _pl = _saved.get("pivot_levels") or {}
-                if _pl.get("prev_high") and _pl.get("prev_low") and _pl.get("prev_close"):
-                    ctx.prev_day_high  = float(_pl["prev_high"])
-                    ctx.prev_day_low   = float(_pl["prev_low"])
-                    ctx.prev_day_close = float(_pl["prev_close"])
-                    logger.info(
-                        "Prev-day levels restored from state file — PDH=%.2f  PDL=%.2f  PDC=%.2f",
-                        ctx.prev_day_high, ctx.prev_day_low, ctx.prev_day_close,
-                    )
+                _state_path = _STATE_FILE.parent / f".bot_state_{ctx.underlying.lower()}.json"
+                if not _state_path.exists():
+                    _state_path = _STATE_FILE
+                if _state_path.exists():
+                    _saved = _json.loads(_state_path.read_text())
+                    _up = _saved.get("updated_at") or ""
+                    _is_today = bool(_up and _up[:10] == str(now_ist().date()))
+                    if _is_today:
+                        _pl = _saved.get("pivot_levels") or {}
+                        if _pl.get("prev_high") and _pl.get("prev_low") and _pl.get("prev_close"):
+                            ctx.prev_day_high  = float(_pl["prev_high"])
+                            ctx.prev_day_low   = float(_pl["prev_low"])
+                            ctx.prev_day_close = float(_pl["prev_close"])
+                            logger.info(
+                                "Prev-day levels restored from intraday state file — PDH=%.2f  PDL=%.2f  PDC=%.2f",
+                                ctx.prev_day_high, ctx.prev_day_low, ctx.prev_day_close,
+                            )
+                        else:
+                            logger.warning("Intraday state file has no prev-day levels — PDHL/pivot disabled today.")
+                    else:
+                        logger.warning("State file is from a prior session (%s) — refusing stale levels for today.", _up[:10] or "unknown")
                 else:
-                    logger.warning("State file has no prev-day levels — PDHL/pivot disabled today.")
+                    logger.warning("No state file found — PDHL/pivot disabled today.")
             except Exception as exc2:
                 logger.warning("State file fallback also failed (%s) — PDHL/pivot disabled today.", exc2)
 
@@ -3186,7 +3241,7 @@ def bootstrap_session(ctx: BotContext) -> None:
 
     # Compute pivot levels from prev-day H/L/C (no extra API call needed).
     # If ENABLE_PIVOT_LEVELS is true and we have the data, build PivotLevels directly.
-    if settings.ENABLE_PIVOT_LEVELS and ctx.prev_day_high and ctx.prev_day_low and ctx.prev_day_close:
+    if _need_levels and ctx.prev_day_high and ctx.prev_day_low and ctx.prev_day_close:
         ctx.pivot_levels = compute_pivot_levels(
             ctx.prev_day_high,
             ctx.prev_day_low,

@@ -1123,6 +1123,24 @@ PIVOT_PINE_BACKSTOP_CUSHION: float = _getfloat("PIVOT_PINE_BACKSTOP_CUSHION", 2.
 PIVOT_PINE_REVERSAL_EXIT: bool    = _getbool("PIVOT_PINE_REVERSAL_EXIT", True)
 # Lull windows hide valid Pine breakouts, so they are opt-in for this engine.
 PIVOT_PINE_SKIP_LULLS: bool       = _getbool("PIVOT_PINE_SKIP_LULLS", False)
+# ── Pivot-grid floor lock (Pine trades) ──────────────────────────────────────
+# PIVOT_PINE_GRID_LOCK: manage Pine trades on the daily pivot grid instead of the
+# ATR break-even / chandelier.  The pivot levels ahead of entry in the trade direction
+# (P, R1..R5 for CE / P, S1..S5 for PE) form a ladder.  The initial Pine stop is
+# untouched until the first level prints, so a trending day is not cut by a premature
+# ATR break-even.  Polarity-flipped floor lock - every level price clears flips from
+# resistance to support (PE: support to resistance) and the stop ratchets to it:
+#   clear level N -> stop = level N -/+ buffer   (CE: minus, PE: plus)
+# A pullback to the floor exits the trade.  There is no hard target exit by default
+# (PIVOT_PINE_GRID_EXIT_AT = 0), so a runner keeps climbing the ladder; set 1/2/3 to
+# also exit outright when T1/T2/T3 prints.
+# Previous-day levels are loaded at startup for this even if ENABLE_PIVOT_LEVELS=false.
+PIVOT_PINE_GRID_LOCK: bool        = _getbool("PIVOT_PINE_GRID_LOCK", False)
+PIVOT_PINE_GRID_EXIT_AT: int      = min(3, max(0, _getint("PIVOT_PINE_GRID_EXIT_AT", 0)))
+# Buffer = this x ATR(entry), fixed for the trade.
+PIVOT_PINE_GRID_BUFFER_ATR: float = _getfloat("PIVOT_PINE_GRID_BUFFER_ATR", 0.2)
+# Grid levels closer than this x ATR to the entry are skipped as targets.
+PIVOT_PINE_GRID_MIN_GAP_ATR: float = _getfloat("PIVOT_PINE_GRID_MIN_GAP_ATR", 0.5)
 PIVOT_PINE_REQUIRE_CANDLE_COLOR: bool     = _getbool("PIVOT_PINE_REQUIRE_CANDLE_COLOR", False)
 PIVOT_PINE_MAX_REJECTION_WICK_PCT: float  = _getfloat("PIVOT_PINE_MAX_REJECTION_WICK_PCT", 0.0)
 PIVOT_PINE_MAX_REJECTION_WICK_ATR: float  = _getfloat("PIVOT_PINE_MAX_REJECTION_WICK_ATR", 0.0)
