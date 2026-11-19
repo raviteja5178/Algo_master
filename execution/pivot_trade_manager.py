@@ -69,6 +69,9 @@ class PivotTradeManager:
     grid_exit_at: int = 0          # 0 = no hard target exit, ladder floors only
     grid_buffer: float = 0.0
     grid_levels: list = []         # every grid level ahead of entry, nearest first
+    # Grid break-even: once price has covered this fraction of the way from entry to T1,
+    # move the stop to the entry price (0 = off).  Saved states without it load as off.
+    grid_be_pct: float = 0.0
 
     def __init__(
         self,
@@ -102,7 +105,9 @@ class PivotTradeManager:
         grid_exit_at: int = 0,
         grid_buffer: float = 0.0,
         grid_levels: Sequence[float] | None = None,
+        grid_be_pct: float = 0.0,
     ) -> None:
+        self.grid_be_pct = max(0.0, grid_be_pct)
         self.grid_mode = grid_mode
         self.grid_exit_at = min(3, max(0, int(grid_exit_at)))
         self.grid_buffer = max(0.0, grid_buffer)
@@ -242,6 +247,9 @@ class PivotTradeManager:
             if cleared:
                 moved = self._move_stop(cleared[-1] - self.sign * self.grid_buffer,
                                         "T1" if len(cleared) == 1 else "T2")
+            elif (self.grid_be_pct > 0 and self.stage == "INITIAL"
+                  and fav_best >= self.grid_be_pct * self._fav(self.t1)):
+                moved = self._move_stop(self.entry_index, "BE")
             return ("STOP_MOVED", self.option_stop) if moved else None
 
         # 1b. peak fallback guard (if price gives back >= max_peak_fallback_pts from high-watermark)

@@ -5,6 +5,6 @@ cd /d "%~dp0"
 if exist "venv\Scripts\python.exe" (
     "venv\Scripts\python.exe" stop_bot.py
 ) else (
-    python stop_bot.py
+    py stop_bot.py
 )
 pause

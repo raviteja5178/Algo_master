@@ -358,6 +358,53 @@ def test_grid_initial_stop_still_exits_as_sl_hit():
     m = _grid_mgr("PE")
     assert m.on_index_price(28290.0) == ("EXIT", "PIVOT_SL_HIT")
 
+def _grid_be_mgr(side="CE", pct=0.5):
+    m = _grid_mgr(side, exit_at=0)
+    m.grid_be_pct = pct
+    return m
+
+
+def test_grid_be_off_by_default_keeps_initial_stop():
+    m = _grid_mgr("CE", exit_at=0)
+    assert m.on_index_price(28165.0 + 100) is None                # 83% of the way to T1, no BE
+    assert m.stop_index == pytest.approx(28165.0 - 107.0)
+
+
+def test_grid_be_moves_stop_to_entry_at_half_way_to_t1():
+    m = _grid_be_mgr("CE")                                         # T1 = entry + 120 -> trigger +60
+    assert m.on_index_price(28165.0 + 59) is None
+    assert m.on_index_price(28165.0 + 60) == ("STOP_MOVED", m.option_stop)
+    assert m.stop_index == pytest.approx(28165.0) and m.stage == "BE"
+    assert m.on_index_price(28165.0 - 5) == ("EXIT", "PIVOT_BE_STOP")
+
+
+def test_grid_be_works_for_pe_and_then_level_floor_takes_over():
+    e = 28165.0
+    m = _grid_be_mgr("PE")
+    m.on_index_price(e - 61)
+    assert m.stop_index == pytest.approx(e) and m.stage == "BE"
+    m.on_index_price(e - 125)                                      # T1 cleared -> T1 floor, higher than BE
+    assert m.stop_index == pytest.approx(e - 120 + 6.0) and m.stage == "T1"
+
+
+def test_grid_be_uses_best_price_not_current_price():
+    m = _grid_be_mgr("CE")
+    m.on_index_price(28165.0 + 70)                                 # BE armed on the spike
+    assert m.stop_index == pytest.approx(28165.0)
+    m.on_index_price(28165.0 + 20)                                 # pullback does not loosen it
+    assert m.stop_index == pytest.approx(28165.0)
+
+
+def test_grid_be_state_without_field_loads_as_off():
+    m = _grid_mgr("CE")
+    d = dict(m.__dict__)
+    d.pop("grid_be_pct", None)
+    obj = PivotTradeManager.__new__(PivotTradeManager)
+    obj.__dict__.update(d)
+    assert obj.grid_be_pct == 0.0
+
+
+
 
 
 
@@ -423,11 +470,50 @@ def test_restore_rejects_previous_session_and_changed_settings():
     assert other.restore({k: v for k, v in snap.items() if k != "pos"}, candles) is False
 
 
+def test_pine_gate_blocks_entries_before_start_time(monkeypatch):
+    import main
+    import config.settings as s
+    from main import _pine_gate_reason, BotContext
+    from strategies.pivot_reversal import PineSignal
+
+    monkeypatch.setattr(s, "PIVOT_NO_FRIDAY", False)
+    monkeypatch.setattr(s, "PIVOT_NO_NEW_ENTRY_AFTER", "")
+    monkeypatch.setattr(s, "PIVOT_PINE_SKIP_LULLS", False)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_CHASE_ATR", 0.0)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_RISK_ATR", 0.0)
+    monkeypatch.setattr(s, "PIVOT_PINE_REQUIRE_CANDLE_COLOR", False)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_PCT", 0.0)
+    monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_ATR", 0.0)
+    monkeypatch.setattr(main, "pivot_day_cap_reason", lambda day, und: None)
+    monkeypatch.setattr(main, "side_block_reason", lambda side, day, und: None)
+    ctx = BotContext.__new__(BotContext)
+    ctx.underlying = "SENSEX"
+    from market.candle_aggregator import CandleAggregator
+    ctx.agg_5m = CandleAggregator(5)
+    sig = PineSignal(side="CE", bar_ts=datetime(2026, 11, 19, 9, 15), entry=100.0, stop=80.0,
+                     risk=20.0, atr=20.0, level=100.0, source="TICK")
+
+    def _at(h, m):
+        monkeypatch.setattr(main, "now_ist", lambda: datetime(2026, 11, 19, h, m, 30))
+
+    monkeypatch.setattr(s, "PIVOT_NO_ENTRY_BEFORE", "09:20")
+    _at(9, 15)
+    assert _pine_gate_reason(ctx, sig, 100.0) == "before 09:20"
+    _at(9, 19)
+    assert _pine_gate_reason(ctx, sig, 100.0) == "before 09:20"
+    _at(9, 20)
+    assert _pine_gate_reason(ctx, sig, 100.0) is None
+    monkeypatch.setattr(s, "PIVOT_NO_ENTRY_BEFORE", "")            # off -> no restriction
+    _at(9, 15)
+    assert _pine_gate_reason(ctx, sig, 100.0) is None
+
+
 def test_pine_gate_candle_color_and_rejection_wick(monkeypatch):
     from main import _pine_gate_reason, BotContext
     from strategies.pivot_reversal import PineSignal
     import config.settings as s
 
+    monkeypatch.setattr(s, "PIVOT_NO_ENTRY_BEFORE", "")
     monkeypatch.setattr(s, "PIVOT_NO_FRIDAY", False)
     monkeypatch.setattr(s, "PIVOT_NO_NEW_ENTRY_AFTER", "")
     monkeypatch.setattr(s, "PIVOT_PINE_SKIP_LULLS", False)

@@ -1183,6 +1183,7 @@ def execute_entry(ctx: BotContext, signal_type: str, sensex_ltp: float,
             grid_exit_at=settings.PIVOT_PINE_GRID_EXIT_AT,
             grid_buffer=settings.PIVOT_PINE_GRID_BUFFER_ATR * _pv_setup.atr,
             grid_levels=_pv_setup.ladder,
+            grid_be_pct=settings.PIVOT_PINE_GRID_BE_PCT,
             trail_act_r=settings.PIVOT_PINE_TRAIL_ACT_R,
             trail_mult=settings.PIVOT_PINE_TRAIL_ATR_MULT,
             trail_act_atr=settings.PIVOT_PINE_TRAIL_ACT_ATR,
@@ -1572,6 +1573,9 @@ def _pine_gate_reason(ctx: BotContext, sig: PineSignal, price: float) -> str | N
     day = str(now_ist().date())
     if settings.PIVOT_NO_FRIDAY and now_ist().weekday() == 4:
         return "friday blocked"
+    if settings.PIVOT_NO_ENTRY_BEFORE and not is_after_or_equal(
+            now_t, parse_time_ist(settings.PIVOT_NO_ENTRY_BEFORE)):
+        return f"before {settings.PIVOT_NO_ENTRY_BEFORE}"
     if settings.PIVOT_NO_NEW_ENTRY_AFTER and is_after_or_equal(
             now_t, parse_time_ist(settings.PIVOT_NO_NEW_ENTRY_AFTER)):
         return f"after {settings.PIVOT_NO_NEW_ENTRY_AFTER}"

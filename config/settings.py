@@ -1074,6 +1074,10 @@ PIVOT_T2_TRAIL_ATR_MULT: float  = _getfloat("PIVOT_T2_TRAIL_ATR_MULT", 0.75)   #
 PIVOT_HARD_SL_CUSHION: float    = _getfloat("PIVOT_HARD_SL_CUSHION", 1.75)     # broker SL backstop width
 PIVOT_OPTION_DELTA: float       = _getfloat("PIVOT_OPTION_DELTA", 0.4)
 PIVOT_MAX_TRADES_PER_DAY: int   = _getint("PIVOT_MAX_TRADES_PER_DAY", 3)
+# PIVOT_NO_ENTRY_BEFORE: block new Pine pivot entries before this time (HH:MM).  Empty = off.
+# The engine still processes the signal (the swing level is consumed, as on the chart);
+# only the trade is skipped.  Backtest: 09:15-09:20 entries lost money (PF 0.91).
+PIVOT_NO_ENTRY_BEFORE: str      = _get("PIVOT_NO_ENTRY_BEFORE", "")
 # PIVOT_NO_NEW_ENTRY_AFTER: block new pivot entries at or after this time (HH:MM).
 # Backtest shows 14:00+ entries: 17 trades, 0 wins, −₹11,841 (PF 0.00).
 # Empty string = disabled (use global NO_NEW_ENTRY_AFTER).
@@ -1139,6 +1143,10 @@ PIVOT_PINE_GRID_LOCK: bool        = _getbool("PIVOT_PINE_GRID_LOCK", False)
 PIVOT_PINE_GRID_EXIT_AT: int      = min(3, max(0, _getint("PIVOT_PINE_GRID_EXIT_AT", 0)))
 # Buffer = this x ATR(entry), fixed for the trade.
 PIVOT_PINE_GRID_BUFFER_ATR: float = _getfloat("PIVOT_PINE_GRID_BUFFER_ATR", 0.2)
+# Grid break-even: once price has covered this fraction of the way from entry to T1
+# (0.25 = a quarter of the way), move the stop to the entry price.  0 = off (default).
+# Only used with PIVOT_PINE_GRID_LOCK; the first cleared level then takes over as before.
+PIVOT_PINE_GRID_BE_PCT: float     = max(0.0, _getfloat("PIVOT_PINE_GRID_BE_PCT", 0.0))
 # Grid levels closer than this x ATR to the entry are skipped as targets.
 PIVOT_PINE_GRID_MIN_GAP_ATR: float = _getfloat("PIVOT_PINE_GRID_MIN_GAP_ATR", 0.5)
 PIVOT_PINE_REQUIRE_CANDLE_COLOR: bool     = _getbool("PIVOT_PINE_REQUIRE_CANDLE_COLOR", False)
