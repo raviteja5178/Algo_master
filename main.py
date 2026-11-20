@@ -1586,6 +1586,13 @@ def _pine_gate_reason(ctx: BotContext, sig: PineSignal, price: float) -> str | N
     if (reason := side_block_reason(sig.side, day, ctx.underlying)):
         return reason
     atr = sig.atr
+    # In-swing re-entry: require room for T1, i.e. at least one pivot-grid level
+    # ahead of price in the trade direction.
+    if (sig.source == "REENTRY" and settings.PIVOT_PINE_GRID_LOCK
+            and ctx.pivot_levels is not None):
+        if not grid_ladder(ctx.pivot_levels, sig.side, price, atr,
+                           settings.PIVOT_PINE_GRID_MIN_GAP_ATR):
+            return "re-entry: no pivot-grid room for T1"
     if atr > 0:
         # chase: price already ran away from Pine's fill price (max(open, level)
         # for CE, min(open, level) for PE - a gap open is the fill, not a chase)
@@ -1688,6 +1695,11 @@ def _pine_handle_signal(ctx: BotContext, sig: PineSignal, price: float,
     execute_entry(ctx, sig_name, price, signal_candle_ts=sig.bar_ts,
                   candle_completed_ts=candle_completed_ts)
     consume_pivot_setup(ctx.underlying)   # never leave a stale setup behind if the entry bailed out
+    if sig.source == "REENTRY" and ctx.sm.state == State.POSITION_OPEN and ctx.pine is not None:
+        ctx.pine.confirm_reentry()        # this swing has used its one re-entry per side
+        _pine_save_state(ctx)
+        log_event(logger, "PINE_REENTRY_TAKEN", side=sig.side, price=round(price, 2),
+                  stop=sig.stop, underlying=ctx.underlying)
 
 
 def _pine_state_path(ctx: BotContext) -> Path:
@@ -1726,11 +1738,21 @@ def _pine_on_bar_close(ctx: BotContext, candles_5m: list[Candle]) -> None:
 
 def _pine_on_tick(ctx: BotContext, ltp: float) -> None:
     """Real-time breakout trigger on the forming 5m bar (PIVOT_PINE_TICK_ENTRY)."""
-    if ctx.pine is None or not settings.PIVOT_PINE_TICK_ENTRY:
+    if ctx.pine is None:
         return
     if not market_open():
         return
     bar_ts, bar_open = ctx.agg_5m.wip_snapshot()
+    # In-swing re-entry (armed after a floor/trail/BE exit) is tick-driven
+    # independently of PIVOT_PINE_TICK_ENTRY; fresh signals stay TradingView-exact.
+    if ctx.pine.reentry is not None and ctx.sm.state == State.IDLE:
+        rsig = ctx.pine.on_reentry_tick(ltp, bar_ts)
+        if rsig is not None:
+            _pine_save_state(ctx)
+            _pine_handle_signal(ctx, rsig, ltp, candle_completed_ts=now_ist().isoformat())
+            return
+    if not settings.PIVOT_PINE_TICK_ENTRY:
+        return
     sig = ctx.pine.on_tick(ltp, bar_open or ltp, bar_ts)
     if sig is not None:
         _pine_save_state(ctx)     # before the entry gate/order: a crash mid-entry must not re-fire it
@@ -1919,8 +1941,29 @@ def _resolve_sl_fill_price(ctx: BotContext) -> float:
     return fallback
 
 
-def _close_trade_context(ctx: BotContext) -> None:
+# Exits that leave Pine's swing alive and had already banked a floor (never the
+# initial stop).  PIVOT_BE_STOP = break-even, PIVOT_TSL_HIT = grid floor / trail.
+_PINE_REENTRY_EXITS = frozenset({
+    "PIVOT_TSL_HIT", "PIVOT_BE_STOP", "PIVOT_PEAK_FALLBACK",
+    "PIVOT_TARGET_T1", "PIVOT_TARGET_T2", "PIVOT_TARGET_T3",
+})
+
+
+def _close_trade_context(ctx: BotContext, reason: str = "") -> None:
     """Clear all active-trade fields on ctx after a confirmed exit."""
+    # Pine in-swing re-entry: the trade exited on a profit-side floor (grid floor /
+    # trail / break-even / target) while Pine's swing is still alive -> arm ONE
+    # re-entry for that side.  A full stop-out, a Pine reversal, EOD or a manual
+    # exit never re-arm.  Fresh signals still follow the TradingView rules.
+    if (settings.PIVOT_PINE_REENTRY and getattr(ctx, "pine", None) is not None
+            and (getattr(ctx, "strategy_type", None) or "").endswith("_PIVOT")
+            and reason in _PINE_REENTRY_EXITS and ctx.pivot_mgr is not None):
+        _side = ctx.strategy_type[:2]
+        if ctx.pine.arm_reentry(_side, ctx.pivot_mgr.best_index):
+            _pine_save_state(ctx)
+            log_event(logger, "PINE_REENTRY_ARMED", side=_side, reason=reason,
+                      best=round(ctx.pivot_mgr.best_index, 2),
+                      pine_stop=ctx.pine.reentry["stop"], underlying=ctx.underlying)
     if getattr(ctx, "strategy_type", None) in ("CE_MOM", "PE_MOM"):
         note_mom_exit(ctx.strategy_type[:2], ctx.underlying)
     # Unsubscribe option token from WebSocket so the stale monitor stops watching it.
@@ -2155,7 +2198,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
                 note_ema_result(str(now_ist().date()), pnl, ctx.underlying)
             ctx.sm.transition(State.CLOSED, reason="SL filled at exchange")
             ctx.sm.transition(State.IDLE, reason="ready for next trade")
-            _close_trade_context(ctx)
+            _close_trade_context(ctx, reason=reason)
             return
         # Any other RuntimeError — genuine failure.  The stop was cancelled
         # above, so put it back before halting.
@@ -2215,7 +2258,7 @@ def execute_exit(ctx: BotContext, reason: str = "", exit_ltp: float | None = Non
 
     ctx.sm.transition(State.CLOSED, reason=reason)
     ctx.sm.transition(State.IDLE, reason="ready for next trade")
-    _close_trade_context(ctx)
+    _close_trade_context(ctx, reason=reason)
 
 
 # ── Restart recovery ──────────────────────────────────────────────────────────

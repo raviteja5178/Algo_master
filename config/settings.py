@@ -1125,6 +1125,16 @@ PIVOT_PINE_BE_BUF_ATR: float      = _getfloat("PIVOT_PINE_BE_BUF_ATR", 0.2)
 PIVOT_PINE_BACKSTOP_CUSHION: float = _getfloat("PIVOT_PINE_BACKSTOP_CUSHION", 2.5)
 # Close an open trade when Pine flips to the opposite side.
 PIVOT_PINE_REVERSAL_EXIT: bool    = _getbool("PIVOT_PINE_REVERSAL_EXIT", True)
+# One in-swing re-entry per side: after a trade exits on a banked floor (grid
+# floor / trail / break-even) while Pine's swing is still alive (Pine stop not
+# hit), re-enter once when price makes a new extreme past the trade's best, EMA
+# direction still agrees and a pivot-grid level (room for T1) is ahead.  After
+# that, only a fresh TradingView signal trades.  Entry gates/daily caps apply.
+PIVOT_PINE_REENTRY: bool          = _getbool("PIVOT_PINE_REENTRY", True)
+# Pine's virtual position (and an armed re-entry) carries across sessions like the
+# TradingView chart.  True = start every session flat (old bot behaviour), which
+# lets a stale overnight swing fire phantom trades the chart never shows.
+PIVOT_PINE_DAY_RESET: bool        = _getbool("PIVOT_PINE_DAY_RESET", False)
 # Lull windows hide valid Pine breakouts, so they are opt-in for this engine.
 PIVOT_PINE_SKIP_LULLS: bool       = _getbool("PIVOT_PINE_SKIP_LULLS", False)
 # ── Pivot-grid floor lock (Pine trades) ──────────────────────────────────────

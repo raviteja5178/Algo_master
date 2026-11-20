@@ -102,9 +102,9 @@ def test_engine_matches_literal_pine_port(seed):
 
 
 def test_new_session_starts_flat_but_keeps_yesterdays_swing_levels():
-    """A virtual short left open overnight must not block the first break of the next day."""
+    """day_reset=True: a virtual short left open overnight must not block the next day's first break."""
     candles = _walk(300, 21)
-    eng = PineReversalEngine()
+    eng = PineReversalEngine(day_reset=True)
     eng.warm_up(candles)
     eng.pos, eng.v_sl, eng.v_t2 = -1, 1e9, -1e9          # stale short: stop/T2 never hit
     eng.se, eng.lprice = True, candles[-1].close - 40
@@ -190,6 +190,66 @@ def test_tick_trigger_respects_ema_filter():
     eng._ema_prev = candles[-1].close - 500      # price far ABOVE EMA -> no short
     ts = candles[-1].timestamp + timedelta(minutes=5)
     assert eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts) is None
+
+def _short_swing():
+    """Engine in a live PE swing (pos -1, stop above) with a downward EMA context."""
+    eng, candles = _armed_engine()
+    eng.pos = 0
+    eng.se = True
+    eng.lprice = candles[-1].close - 50
+    eng.hprice = candles[-1].close + 300
+    eng._ema_prev = candles[-1].close + 200
+    ts = candles[-1].timestamp + timedelta(minutes=5)
+    sig = eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts)
+    assert sig.side == "PE"
+    return eng, sig, ts
+
+
+def test_reentry_fires_once_per_side_inside_live_swing():
+    eng, sig, ts = _short_swing()
+    best = sig.entry - 100                       # trade ran 100 pts, exited on the floor
+    assert eng.arm_reentry("PE", best)
+    assert eng.pos == -1 and eng.se is False     # Pine's own state is untouched
+    assert eng.on_reentry_tick(best + 20, ts) is None       # pulled back: wait
+    re = eng.on_reentry_tick(best - 5, ts)                   # new low past the best
+    assert re is not None and re.side == "PE" and re.source == "REENTRY"
+    assert re.stop == sig.stop
+    assert eng.on_reentry_tick(best - 9, ts) is None         # one attempt per 5m bar
+    eng.confirm_reentry()
+    assert not eng.arm_reentry("PE", best - 50)              # only ONE re-entry per side/swing
+
+
+def test_reentry_cancelled_when_pine_stop_hit_or_direction_flips():
+    eng, sig, ts = _short_swing()
+    best = sig.entry - 100
+    eng.arm_reentry("PE", best)
+    assert eng.on_reentry_tick(sig.stop + 5, ts) is None     # above Pine stop: swing over
+    assert eng.reentry is None
+    eng, sig, ts = _short_swing()
+    eng.arm_reentry("PE", sig.entry - 100)
+    eng._ema_prev = 0.0                                      # price now above EMA: shorts disallowed
+    assert eng.on_reentry_tick(sig.entry - 105, ts) is None
+
+
+def test_reentry_not_armed_after_swing_ended_and_fresh_signal_resets_allowance():
+    eng, sig, ts = _short_swing()
+    eng.pos = 0                                              # Pine stop/T2 already ended the swing
+    assert not eng.arm_reentry("PE", sig.entry - 100)
+    eng, sig, ts = _short_swing()
+    eng.arm_reentry("PE", sig.entry - 100)
+    eng.confirm_reentry()
+    assert eng._re_used["PE"]
+    eng.pos, eng.se = 0, True                                # new TradingView signal = new swing
+    eng.lprice = sig.entry - 400
+    eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts)
+    assert eng._re_used["PE"] is False
+
+
+def test_reentry_state_survives_snapshot_restore():
+    eng, sig, ts = _short_swing()
+    eng.arm_reentry("PE", sig.entry - 100)
+    snap = eng.snapshot()
+    assert snap["reentry"]["side"] == "PE" and snap["re_used"] == {"CE": False, "PE": False}
 
 
 # â”€â”€ trail-only manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -468,6 +528,57 @@ def test_restore_rejects_previous_session_and_changed_settings():
     assert other.restore({}, candles) is False
     assert other.restore({**snap, "last_ts": "garbage"}, candles) is False
     assert other.restore({k: v for k, v in snap.items() if k != "pos"}, candles) is False
+
+def _carry_setup(day_reset: bool):
+    """Engine holding a live long from 'yesterday' with an armed CE level broken on the next session."""
+    candles = _walk(300, 21)
+    eng = PineReversalEngine(day_reset=day_reset)
+    eng.warm_up(candles)
+    last = candles[-1]
+    eng.pos, eng.v_sl, eng.v_t1, eng.v_t2 = 1, last.close - 1e6, last.close + 1e6, last.close + 1e6
+    eng.le, eng.hprice = True, last.close + 20
+    eng.lprice = last.close - 400
+    eng._ema_prev = last.close - 500                      # price above EMA -> longs allowed
+    return eng, last, last.timestamp + timedelta(days=1)
+
+
+def test_day_reset_false_carries_virtual_position_overnight_like_the_chart():
+    eng, last, nxt = _carry_setup(day_reset=False)
+    assert eng.on_tick(eng.hprice + 5, eng.hprice - 5, nxt) is None     # pos still long -> CE blocked
+    assert eng.pos == 1 and eng.v_sl is not None
+    # same data with the reset on would have fired the CE (phantom trade the chart never shows)
+    eng2, _, nxt2 = _carry_setup(day_reset=True)
+    sig = eng2.on_tick(eng2.hprice + 5, eng2.hprice - 5, nxt2)
+    assert sig is not None and sig.side == "CE"
+
+
+def test_armed_reentry_survives_overnight_when_day_reset_false():
+    eng, last, nxt = _carry_setup(day_reset=False)
+    best = last.close + 30                                # yesterday's trade peaked here, exited on its floor
+    assert eng.arm_reentry("CE", best)
+    assert eng.on_reentry_tick(best - 5, nxt) is None     # below yesterday's best: wait
+    re = eng.on_reentry_tick(best + 5, nxt + timedelta(minutes=5))
+    assert re is not None and re.side == "CE" and re.source == "REENTRY"
+    # with the reset on, the armed re-entry is dropped at the session boundary
+    eng2, last2, nxt2 = _carry_setup(day_reset=True)
+    eng2.arm_reentry("CE", last2.close + 30)
+    assert eng2.on_reentry_tick(last2.close + 35, nxt2) is None
+    assert eng2.reentry is None
+
+
+def test_restore_accepts_previous_session_snapshot_only_without_day_reset():
+    candles = _walk(400, 21)
+    eng = PineReversalEngine(day_reset=False)
+    eng.warm_up(candles[:350])
+    eng.pos, eng.v_sl, eng.v_t2 = 1, 1.0, 1e9
+    snap = eng.snapshot()
+    # same-session or not, a snapshot from the same candle set restores when the reset is off
+    again = PineReversalEngine(day_reset=False)
+    again.warm_up(candles)
+    assert again.restore(snap, candles) is True
+    assert snap["fp"] != PineReversalEngine(day_reset=True).snapshot()["fp"]   # setting change invalidates it
+
+
 
 
 def test_pine_gate_blocks_entries_before_start_time(monkeypatch):
