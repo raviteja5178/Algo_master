@@ -139,6 +139,11 @@ PIVOT_PINE_DAY_RESET=false
 PIVOT_PINE_CARRY=true
 PIVOT_PINE_RESIGNAL=best 
 
+PIVOT_PINE_REENTRY_MIN_T1_SENSEX=100
+PIVOT_PINE_REENTRY_MIN_T1_NIFTY=70
+PIVOT_PINE_REENTRY_MIN_T1_FINNIFTY=80
+PIVOT_PINE_REENTRY_MIN_T1_BANKNIFTY=80
+
 
 # ── Expiry-day iron butterfly (SHADOW only; refused in LIVE) ──────────────────
 # Sells the ATM straddle and buys wings on SENSEX expiry day; see

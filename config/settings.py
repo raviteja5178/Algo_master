@@ -1131,6 +1131,13 @@ PIVOT_PINE_REVERSAL_EXIT: bool    = _getbool("PIVOT_PINE_REVERSAL_EXIT", True)
 # direction still agrees and a pivot-grid level (room for T1) is ahead.  After
 # that, only a fresh TradingView signal trades.  Entry gates/daily caps apply.
 PIVOT_PINE_REENTRY: bool          = _getbool("PIVOT_PINE_REENTRY", True)
+# Minimum index-point distance from re-entry price to T1 required before a
+# re-entry is allowed.  Protects against re-entering when there is no meaningful
+# room left to the first target.  Set 0 to disable for a given index.
+PIVOT_PINE_REENTRY_MIN_T1_SENSEX:   float = _getfloat("PIVOT_PINE_REENTRY_MIN_T1_SENSEX",   100.0)
+PIVOT_PINE_REENTRY_MIN_T1_NIFTY:    float = _getfloat("PIVOT_PINE_REENTRY_MIN_T1_NIFTY",     70.0)
+PIVOT_PINE_REENTRY_MIN_T1_FINNIFTY: float = _getfloat("PIVOT_PINE_REENTRY_MIN_T1_FINNIFTY",  80.0)
+PIVOT_PINE_REENTRY_MIN_T1_BANKNIFTY:float = _getfloat("PIVOT_PINE_REENTRY_MIN_T1_BANKNIFTY", 80.0)
 # Pine's virtual position (and an armed re-entry) carries across sessions like the
 # TradingView chart.  True = start every session flat (old bot behaviour), which
 # lets a stale overnight swing fire phantom trades the chart never shows.

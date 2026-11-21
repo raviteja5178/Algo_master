@@ -1593,6 +1593,23 @@ def _pine_gate_reason(ctx: BotContext, sig: PineSignal, price: float) -> str | N
         if not grid_ladder(ctx.pivot_levels, sig.side, price, atr,
                            settings.PIVOT_PINE_GRID_MIN_GAP_ATR):
             return "re-entry: no pivot-grid room for T1"
+    # In-swing re-entry: require a minimum index-point gap from price to T1.
+    # T1 is calculated from the actual re-entry price using the Pine R:R ratio,
+    # matching exactly how _pine_handle_signal computes t1 at execution time.
+    if sig.source == "REENTRY":
+        _min_t1_map = {
+            "SENSEX":    settings.PIVOT_PINE_REENTRY_MIN_T1_SENSEX,
+            "NIFTY":     settings.PIVOT_PINE_REENTRY_MIN_T1_NIFTY,
+            "FINNIFTY":  settings.PIVOT_PINE_REENTRY_MIN_T1_FINNIFTY,
+            "BANKNIFTY": settings.PIVOT_PINE_REENTRY_MIN_T1_BANKNIFTY,
+        }
+        _min_t1_pts = _min_t1_map.get(ctx.underlying, 0.0)
+        if _min_t1_pts > 0:
+            _risk_now = abs(price - sig.stop)
+            _t1_dist = settings.PIVOT_PINE_RR_T1 * _risk_now
+            if _t1_dist < _min_t1_pts:
+                return (f"re-entry: T1 only {_t1_dist:.0f} pts away "
+                        f"(min {_min_t1_pts:.0f} pts for {ctx.underlying})")
     if atr > 0:
         # chase: price already ran away from Pine's fill price (max(open, level)
         # for CE, min(open, level) for PE - a gap open is the fill, not a chase)
