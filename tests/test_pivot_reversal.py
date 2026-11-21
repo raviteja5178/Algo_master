@@ -174,11 +174,12 @@ def test_tick_trigger_fires_once_and_blocks_bar_close_duplicate():
     eng.hprice = candles[-1].close + 300
     eng._ema_prev = candles[-1].close + 200      # price well below EMA -> shorts allowed
     ts = candles[-1].timestamp + timedelta(minutes=5)
+    before = (eng.pos, eng.le, eng.se, eng.v_sl, eng.v_t2)
     sig = eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts)
     assert sig is not None and sig.side == "PE" and sig.source == "TICK"
     assert sig.entry == pytest.approx(eng.lprice, abs=0.01)   # min(open, level) = level
-    assert eng.se is False and eng.pos == -1
-    assert eng.on_tick(eng.lprice - 10, eng.lprice + 20, ts) is None   # one trade per level
+    assert (eng.pos, eng.le, eng.se, eng.v_sl, eng.v_t2) == before   # a tick PREVIEW never commits Pine state
+    assert eng.on_tick(eng.lprice - 10, eng.lprice + 20, ts) is None   # one preview per level per bar
 
 
 def test_tick_trigger_respects_ema_filter():
@@ -202,6 +203,7 @@ def _short_swing():
     ts = candles[-1].timestamp + timedelta(minutes=5)
     sig = eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts)
     assert sig.side == "PE"
+    eng._open("PE", sig.entry, sig.level, eng._atr_prev, ts, "BAR_CLOSE")   # the bar close commits it
     return eng, sig, ts
 
 
@@ -241,7 +243,7 @@ def test_reentry_not_armed_after_swing_ended_and_fresh_signal_resets_allowance()
     assert eng._re_used["PE"]
     eng.pos, eng.se = 0, True                                # new TradingView signal = new swing
     eng.lprice = sig.entry - 400
-    eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts)
+    eng._open("PE", eng.lprice, eng.lprice, eng._atr_prev, ts, "BAR_CLOSE")
     assert eng._re_used["PE"] is False
 
 
@@ -479,6 +481,7 @@ def _fire_tick_short(eng, candles):
     ts = candles[-1].timestamp + timedelta(minutes=5)
     sig = eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts)
     assert sig is not None
+    eng._open("PE", sig.entry, sig.level, eng._atr_prev, ts, "BAR_CLOSE")   # committed at bar close
     return sig
 
 
@@ -677,3 +680,152 @@ def test_pine_gate_candle_color_and_rejection_wick(monkeypatch):
     monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_PCT", 0.0)
     monkeypatch.setattr(s, "PIVOT_PINE_MAX_REJECTION_WICK_ATR", 0.0)
     assert _pine_gate_reason(ctx, sig_pe, 98.0) is None
+
+
+def _carry_engine(carry=True):
+    eng, last, nxt = _carry_setup(day_reset=False)
+    eng.carry = carry
+    eng._pos_day = last.timestamp.date()
+    eng._day = last.timestamp.date()
+    eng._day_hi, eng._day_lo = last.close + 30, last.close - 80   # yesterday's range
+    return eng, last, nxt
+
+
+def test_carry_arms_one_continuation_entry_that_needs_a_break_of_yesterdays_extreme():
+    eng, last, nxt = _carry_engine()
+    eng.on_tick(last.close, last.close, nxt)                   # session roll
+    assert eng.reentry and eng.reentry["carry"] and eng.reentry["side"] == "CE"
+    assert eng.reentry["best"] == last.close + 30
+    assert eng.on_reentry_tick(last.close + 10, nxt) is None   # not past yesterday's high: no continuation
+    re = eng.on_reentry_tick(last.close + 35, nxt + timedelta(minutes=5))
+    assert re is not None and re.side == "CE" and re.source == "REENTRY"
+    eng.confirm_reentry()
+    assert eng._re_used["CE"] is False                         # carry does not eat the in-swing re-entry
+
+
+def test_carry_stays_unarmed_when_swing_is_over_or_carry_off():
+    eng, last, nxt = _carry_engine()
+    eng.pos = 0
+    eng.on_tick(last.close, last.close, nxt)
+    assert eng.reentry is None
+    eng, last, nxt = _carry_engine(carry=False)
+    eng.on_tick(last.close, last.close, nxt)
+    assert eng.reentry is None
+
+
+def test_carry_continuation_is_dropped_when_pine_stop_is_hit_or_ema_disagrees():
+    eng, last, nxt = _carry_engine()
+    eng.on_tick(last.close, last.close, nxt)
+    eng.reentry["stop"] = last.close + 100                     # price already through the Pine stop -> swing over
+    assert eng.on_reentry_tick(last.close + 35, nxt) is None and eng.reentry is None
+    eng, last, nxt = _carry_engine()
+    eng.on_tick(last.close, last.close, nxt)
+    eng._ema_prev = last.close + 1000                          # price below EMA -> longs disallowed
+    assert eng.on_reentry_tick(last.close + 35, nxt) is None
+
+
+def test_todays_own_break_fires_while_bot_flat_even_though_yesterdays_swing_is_still_long():
+    eng, last, nxt = _carry_engine()
+    eng.bot_flat = True
+    before = (eng.pos, eng.le, eng.v_sl, eng.v_t2)
+    sig = eng.on_tick(eng.hprice + 5, eng.hprice - 5, nxt)
+    assert sig is not None and sig.side == "CE" and sig.source == "RESIGNAL"
+    assert (eng.pos, eng.le, eng.v_sl, eng.v_t2) == before     # Pine's own stop / T2 stay the chart's
+    eng, last, nxt = _carry_engine()
+    eng.bot_flat = False                                       # bot already holding: Pine rule applies
+    assert eng.on_tick(eng.hprice + 5, eng.hprice - 5, nxt) is None
+
+
+def test_same_session_swing_still_blocks_same_side_break_like_the_chart():
+    eng, last, nxt = _carry_engine()
+    eng.bot_flat = True
+    eng._pos_day = nxt.date()                                  # position opened TODAY
+    assert eng.on_tick(eng.hprice + 5, eng.hprice - 5, nxt) is None
+
+
+def test_resignal_allows_same_session_same_side_break_when_bot_flat():
+    eng, last, nxt = _carry_engine()
+    eng.resignal = 'any'
+    eng.bot_flat = True
+    eng._pos_day = nxt.date()                                  # opened earlier TODAY, bot exited on its trail
+    before = (eng.pos, eng.le, eng.v_sl, eng.v_t2)
+    sig = eng.on_tick(eng.hprice + 5, eng.hprice - 5, nxt)
+    assert sig is not None and sig.side == "CE" and sig.source == "RESIGNAL"
+    assert (eng.pos, eng.le, eng.v_sl, eng.v_t2) == before     # chart state untouched by the extra entry
+    eng.confirm_tick(sig)                                      # order filled -> this level is used up
+    eng._tick_seen = set()
+    assert eng.on_tick(eng.hprice + 8, eng.hprice - 5, nxt) is None
+    eng, last, nxt = _carry_engine()
+    eng.resignal, eng.bot_flat, eng._pos_day = 'any', False, nxt.date()
+    assert eng.on_tick(eng.hprice + 5, eng.hprice - 5, nxt) is None   # bot holding a trade: blocked
+
+def test_resignal_best_needs_a_break_past_the_previous_trades_best_price():
+    eng, last, nxt = _carry_engine()
+    eng.resignal, eng.bot_flat, eng._pos_day = 'best', True, nxt.date()
+    px = eng.hprice + 5
+    assert eng.on_tick(px, px - 10, nxt) is None               # no exit recorded yet -> blocked
+    eng.note_exit("CE", px + 40)                               # previous trade peaked above this break
+    assert eng.on_tick(px, px - 10, nxt) is None               # break is inside the old range -> chop, blocked
+    eng.note_exit("CE", px - 20)                               # previous trade peaked below this break
+    sig = eng.on_tick(px, px - 10, nxt)
+    assert sig is not None and sig.side == "CE" and sig.source == "RESIGNAL"
+    assert eng._last_best["CE"] == px - 20                     # Pine state untouched: best kept until a real new swing
+
+
+def test_resignal_setting_values_are_normalised_and_off_by_default():
+    n = PineReversalEngine.norm_resignal
+    assert [n(v) for v in ("off", "best", "ANY", True, "true", "", None, "junk")] == \
+        ["off", "best", "any", "any", "any", "off", "off", "off"]
+    eng = PineReversalEngine()
+    assert eng.resignal == "off" and eng.snapshot()["last_best"] == {"CE": None, "PE": None}
+
+
+def test_unconfirmed_tick_preview_leaves_no_trace_when_bar_closes_without_a_signal():
+    """The 20 Nov phantom: a gap tick below the swing low, bar closes ABOVE the EMA -> no chart signal."""
+    eng, candles = _armed_engine()
+    eng.pos, eng.se, eng.le = 0, True, False
+    eng.lprice = candles[-1].close - 50
+    eng.hprice = candles[-1].close + 300
+    eng._ema_prev = candles[-1].close + 200                    # live price below EMA -> preview allowed
+    ts = candles[-1].timestamp + timedelta(minutes=5)
+    sig = eng.on_tick(eng.lprice - 5, eng.lprice + 20, ts)
+    assert sig is not None and sig.side == "PE"
+    c = candles[-1]
+    wick = Candle(ts, c.close, c.close + 1500, eng.lprice - 5, c.close + 1000)   # pierces the level, closes far above EMA
+    out = eng.on_bar_close(list(candles) + [wick])
+    assert out is None and eng.pos == 0 and eng.se is True     # chart has no signal -> engine is untouched
+
+
+def _short_break_setup():
+    """Armed swing low sitting just above the real EMA; a bar that pierces it and closes below the EMA."""
+    eng, candles = _armed_engine()
+    ema0 = eng._ema_prev
+    eng.pos, eng.se, eng.le = 0, True, False
+    eng.lprice, eng.hprice = ema0 + 20, ema0 + 320
+    ts = candles[-1].timestamp + timedelta(minutes=5)
+    bar = Candle(ts, ema0 + 25, ema0 + 25, ema0 - 10, ema0 - 5)
+    return eng, candles, bar, ts, ema0
+
+
+def test_bar_close_commits_the_same_signal_and_never_double_trades_after_a_fill():
+    eng, candles, bar, ts, ema0 = _short_break_setup()
+    sig = eng.on_tick(ema0 - 2, eng.lprice + 5, ts)
+    assert sig is not None and sig.source == "TICK" and sig.side == "PE"
+    eng.confirm_tick(sig)                                       # the order went out on the tick
+    assert eng.on_bar_close(list(candles) + [bar]) is None      # bar close does NOT trade it again ...
+    assert eng.pos == -1 and eng.se is False                    # ... but Pine state is committed now
+
+    eng2, candles2, bar2, ts2, _ = _short_break_setup()
+    sig2 = eng2.on_bar_close(list(candles2) + [bar2])           # nothing was ordered on the tick
+    assert sig2 is not None and sig2.side == "PE" and sig2.source == "BAR_CLOSE"
+    assert eng2.pos == -1 and sig2.stop == sig.stop and sig2.entry == sig.entry
+
+
+def test_snapshot_carries_extra_used_and_tick_taken():
+    eng, last, nxt = _carry_engine()
+    eng.bot_flat = True
+    sig = eng.on_tick(eng.hprice + 5, eng.hprice - 5, nxt)
+    eng.confirm_tick(sig)
+    snap = eng.snapshot()
+    assert snap["extra_used"] and snap["tick_taken"]
+    assert snap["fp"] != PineReversalEngine(day_reset=False).snapshot()["fp"]

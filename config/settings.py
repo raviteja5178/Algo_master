@@ -1135,6 +1135,21 @@ PIVOT_PINE_REENTRY: bool          = _getbool("PIVOT_PINE_REENTRY", True)
 # TradingView chart.  True = start every session flat (old bot behaviour), which
 # lets a stale overnight swing fire phantom trades the chart never shows.
 PIVOT_PINE_DAY_RESET: bool        = _getbool("PIVOT_PINE_DAY_RESET", False)
+# Yesterday's swing carried into today (needs DAY_RESET=false):
+#  * ONE continuation entry arms at the session start - it fires only if price breaks
+#    yesterday's extreme in the swing direction, EMA agrees, Pine stop is not hit and
+#    a pivot-grid level (T1) is ahead.  If the swing is not continuing, nothing trades.
+#  * Today's own levels/signals are never hidden: a fresh same-side break fires while
+#    the bot is flat even though Pine's virtual position is still long/short from an
+#    earlier session.
+PIVOT_PINE_CARRY: bool            = _getbool("PIVOT_PINE_CARRY", True)
+# Same idea inside one session: while the bot is flat, a fresh swing-level break on the
+# side Pine is already "long/short" on (trade exited on a trail/floor, Pine stop not hit),
+# e.g. a 12:05 breakout after the 09:50 trade exited at 11:49.  PIVOT_PINE_RESIGNAL:
+#   off  - blocked (pure TradingView rule)           [default]
+#   best - only once price also passes the previous trade's best price (continuation)
+#   any  - any fresh break (true/1 also mean 'any')  - backtest: many chop re-entries
+PIVOT_PINE_RESIGNAL: str          = _get("PIVOT_PINE_RESIGNAL", "off").lower()
 # Lull windows hide valid Pine breakouts, so they are opt-in for this engine.
 PIVOT_PINE_SKIP_LULLS: bool       = _getbool("PIVOT_PINE_SKIP_LULLS", False)
 # ── Pivot-grid floor lock (Pine trades) ──────────────────────────────────────

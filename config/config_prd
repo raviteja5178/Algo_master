@@ -1,0 +1,166 @@
+# ==============================================================================
+# ALGO MASTER -- TRADINGVIEW PINE SCRIPT v6 PIVOT REVERSAL STRATEGY (.env)
+# ==============================================================================
+
+# ── 1. Zerodha Kite Connect Credentials ───────────────────────────────────────
+KITE_API_KEY=
+KITE_API_SECRET=
+KITE_ACCESS_TOKEN=
+KITE_TOKEN_DATE=
+
+# Optional: Automated Headless Daily Login
+KITE_USER_ID=
+KITE_PASSWORD=
+KITE_TOTP_SECRET=''
+
+# ── 2. Trading Mode & Instrument Setup ─────────────────────────────────────────
+# Options: PAPER (simulation) | SHADOW (real market live-data simulation) | LIVE
+TRADING_MODE=SHADOW
+ENABLE_LIVE_TRADING=false
+
+# Multi-Instrument Configuration
+UNDERLYING=SENSEX
+ACTIVE_UNDERLYINGS=SENSEX,NIFTY,FINNIFTY
+
+# Position & Lot Sizing
+NUM_LOTS=1
+SENSEX_LOT_SIZE=20
+NIFTY_LOT_SIZE=65
+FINNIFTY_LOT_SIZE=60
+
+# Model Option Delta (used to calculate option price & SL triggers from index moves)
+PIVOT_OPTION_DELTA=0.4
+
+# Session & Operating Rules
+FORCE_EXIT_TIME=15:10
+NO_NEW_ENTRY_AFTER=14:30
+TIMEZONE=Asia/Kolkata
+EXPIRY_MODE=AUTO
+DB_PATH=trades.db
+LOG_LEVEL=INFO
+
+# ── 3. Risk Management & Account Protections ──────────────────────────────────
+# Max stop loss percentage relative to entry premium (0.50 = max 50% premium loss)
+MAX_SL_PCT=0.50
+
+# Absolute max rupee risk per trade (0 = disabled / pure index SL logic)
+MAX_RISK_RUPEES_PER_TRADE=0
+
+# Account daily drawdown limiter
+ENABLE_DAILY_LOSS_LIMIT=false
+DAILY_LOSS_LIMIT_RUPEES=3000
+
+# Fixed-fallback baseline points (used if market ATR is temporarily unavailable)
+INITIAL_SL_POINTS=45
+BREAK_EVEN_TRIGGER_POINTS=63
+TRAIL_STEP_POINTS=15
+INITIAL_TARGET_OFFSET_POINTS=50
+TARGET_TRAIL_STEP_POINTS=10
+USE_LIVE_TARGET_ORDER=false
+
+# ── 4. Pine Script v6 Pivot Reversal Engine (Canonical Strategy) ─────────────
+# Enables the Pine Pivot Reversal Engine as the exclusive active strategy
+ENABLE_PIVOT_STRATEGY=true
+PIVOT_PINE_MODE=true
+
+# Fractal Pivot Lookback Window (Pine Script: leftbars=4, rightbars=2)
+PIVOT_PINE_LEFT=4
+PIVOT_PINE_RIGHT=2
+
+# Trend Filter: 50 EMA (CE entries only above EMA50, PE entries only below EMA50; 0 = disabled)
+PIVOT_PINE_EMA=50
+
+# ATR Indicator Period for Volatility Calculations & Trailing Cushions
+PIVOT_ATR_PERIOD=14
+
+# Take breakout entry on real-time tick crossing swing level instead of waiting for bar close
+PIVOT_PINE_TICK_ENTRY=false
+
+# Stop Loss Mode: false = structural opposite swing high/low; true = ATR multiplier stop
+PIVOT_PINE_USE_ATR_SL=false
+PIVOT_PINE_ATR_MULT=1.5
+
+# Signal Guards: Skip stale swing stops wider than N x ATR (e.g. 4.0 = max 4x ATR risk)
+PIVOT_PINE_MAX_RISK_ATR=0
+
+# Signal Guards: Skip entry if price has already chased N x ATR past the swing level
+PIVOT_PINE_MAX_CHASE_ATR=0.5
+
+# Reversal Execution: Close active position immediately when opposite Pine signal fires
+PIVOT_PINE_REVERSAL_EXIT=true
+
+# ── 5. Targets, Break-Even & Multi-Stage Trailing Stop (TSL) ──────────────────
+# Virtual Target Milestones (R:R multiples based on initial risk)
+PIVOT_PINE_RR_T1=1.5
+PIVOT_PINE_RR_T2=2.5
+
+# Break-Even (BE) Trigger: Lock stop at entry (+0.2x ATR buffer) once price gains >= 1.0x ATR
+PIVOT_PINE_BE_ATR=1.0
+PIVOT_PINE_BE_BUF_ATR=0.2
+
+# Chandelier Trailing SL Activation & Multiplier
+# Arms trail when profit >= 1.0R (or 1.0x ATR); trails 2.5x ATR behind highest peak
+PIVOT_PINE_TRAIL_ACT_R=1.0
+PIVOT_PINE_TRAIL_ACT_ATR=1.0
+PIVOT_PINE_TRAIL_ATR_MULT=2.5
+
+# Broker Disaster Backstop Cushion (Multiplier on index SL for emergency broker hard order)
+PIVOT_PINE_BACKSTOP_CUSHION=2.5
+
+# ── 6. Operational Filters & Intraday Guards ──────────────────────────────────
+# Max daily trades allowed per instrument
+PIVOT_MAX_TRADES_PER_DAY=3
+
+# Block new entries after this time (HH:MM format)
+PIVOT_NO_ENTRY_BEFORE=09:20
+PIVOT_NO_NEW_ENTRY_AFTER=14:30
+
+# Block entries on Fridays (false = trade Fridays normally)
+PIVOT_NO_FRIDAY=false
+
+# Low-volume lull window filter (skip chop during lunch hours)
+PIVOT_PINE_SKIP_LULLS=false
+PIVOT_LULL_WINDOWS=11:20-11:55,13:10-13:35
+
+# Optional Confirmation Candle & Rejection Wick Filters (0.0 = disabled)
+PIVOT_PINE_REQUIRE_CANDLE_COLOR=false
+PIVOT_PINE_MAX_REJECTION_WICK_PCT=0.0
+PIVOT_PINE_MAX_REJECTION_WICK_ATR=0.0
+KITE_TOKEN_DATE=
+ENABLE_PIVOT_LEVELS=true
+PIVOT_PINE_GRID_LOCK=true
+PIVOT_PINE_GRID_EXIT_AT=0
+PIVOT_PINE_GRID_BUFFER_ATR=0.2
+PIVOT_PINE_GRID_MIN_GAP_ATR=0.5
+
+PIVOT_PINE_GRID_BE_PCT=0
+PIVOT_PINE_REENTRY =true
+PIVOT_PINE_DAY_RESET=false
+PIVOT_PINE_CARRY=true
+PIVOT_PINE_RESIGNAL=best 
+
+
+# ── Expiry-day iron butterfly (SHADOW only; refused in LIVE) ──────────────────
+# Sells the ATM straddle and buys wings on SENSEX expiry day; see
+# research/output/strategy_lab/STRATEGY_REPORT.md.  Fills are simulated at the
+# real bid/ask and stored for comparison with the model (research.fly_vs_model).
+ENABLE_EXPIRY_FLY=true
+FLY_ENTRY_TIME=10:30
+FLY_EXIT_TIME=15:10
+FLY_WING_POINTS=1000
+FLY_STOP_PCT=0.5
+FLY_QUANTITY=20
+FLY_MIN_CREDIT=50
+FLY_SKIP_DATES=
+FLY_EXTRA_SLIPPAGE_PTS=0
+ENABLE_ORB_STRATEGY=false
+ENABLE_TRB_STRATEGY=false
+ENABLE_OB_STRATEGY=false
+ENABLE_MOMENTUM_PHASE=false
+ENABLE_VWAP_STRATEGY=false
+ENABLE_CE_VWAP=true
+ENABLE_PE_VWAP=true
+ENABLE_PDHL_STRATEGY=false
+ENABLE_NATR_STRATEGY=false
+ENABLE_ATR_COPILOT_STRATEGY=false
+ENABLE_EMA_STRATEGY=false

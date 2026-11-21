@@ -45,7 +45,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 from market.candle_builder import Candle
 from market.indicators import atr as atr_series, ema as ema_series
@@ -105,10 +105,28 @@ class PineReversalEngine:
         atr_mult: float = 1.5,
         atr_period: int = 14,
         day_reset: bool = True,
+        carry: bool = False,
+        resignal: str | bool = 'off',
     ) -> None:
+        # While the bot is flat, a fresh swing-level break on the SAME side as Pine's still-open
+        # virtual position (e.g. a 12:05 breakout after the 09:50 trade exited on its trail):
+        #   'off'  - blocked (pure Pine rule)
+        #   'best' - tradeable only once price also passes the previous trade's best price
+        #   'any'  - tradeable on any fresh break
+        # Each swing level still fires at most once (le / se are consumed).
+        self.resignal = self.norm_resignal(resignal)
+        self._last_best: dict[str, float | None] = {'CE': None, 'PE': None}
         # True  = each session starts flat (bot-only behaviour).
         # False = the virtual position carries across sessions like the TradingView chart.
         self.day_reset = day_reset
+        # Only with day_reset=False: a carried swing (a) arms ONE continuation entry per
+        # session (price must break the previous session's extreme in the swing direction
+        # with the EMA agreeing) and (b) does not block a fresh same-side break today
+        # while the bot itself is flat (see ``bot_flat``).
+        self.carry = bool(carry) and not day_reset
+        # Set by the caller before each on_tick / on_bar_close: True when the real
+        # account has no open position.  False during warm_up / restore replays.
+        self.bot_flat = False
         self.left = max(1, int(left))
         self.right = max(1, int(right))
         self.ema_len = int(ema_len)
@@ -134,11 +152,31 @@ class PineReversalEngine:
         self._re_used = {"CE": False, "PE": False}
         self._re_try_bar: datetime | None = None
 
+        # Bar-close commit: Pine state (pos / le / se / stop / T2) changes ONLY when a bar
+        # closes.  A tick merely PREVIEWS the signal so the order can go out early.
+        self._tick_seen: set = set()          # (side, level) previewed in the forming bar
+        self._tick_seen_bar: datetime | None = None
+        self._tick_taken: set = set()         # (side, bar_ts) the bot really entered on a tick
+        self._extra_used: set = set()         # (side, level) already used by a carry / resignal entry
+
+        self._pos_day: date | None = None     # session in which the current `pos` was opened
+        self._day_hi: float | None = None     # running high / low of the current session
+        self._day_lo: float | None = None
+        self._prev_hi: float | None = None    # previous session's high / low
+        self._prev_lo: float | None = None
+
         self._day = None                      # session date of the last bar seen
         self._ema_prev: float | None = None   # EMA at the last completed bar
         self._atr_prev: float | None = None   # ATR at the last completed bar
         self._last_ts: datetime | None = None
         self._index = -1
+
+    @staticmethod
+    def norm_resignal(v) -> str:
+        s = str(v).strip().lower()
+        if s in ('best', 'any'):
+            return s
+        return 'any' if s in ('true', '1', 'yes', 'on') else 'off'
 
     @classmethod
     def from_settings(cls, settings) -> "PineReversalEngine":
@@ -152,6 +190,8 @@ class PineReversalEngine:
             atr_mult=settings.PIVOT_PINE_ATR_MULT,
             atr_period=settings.PIVOT_ATR_PERIOD,
             day_reset=settings.PIVOT_PINE_DAY_RESET,
+            carry=settings.PIVOT_PINE_CARRY,
+            resignal=settings.PIVOT_PINE_RESIGNAL,
         )
 
     # ── public API ────────────────────────────────────────────────────────────
@@ -180,6 +220,10 @@ class PineReversalEngine:
             "le": self.le, "se": self.se, "pos": self.pos,
             "v_sl": self.v_sl, "v_t1": self.v_t1, "v_t2": self.v_t2,
             "reentry": self.reentry, "re_used": dict(self._re_used),
+            "pos_day": self._pos_day.isoformat() if self._pos_day else None,
+            "last_best": dict(self._last_best),
+            "extra_used": [[s, p] for s, p in sorted(self._extra_used)],
+            "tick_taken": [[s, t.isoformat()] for s, t in sorted(self._tick_taken)],
             "last_ts": self._last_ts.isoformat() if self._last_ts else None,
         }
 
@@ -213,6 +257,17 @@ class PineReversalEngine:
         self.v_sl, self.v_t1, self.v_t2 = new["v_sl"], new["v_t1"], new["v_t2"]
         self.reentry = snap.get("reentry")
         self._re_used = {"CE": False, "PE": False, **(snap.get("re_used") or {})}
+        self._last_best = {'CE': None, 'PE': None, **(snap.get('last_best') or {})}
+        try:
+            self._extra_used = {(s, float(p)) for s, p in (snap.get("extra_used") or [])}
+            self._tick_taken = {(s, datetime.fromisoformat(t)) for s, t in (snap.get("tick_taken") or [])}
+        except (TypeError, ValueError):
+            self._extra_used, self._tick_taken = set(), set()
+        self._tick_seen, self._tick_seen_bar = set(), None
+        try:
+            self._pos_day = date.fromisoformat(snap["pos_day"]) if snap.get("pos_day") else None
+        except ValueError:
+            self._pos_day = None
         ema_arr = self._ema(candles)
         atr_arr = atr_series(candles, self.atr_period)
         for i, c in enumerate(candles):
@@ -269,14 +324,29 @@ class PineReversalEngine:
         )
 
     def confirm_reentry(self) -> None:
-        """The re-entry order went through: this swing has used its one re-entry."""
-        if self.reentry is not None:
+        """The re-entry order went through: this swing has used its one re-entry.
+
+        A session-start CARRY continuation does not use up the in-swing re-entry
+        allowance - a floor exit after it can still re-enter once.
+        """
+        if self.reentry is not None and not self.reentry.get("carry"):
             self._re_used[self.reentry["side"]] = True
         self.reentry = None
 
+    def confirm_tick(self, sig: PineSignal) -> None:
+        """The order for a TICK / RESIGNAL preview really went through: the bar-close
+        evaluation of the same bar must not trade it a second time, and an armed
+        in-swing re-entry on that side is no longer needed."""
+        self._tick_taken.add((sig.side, sig.bar_ts))
+        if sig.source == "RESIGNAL":
+            self._extra_used.add((sig.side, round(float(sig.level), 2)))
+        if self.reentry is not None and self.reentry["side"] == sig.side:
+            self.reentry = None
+
     def _fingerprint(self) -> list:
         return [self.left, self.right, self.ema_len, self.rr_t1, self.rr_t2,
-                self.use_atr_sl, self.atr_mult, self.atr_period, self.day_reset]
+                self.use_atr_sl, self.atr_mult, self.atr_period, self.day_reset,
+                self.carry, self.resignal, "bar-close-commit"]
 
     def on_bar_close(self, candles: Sequence[Candle]) -> PineSignal | None:
         """Evaluate the newly completed bar (candles[-1]) exactly as Pine does.
@@ -304,7 +374,13 @@ class PineReversalEngine:
         return sig
 
     def on_tick(self, price: float, bar_open: float, bar_ts: datetime | None) -> PineSignal | None:
-        """Real-time breakout trigger on the forming bar."""
+        """Real-time PREVIEW of the breakout on the forming bar.
+
+        Pine only commits a signal when the bar closes, so this never changes
+        pos / le / se / stop / T2 - it just lets the order go out up to 5 minutes
+        early.  A preview that the bar close does not confirm leaves Pine's state
+        exactly as the chart has it.  At most one preview per (side, level) per bar.
+        """
         if price <= 0 or self._atr_prev is None or bar_ts is None:
             return None
         self._roll_day(bar_ts)
@@ -318,15 +394,31 @@ class PineReversalEngine:
             long_ok = short_ok = True
         open_ = bar_open if bar_open and bar_open > 0 else price
 
-        if (self.le and self.hprice is not None and price > self.hprice
-                and long_ok and self.pos <= 0):
-            return self._open("CE", max(open_, self.hprice), self.hprice,
-                              self._atr_prev, bar_ts, "TICK")
-        if (self.se and self.lprice is not None and price < self.lprice
-                and short_ok and self.pos >= 0):
-            return self._open("PE", min(open_, self.lprice), self.lprice,
-                              self._atr_prev, bar_ts, "TICK")
+        if self.le and self.hprice is not None and price > self.hprice and long_ok:
+            sig = self._preview("CE", price, open_, bar_ts)
+            if sig is not None:
+                return sig
+        if self.se and self.lprice is not None and price < self.lprice and short_ok:
+            return self._preview("PE", price, open_, bar_ts)
         return None
+
+    def _preview(self, side: str, price: float, open_: float, bar_ts: datetime) -> PineSignal | None:
+        sign = 1 if side == "CE" else -1
+        level = self.hprice if sign == 1 else self.lprice
+        if self._tick_seen_bar != bar_ts:
+            self._tick_seen, self._tick_seen_bar = set(), bar_ts
+        key = (side, round(level, 2))
+        if key in self._tick_seen:
+            return None
+        if self.pos * sign <= 0:                       # Pine's own rule: pos <= 0 for a BUY
+            source = "TICK"
+        elif self._extra_ok(sign, price, level, bar_ts.date()):
+            source = "RESIGNAL"                        # extra entry; Pine state untouched
+        else:
+            return None
+        self._tick_seen.add(key)
+        entry = max(open_, level) if sign == 1 else min(open_, level)
+        return self._signal(side, entry, level, self._atr_prev, bar_ts, source)
 
     # ── internals ─────────────────────────────────────────────────────────────
     def _reset(self) -> None:
@@ -338,6 +430,11 @@ class PineReversalEngine:
         self.reentry = None
         self._re_used = {"CE": False, "PE": False}
         self._re_try_bar = None
+        self._tick_seen, self._tick_seen_bar = set(), None
+        self._tick_taken, self._extra_used = set(), set()
+        self._pos_day = None
+        self._last_best = {'CE': None, 'PE': None}
+        self._day_hi = self._day_lo = self._prev_hi = self._prev_lo = None
         self._ema_prev = self._atr_prev = None
         self._last_ts = None
         self._index = -1
@@ -394,15 +491,60 @@ class PineReversalEngine:
         armed in-swing re-entry.
         """
         day = ts.date()
-        if self.day_reset and self._day is not None and day != self._day:
-            self.pos = 0
-            self.v_sl = self.v_t1 = self.v_t2 = None
-            self.reentry = None
+        if self._day is not None and day != self._day:
+            self._prev_hi, self._prev_lo = self._day_hi, self._day_lo
+            self._day_hi = self._day_lo = None
+            if self.day_reset:
+                self.pos = 0
+                self.v_sl = self.v_t1 = self.v_t2 = None
+                self.reentry = None
+            else:
+                self._arm_carry()
         self._day = day
+
+    def note_exit(self, side: str, best: float) -> None:
+        """The real trade on `side` exited; remember how far it got (resignal='best')."""
+        if side in self._last_best and best:
+            self._last_best[side] = float(best)
+
+    def _extra_ok(self, sign: int, px: float, level: float, day: date) -> bool:
+        """A fresh same-side break while Pine is still 'in' that side and the bot is flat
+        (the chart blocks it).  Allowed by resignal ('any', or 'best' = past the previous
+        trade's best price) or by carry (the swing was opened in an EARLIER session, so
+        yesterday's swing must not hide today's own levels).  Each level fires once and
+        the trade never touches Pine's own state / stop / T2."""
+        side = "CE" if sign == 1 else "PE"
+        if not (self.bot_flat and self.pos == sign) or (side, round(level, 2)) in self._extra_used:
+            return False
+        if self.resignal == "any":
+            return True
+        if self.resignal == "best":
+            b = self._last_best[side]
+            if b is not None and (px - b) * sign > 0:
+                return True
+        return bool(self.carry and self._pos_day is not None and self._pos_day < day)
+
+    def _arm_carry(self) -> None:
+        """New session with a live carried swing: arm ONE continuation entry that fires
+        when price breaks the previous session's extreme in the swing direction (EMA
+        agrees, Pine stop not hit - all checked in on_reentry_tick).  An already armed
+        in-swing re-entry is kept as it is."""
+        if self.reentry is not None and not self.reentry.get("carry"):
+            return
+        self.reentry = None
+        if not self.carry or self.pos == 0 or self.v_sl is None:
+            return
+        best = self._prev_hi if self.pos == 1 else self._prev_lo
+        if best is None:
+            return
+        self.reentry = {"side": "CE" if self.pos == 1 else "PE", "best": float(best),
+                        "stop": float(self.v_sl), "carry": True}
 
     def _step(self, candles, i, ema_i, atr_i, source) -> PineSignal | None:
         bar = candles[i]
         self._roll_day(bar.timestamp)
+        self._day_hi = bar.high if self._day_hi is None else max(self._day_hi, bar.high)
+        self._day_lo = bar.low if self._day_lo is None else min(self._day_lo, bar.low)
         self._pivots(candles, i)
         sig: PineSignal | None = None
 
@@ -411,16 +553,20 @@ class PineReversalEngine:
             long_ok = self.ema_len <= 0 or bar.close > ema_i
             short_ok = self.ema_len <= 0 or bar.close < ema_i
             pos0 = self.pos     # Pine computes both signals before either executes
-            buy = (self.le and self.hprice is not None and bar.high > self.hprice
-                   and long_ok and pos0 <= 0)
-            sell = (self.se and self.lprice is not None and bar.low < self.lprice
-                    and short_ok and pos0 >= 0)
-            if buy:
-                sig = self._open("CE", max(bar.open, self.hprice), self.hprice,
-                                 atr_i, bar.timestamp, source)
-            if sell:
-                sig = self._open("PE", min(bar.open, self.lprice), self.lprice,
-                                 atr_i, bar.timestamp, source)
+            bday = bar.timestamp.date()
+            ts = bar.timestamp
+            hit_hi = self.le and self.hprice is not None and bar.high > self.hprice and long_ok
+            hit_lo = self.se and self.lprice is not None and bar.low < self.lprice and short_ok
+            if hit_hi and pos0 <= 0:
+                sig = self._open("CE", max(bar.open, self.hprice), self.hprice, atr_i, ts, source)
+            elif hit_hi and self._extra_ok(1, bar.high, self.hprice, bday):
+                sig = self._signal("CE", max(bar.open, self.hprice), self.hprice, atr_i, ts, "RESIGNAL")
+            if hit_lo and pos0 >= 0:
+                sig = self._open("PE", min(bar.open, self.lprice), self.lprice, atr_i, ts, source)
+            elif hit_lo and self._extra_ok(-1, bar.low, self.lprice, bday):
+                sig = self._signal("PE", min(bar.open, self.lprice), self.lprice, atr_i, ts, "RESIGNAL")
+            if sig is not None and (sig.side, ts) in self._tick_taken:
+                sig = None      # the bot already entered this one on the tick preview
 
         # Pine exit checking (same bar as the entry is checked too)
         if self.pos == 1 and self.v_sl is not None and (
@@ -433,11 +579,8 @@ class PineReversalEngine:
             self.reentry = None
         return sig
 
-    def _open(self, side: str, entry: float, level: float, atr_val: float,
-              ts: datetime, source: str) -> PineSignal:
-        self._re_used[side] = False        # a fresh Pine signal = a new swing
-        if self.reentry is not None and self.reentry["side"] == side:
-            self.reentry = None
+    def _calc(self, side: str, entry: float, atr_val: float) -> tuple[float, float, float, float]:
+        """Pine's stop / risk / T1 / T2 for an entry at ``entry`` (no state change)."""
         if side == "CE":
             swing = self.lprice
             if self.use_atr_sl or swing is None or swing >= entry:
@@ -445,24 +588,39 @@ class PineReversalEngine:
             else:
                 stop = swing
             risk = max(entry - stop, MINTICK)
-            self.v_t1 = entry + self.rr_t1 * risk
-            self.v_t2 = entry + self.rr_t2 * risk
-            self.pos = 1
-            self.le = False
+            return stop, risk, entry + self.rr_t1 * risk, entry + self.rr_t2 * risk
+        swing = self.hprice
+        if self.use_atr_sl or swing is None or swing <= entry:
+            stop = entry + self.atr_mult * atr_val
         else:
-            swing = self.hprice
-            if self.use_atr_sl or swing is None or swing <= entry:
-                stop = entry + self.atr_mult * atr_val
-            else:
-                stop = swing
-            risk = max(stop - entry, MINTICK)
-            self.v_t1 = entry - self.rr_t1 * risk
-            self.v_t2 = entry - self.rr_t2 * risk
-            self.pos = -1
-            self.se = False
-        self.v_sl = stop
+            stop = swing
+        risk = max(stop - entry, MINTICK)
+        return stop, risk, entry - self.rr_t1 * risk, entry - self.rr_t2 * risk
+
+    def _signal(self, side: str, entry: float, level: float, atr_val: float,
+                ts: datetime, source: str) -> PineSignal:
+        """Build a signal WITHOUT touching Pine's state (tick preview / extra entries)."""
+        stop, risk, _, _ = self._calc(side, entry, atr_val)
         return PineSignal(
             side=side, entry=round(entry, 2), stop=round(stop, 2),
             risk=round(risk, 2), atr=round(atr_val, 2), level=level,
             bar_ts=ts, source=source,
         )
+
+    def _open(self, side: str, entry: float, level: float, atr_val: float,
+              ts: datetime, source: str) -> PineSignal:
+        """Commit a Pine signal at bar close: flips pos, consumes the arm flag, sets stop/T1/T2."""
+        self._pos_day = ts.date()
+        self._last_best = {'CE': None, 'PE': None}   # new swing: previous trade's best no longer applies
+        self._re_used[side] = False        # a fresh Pine signal = a new swing
+        if self.reentry is not None and self.reentry["side"] == side:
+            self.reentry = None
+        stop, _risk, self.v_t1, self.v_t2 = self._calc(side, entry, atr_val)
+        if side == "CE":
+            self.pos = 1
+            self.le = False
+        else:
+            self.pos = -1
+            self.se = False
+        self.v_sl = stop
+        return self._signal(side, entry, level, atr_val, ts, source)

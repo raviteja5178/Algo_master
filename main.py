@@ -1635,6 +1635,11 @@ def _pine_gate_reason(ctx: BotContext, sig: PineSignal, price: float) -> str | N
 def _pine_handle_signal(ctx: BotContext, sig: PineSignal, price: float,
                         candle_completed_ts: str | None = None) -> None:
     """Act on a Pine signal: optional reversal exit, guards, then entry."""
+    # Extra entries (re-entry / resignal) re-fire every bar: once the daily cap is hit
+    # they are pure noise, so drop them before they flood the event log.
+    if sig.source in ("REENTRY", "RESIGNAL") and pivot_day_cap_reason(
+            str(now_ist().date()), ctx.underlying):
+        return
     log_event(logger, "PINE_SIGNAL", side=sig.side, source=sig.source, bar=sig.bar_ts,
               entry=sig.entry, stop=sig.stop, risk=sig.risk, atr=sig.atr,
               level=sig.level, price=round(price, 2))
@@ -1644,6 +1649,12 @@ def _pine_handle_signal(ctx: BotContext, sig: PineSignal, price: float,
     # Opposite signal = Pine reversal: close the running trade first.
     if ctx.sm.state == State.POSITION_OPEN:
         held = (ctx.strategy_type or "")[:2]
+        if held and held != sig.side and sig.source in ("TICK", "RESIGNAL"):
+            # Tick previews are not committed by Pine until the bar closes: never close a
+            # running trade on a wick the chart may not confirm - the bar-close signal will.
+            log_event(logger, "PINE_SIGNAL_SKIPPED", side=sig.side,
+                      reason="opposite tick preview - waiting for bar close")
+            return
         if held and held != sig.side and settings.PIVOT_PINE_REVERSAL_EXIT:
             log_event(logger, "PINE_REVERSAL_EXIT", held=held, new=sig.side, price=round(price, 2))
             execute_exit(ctx, reason="PINE_REVERSAL")
@@ -1695,11 +1706,16 @@ def _pine_handle_signal(ctx: BotContext, sig: PineSignal, price: float,
     execute_entry(ctx, sig_name, price, signal_candle_ts=sig.bar_ts,
                   candle_completed_ts=candle_completed_ts)
     consume_pivot_setup(ctx.underlying)   # never leave a stale setup behind if the entry bailed out
-    if sig.source == "REENTRY" and ctx.sm.state == State.POSITION_OPEN and ctx.pine is not None:
-        ctx.pine.confirm_reentry()        # this swing has used its one re-entry per side
-        _pine_save_state(ctx)
-        log_event(logger, "PINE_REENTRY_TAKEN", side=sig.side, price=round(price, 2),
-                  stop=sig.stop, underlying=ctx.underlying)
+    if ctx.sm.state == State.POSITION_OPEN and ctx.pine is not None:
+        if sig.source == "REENTRY":
+            ctx.pine.confirm_reentry()    # this swing has used its one re-entry per side
+            _pine_save_state(ctx)
+            log_event(logger, "PINE_REENTRY_TAKEN", side=sig.side, price=round(price, 2),
+                      stop=sig.stop, underlying=ctx.underlying)
+        else:
+            # the order is in: the bar-close evaluation of this bar must not trade it again
+            ctx.pine.confirm_tick(sig)
+            _pine_save_state(ctx)
 
 
 def _pine_state_path(ctx: BotContext) -> Path:
@@ -1728,6 +1744,7 @@ def _pine_on_bar_close(ctx: BotContext, candles_5m: list[Candle]) -> None:
     """Feed the completed 5m bar to the Pine engine (always, to keep its state)."""
     if ctx.pine is None:
         return
+    ctx.pine.bot_flat = ctx.sm.state == State.IDLE
     sig = ctx.pine.on_bar_close(candles_5m)
     _pine_save_state(ctx)
     if sig is not None:
@@ -1742,6 +1759,7 @@ def _pine_on_tick(ctx: BotContext, ltp: float) -> None:
         return
     if not market_open():
         return
+    ctx.pine.bot_flat = ctx.sm.state == State.IDLE
     bar_ts, bar_open = ctx.agg_5m.wip_snapshot()
     # In-swing re-entry (armed after a floor/trail/BE exit) is tick-driven
     # independently of PIVOT_PINE_TICK_ENTRY; fresh signals stay TradingView-exact.
@@ -1955,6 +1973,10 @@ def _close_trade_context(ctx: BotContext, reason: str = "") -> None:
     # trail / break-even / target) while Pine's swing is still alive -> arm ONE
     # re-entry for that side.  A full stop-out, a Pine reversal, EOD or a manual
     # exit never re-arm.  Fresh signals still follow the TradingView rules.
+    if (getattr(ctx, "pine", None) is not None and ctx.pivot_mgr is not None
+            and (getattr(ctx, "strategy_type", None) or "").endswith("_PIVOT")):
+        ctx.pine.note_exit(ctx.strategy_type[:2], ctx.pivot_mgr.best_index)
+        _pine_save_state(ctx)
     if (settings.PIVOT_PINE_REENTRY and getattr(ctx, "pine", None) is not None
             and (getattr(ctx, "strategy_type", None) or "").endswith("_PIVOT")
             and reason in _PINE_REENTRY_EXITS and ctx.pivot_mgr is not None):
